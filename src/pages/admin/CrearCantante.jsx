@@ -75,27 +75,41 @@ export default function CrearCantante() {
     const coro = await getCoroActual()
     if (!coro) { setErrorGlobal('No se pudo identificar el coro.'); setGuardando(false); return }
 
-    const { data, error } = await supabase.functions.invoke('crear-cantante', {
-      body: {
-        email: form.email.trim(),
-        password: form.password,
-        nombre: form.nombre.trim(),
-        voz: form.voz,
-        telefono: form.telefono.trim() || null,
-        fecha_nacimiento: form.fecha_nacimiento || null,
-        dni: form.dni.trim() || null,
-        coro_id: coro.id,
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crear-cantante`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: form.email.trim(),
+            password: form.password,
+            nombre: form.nombre.trim(),
+            voz: form.voz,
+            telefono: form.telefono.trim() || null,
+            fecha_nacimiento: form.fecha_nacimiento || null,
+            dni: form.dni.trim() || null,
+            coro_id: coro.id,
+          })
+        }
+      )
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setErrorGlobal(data.error || 'No se pudo crear el cantante.')
+        setGuardando(false)
+        return
       }
-    })
-
-    setGuardando(false)
-
-    if (error || data?.error) {
-      setErrorGlobal(data?.error || error?.message || 'No se pudo crear el cantante.')
-      return
+      setExito(true)
+    } catch (err) {
+      setErrorGlobal('Error de conexión. Intentá de nuevo.')
     }
-
-    setExito(true)
+    setGuardando(false)
   }
 
   if (exito) {
