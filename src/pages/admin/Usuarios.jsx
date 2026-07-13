@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 
@@ -251,6 +252,8 @@ export default function Usuarios() {
     }
   }
 
+  const navigate = useNavigate()
+
   function abrirReset(u) {
     setResetPass(u)
     setNuevaPass('')
@@ -286,10 +289,17 @@ export default function Usuarios() {
             )}
           </p>
         </div>
-        <button onClick={() => setMostrarImprimir(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
-          🖨 Imprimir listado
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => setMostrarImprimir(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+            🖨 Imprimir listado
+          </button>
+          <button onClick={() => navigate('/admin/cantantes/nuevo')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#0F6E56', color: '#FFFFFF', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Agregar cantante
+          </button>
+        </div>
       </div>
 
       {mensaje && (

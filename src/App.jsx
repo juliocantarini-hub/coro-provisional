@@ -35,6 +35,7 @@ import { ArticulosAdmin, ArticuloForm } from './pages/admin/ArticulosAdmin'
 import EstudioAdmin    from './pages/admin/EstudioAdmin'
 import AsistenteRepertorio from './pages/admin/AsistenteRepertorio'
 import PagosAdmin from './pages/admin/PagosAdmin'
+import CrearCantante from './pages/admin/CrearCantante'
 
 function RutaPublica({ children }) {
   const { usuario, cargando } = useAuth()
@@ -77,6 +78,7 @@ export default function App() {
 
             <Route path="/admin" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><AdminDashboard /></ConLayout></RutaProtegida>} />
             <Route path="/admin/usuarios" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><Usuarios /></ConLayout></RutaProtegida>} />
+            <Route path="/admin/cantantes/nuevo" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><CrearCantante /></ConLayout></RutaProtegida>} />
             <Route path="/admin/obras" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ObrasLista /></ConLayout></RutaProtegida>} />
             <Route path="/admin/obras/nueva" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ObraForm /></ConLayout></RutaProtegida>} />
             <Route path="/admin/obras/:id" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ObraForm /></ConLayout></RutaProtegida>} />
