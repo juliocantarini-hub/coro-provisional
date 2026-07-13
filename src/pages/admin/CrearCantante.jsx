@@ -113,38 +113,8 @@ export default function CrearCantante() {
   }
 
   if (exito) {
-    return (
-      <div style={{ maxWidth: '480px' }}>
-        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <div style={{ width: '56px', height: '56px', background: '#E1F5EE', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#0F6E56">
-              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-            </svg>
-          </div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 10px' }}>
-            Cantante creado
-          </h2>
-          <p style={{ fontSize: '14px', color: '#5F5E5A', lineHeight: '1.6', margin: '0 0 8px' }}>
-            <strong>{form.nombre}</strong> fue agregado correctamente.
-          </p>
-          <p style={{ fontSize: '13px', color: '#888780', margin: '0 0 28px' }}>
-            Compartile sus credenciales:<br />
-            <strong>Mail:</strong> {form.email}<br />
-            <strong>Contraseña:</strong> {form.password}
-          </p>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            <button onClick={() => { setForm({ nombre: '', email: '', password: '', voz: '', telefono: '', fecha_nacimiento: '', fecha_nacimiento_display: '', dni: '' }); setExito(false) }}
-              style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#1A1A18', fontSize: '13px', cursor: 'pointer' }}>
-              Agregar otro
-            </button>
-            <button onClick={() => navigate('/admin/cantantes')}
-              style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#0F6E56', color: '#FFFFFF', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
-              Ver cantantes
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+    navigate('/admin/usuarios', { state: { mensaje: `${form.nombre} fue agregado correctamente.` } })
+    return null
   }
 
   return (

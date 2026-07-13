@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 
@@ -253,6 +253,16 @@ export default function Usuarios() {
   }
 
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Mensaje desde CrearCantante
+  useEffect(() => {
+    if (location.state?.mensaje) {
+      setMensaje(location.state.mensaje)
+      setTimeout(() => setMensaje(''), 4000)
+      window.history.replaceState({}, '')
+    }
+  }, [])
 
   function abrirReset(u) {
     setResetPass(u)
