@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 import { crearAviso, actualizarAviso, publicarAviso, eliminarAviso, useAvisosAdmin, tiempoRelativo, TIPO_AVISO } from '../../hooks/useAvisos'
+import { useEncuesta, useCrearEncuesta } from '../../hooks/useEncuestas'
+import EncuestaWidget from '../../components/EncuestaWidget'
 
 function useEsMovil() {
   return window.innerWidth <= 768
@@ -194,6 +196,7 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
   const esEdicion = !!aviso
   const [obras, setObras] = useState([])
   const [eventos, setEventos] = useState([])
+  const [coroId, setCoroId] = useState(null)
   const [form, setForm] = useState({
     titulo: aviso?.titulo || '',
     cuerpo: aviso?.cuerpo || '',
@@ -205,10 +208,26 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
   const [guardando, setGuardando] = useState(false)
   const [errorGlobal, setErrorGlobal] = useState('')
 
+  // Encuesta: si el aviso ya tiene una, la traemos para mostrar resultados / cerrar
+  const {
+    encuesta: encuestaExistente, resultados, miVoto, votar,
+    cargando: encCargando, recargar: recargarEncuesta
+  } = useEncuesta(esEdicion ? aviso.id : null)
+  const { crearEncuesta, cerrarEncuesta, reabrirEncuesta } = useCrearEncuesta()
+
+  // Formulario de creación de encuesta (solo se usa si no hay una ya)
+  const [agregarEncuesta, setAgregarEncuesta] = useState(false)
+  const [encuestaPregunta, setEncuestaPregunta] = useState('')
+  const [encuestaOpciones, setEncuestaOpciones] = useState(['', ''])
+  const [encuestaMultiple, setEncuestaMultiple] = useState(false)
+
+  const puedeAgregarEncuesta = !esEdicion || (!encCargando && !encuestaExistente)
+
   useEffect(() => {
     async function cargarOpciones() {
       const coro = await getCoroActual()
       if (!coro) return
+      setCoroId(coro.id)
       supabase.from('obras').select('id, titulo').eq('coro_id', coro.id).eq('publicada', true).order('titulo')
         .then(({ data }) => setObras(data || []))
       supabase.from('eventos').select('id, titulo').eq('coro_id', coro.id).eq('publicado', true).order('fecha_inicio', { ascending: false })
@@ -219,9 +238,36 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
 
   function set(campo) { return e => setForm(f => ({ ...f, [campo]: e.target.value })) }
 
+  function actualizarOpcion(i, valor) {
+    setEncuestaOpciones(prev => prev.map((o, idx) => idx === i ? valor : o))
+  }
+  function agregarOpcion() {
+    setEncuestaOpciones(prev => [...prev, ''])
+  }
+  function quitarOpcion(i) {
+    setEncuestaOpciones(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  async function handleCerrarEncuesta() {
+    await cerrarEncuesta(encuestaExistente.id)
+    recargarEncuesta()
+  }
+  async function handleReabrirEncuesta() {
+    await reabrirEncuesta(encuestaExistente.id)
+    recargarEncuesta()
+  }
+
   async function guardar(publicar) {
     setErrorGlobal('')
     if (!form.titulo.trim()) { setErrores({ titulo: 'El título es obligatorio.' }); return }
+
+    let opcionesValidas = []
+    if (agregarEncuesta) {
+      if (!encuestaPregunta.trim()) { setErrorGlobal('La pregunta de la encuesta es obligatoria.'); return }
+      opcionesValidas = encuestaOpciones.map(o => o.trim()).filter(Boolean)
+      if (opcionesValidas.length < 2) { setErrorGlobal('La encuesta necesita al menos 2 opciones.'); return }
+    }
+
     setGuardando(true)
     const datos = {
       titulo: form.titulo.trim(),
@@ -231,19 +277,44 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
       evento_id: form.evento_id || null,
       publicado: publicar,
     }
-    let ok, error
+
+    let ok, error, avisoGuardado
     if (esEdicion) {
       const res = await actualizarAviso(aviso.id, datos)
-      ok = res.ok; error = res.error
+      ok = res.ok; error = res.error; avisoGuardado = res.data
     } else {
       const res = await crearAviso(datos)
-      ok = res.ok; error = res.error
+      ok = res.ok; error = res.error; avisoGuardado = res.data
     }
+
+    if (!ok) {
+      setGuardando(false)
+      setErrorGlobal(error)
+      return
+    }
+
+    if (agregarEncuesta && avisoGuardado?.id && coroId) {
+      try {
+        await crearEncuesta({
+          avisoId: avisoGuardado.id,
+          coroId,
+          pregunta: encuestaPregunta.trim(),
+          permiteMultiple: encuestaMultiple,
+          opciones: opcionesValidas,
+        })
+      } catch (err) {
+        console.error('Error al crear la encuesta:', err)
+        setGuardando(false)
+        setErrorGlobal('El aviso se guardó, pero hubo un problema al crear la encuesta.')
+        return
+      }
+    }
+
     if (ok && publicar && !esEdicion) {
-  await enviarNotificacionAviso(datos.titulo, datos.cuerpo || '')
+      await enviarNotificacionAviso(datos.titulo, datos.cuerpo || '')
     }
+
     setGuardando(false)
-    if (!ok) { setErrorGlobal(error); return }
     onGuardar()
   }
 
@@ -295,6 +366,68 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
           </select>
         </Campo>
       </div>
+
+      {/* Encuesta existente — resultados + cerrar/reabrir */}
+      {esEdicion && encuestaExistente && (
+        <div style={{ marginTop: '4px', marginBottom: '14px' }}>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#5F5E5A', marginBottom: '5px' }}>
+            Encuesta de este aviso
+          </label>
+          <EncuestaWidget
+            encuesta={encuestaExistente}
+            resultados={resultados}
+            miVoto={miVoto}
+            votar={votar}
+            esAdmin
+            onCerrar={handleCerrarEncuesta}
+            onReabrir={handleReabrirEncuesta}
+          />
+        </div>
+      )}
+
+      {/* Agregar encuesta — solo si todavía no tiene una */}
+      {puedeAgregarEncuesta && (
+        <div style={{ marginTop: '4px', marginBottom: '14px', border: '1px solid #E8E6DF', borderRadius: '10px', padding: '14px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: '#1A1A18' }}>
+            <input type="checkbox" checked={agregarEncuesta} onChange={e => setAgregarEncuesta(e.target.checked)} />
+            Agregar una encuesta a este aviso
+          </label>
+
+          {agregarEncuesta && (
+            <div style={{ marginTop: '12px' }}>
+              <Campo label="Pregunta">
+                <input value={encuestaPregunta} onChange={e => setEncuestaPregunta(e.target.value)}
+                  placeholder="Ej: ¿Qué día prefieren para el ensayo extra?" style={inputStyle} />
+              </Campo>
+
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#5F5E5A', marginBottom: '5px' }}>Opciones</label>
+              {encuestaOpciones.map((op, i) => (
+                <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                  <input value={op} onChange={e => actualizarOpcion(i, e.target.value)}
+                    placeholder={`Opción ${i + 1}`} style={inputStyle} />
+                  {encuestaOpciones.length > 2 && (
+                    <button type="button" onClick={() => quitarOpcion(i)}
+                      style={{ width: '38px', height: '38px', border: '1px solid #F0C5B4', borderRadius: '8px', background: 'none', color: '#A32D2D', cursor: 'pointer', flexShrink: 0 }}>
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+              {encuestaOpciones.length < 8 && (
+                <button type="button" onClick={agregarOpcion}
+                  style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontWeight: '500', marginBottom: '10px' }}>
+                  + Agregar opción
+                </button>
+              )}
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#5F5E5A', marginTop: '4px' }}>
+                <input type="checkbox" checked={encuestaMultiple} onChange={e => setEncuestaMultiple(e.target.checked)} />
+                Permitir elegir más de una opción
+              </label>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
         <button onClick={() => guardar(false)} disabled={guardando}
