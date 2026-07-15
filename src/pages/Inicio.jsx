@@ -6,6 +6,7 @@ import { useObras } from '../hooks/useObras'
 import { useAvisos, tiempoRelativo, TIPO_AVISO } from '../hooks/useAvisos'
 import { useArticulos } from '../hooks/useBlog'
 import MisPagos from '../components/MisPagos'
+import EncuestaDashboard from '../components/EncuestaDashboard'
 
 const ORDEN_ESTADO = { concierto: 0, activo: 1, estudio: 2 }
 
@@ -80,6 +81,9 @@ export default function Inicio() {
         <StatCard val={noLeidos} label={noLeidos === 1 ? 'Aviso sin leer' : 'Avisos sin leer'} color={noLeidos > 0 ? '#D85A30' : '#888780'} bg={noLeidos > 0 ? '#FAECE7' : '#F1EFE8'} onClick={() => navigate('/avisos')} />
         <StatCard val={eventos.length} label="Eventos próximos" color="#378ADD" bg="#E6F1FB" onClick={() => navigate('/calendario')} />
       </div>
+
+      {/* Encuesta activa — solo aparece si hay una encuesta abierta */}
+      <EncuestaDashboard esAdmin={false} />
 
       <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr', gap: '16px' }}>
         <Seccion titulo="Estudia esta semana" linkLabel="Ver todo" onLink={() => navigate('/repertorio')}>

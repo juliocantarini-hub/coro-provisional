@@ -5,6 +5,8 @@ import {
   useAvisos, marcarLeido, marcarTodosLeidos,
   tiempoRelativo, TIPO_AVISO
 } from '../../hooks/useAvisos'
+import { useEncuesta } from '../../hooks/useEncuestas'
+import EncuestaWidget from '../../components/EncuestaWidget'
 
 const FILTROS = [
   { valor: '',         label: 'Todos' },
@@ -14,6 +16,7 @@ const FILTROS = [
   { valor: 'urgente',  label: 'Urgente' },
   { valor: 'general',  label: 'General' },
 ]
+
 export default function Avisos() {
   const navigate       = useNavigate()
   const { perfil }     = useAuth()
@@ -107,76 +110,95 @@ export default function Avisos() {
       {/* Lista */}
       {!cargando && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {avisos.map(aviso => {
-            const tc = TIPO_AVISO[aviso.tipo] || TIPO_AVISO.material
-            const tieneDestino = aviso.obra_id || aviso.evento_id
-            const estaAbierto = avisoAbierto?.id === aviso.id
+          {avisos.map(aviso => (
+            <AvisoCard
+              key={aviso.id}
+              aviso={aviso}
+              estaAbierto={avisoAbierto?.id === aviso.id}
+              onAbrir={() => handleAbrir(aviso)}
+              irADestino={irADestino}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
-            return (
-              <div key={aviso.id} style={{
-                background: '#FFFFFF',
-                border: `1px solid ${aviso.leido ? '#E8E6DF' : '#B4D8CE'}`,
-                borderLeft: `3px solid ${aviso.leido ? '#E8E6DF' : tc.dot}`,
-                borderRadius: '10px',
-                overflow: 'hidden',
-                opacity: aviso.leido && !estaAbierto ? 0.75 : 1,
-                transition: 'border-color 0.12s',
-              }}>
-                {/* Cabecera del aviso — siempre visible */}
-                <div
-                  onClick={() => handleAbrir(aviso)}
-                  style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: tc.color, background: tc.bg, padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                        {tc.label}
-                      </span>
-                      {!aviso.leido && (
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: tc.dot, display: 'inline-block', flexShrink: 0 }} />
-                      )}
-                      <span style={{ fontSize: '11px', color: '#B4B2A9', marginLeft: 'auto' }}>
-                        {tiempoRelativo(aviso.creado_en)}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: aviso.leido ? '400' : '500', color: '#1A1A18' }}>
-                      {aviso.titulo}
-                    </div>
-                  </div>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#B4B2A9"
-                    style={{ transform: estaAbierto ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
-                    <path d="M7 10l5 5 5-5z"/>
-                  </svg>
-                </div>
+function AvisoCard({ aviso, estaAbierto, onAbrir, irADestino }) {
+  const tc = TIPO_AVISO[aviso.tipo] || TIPO_AVISO.material
+  const tieneDestino = aviso.obra_id || aviso.evento_id
+  const { encuesta, resultados, miVoto, votar } = useEncuesta(estaAbierto ? aviso.id : null)
 
-                {/* Contenido expandido */}
-                {estaAbierto && (
-                  <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F1EFE8' }}>
-                    {aviso.cuerpo && (
-                      <p style={{ fontSize: '13px', color: '#5F5E5A', margin: '12px 0 10px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>
-                        {aviso.cuerpo}
-                      </p>
-                    )}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      {aviso.obras && (
-                        <span style={{ fontSize: '11px', color: '#888780' }}>Obra: {aviso.obras.titulo}</span>
-                      )}
-                      {aviso.eventos && (
-                        <span style={{ fontSize: '11px', color: '#888780' }}>Evento: {aviso.eventos.titulo}</span>
-                      )}
-                      {tieneDestino && (
-                        <button
-                          onClick={e => { e.stopPropagation(); irADestino(aviso) }}
-                          style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', border: 'none', padding: '3px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>
-                          {aviso.obra_id ? 'Abrir obra →' : 'Ver evento →'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+  return (
+    <div style={{
+      background: '#FFFFFF',
+      border: `1px solid ${aviso.leido ? '#E8E6DF' : '#B4D8CE'}`,
+      borderLeft: `3px solid ${aviso.leido ? '#E8E6DF' : tc.dot}`,
+      borderRadius: '10px',
+      overflow: 'hidden',
+      opacity: aviso.leido && !estaAbierto ? 0.75 : 1,
+      transition: 'border-color 0.12s',
+    }}>
+      {/* Cabecera del aviso — siempre visible */}
+      <div
+        onClick={onAbrir}
+        style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: tc.color, background: tc.bg, padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              {tc.label}
+            </span>
+            {!aviso.leido && (
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: tc.dot, display: 'inline-block', flexShrink: 0 }} />
+            )}
+            <span style={{ fontSize: '11px', color: '#B4B2A9', marginLeft: 'auto' }}>
+              {tiempoRelativo(aviso.creado_en)}
+            </span>
+          </div>
+          <div style={{ fontSize: '14px', fontWeight: aviso.leido ? '400' : '500', color: '#1A1A18' }}>
+            {aviso.titulo}
+          </div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#B4B2A9"
+          style={{ transform: estaAbierto ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
+          <path d="M7 10l5 5 5-5z"/>
+        </svg>
+      </div>
+
+      {/* Contenido expandido */}
+      {estaAbierto && (
+        <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F1EFE8' }}>
+          {aviso.cuerpo && (
+            <p style={{ fontSize: '13px', color: '#5F5E5A', margin: '12px 0 10px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>
+              {aviso.cuerpo}
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {aviso.obras && (
+              <span style={{ fontSize: '11px', color: '#888780' }}>Obra: {aviso.obras.titulo}</span>
+            )}
+            {aviso.eventos && (
+              <span style={{ fontSize: '11px', color: '#888780' }}>Evento: {aviso.eventos.titulo}</span>
+            )}
+            {tieneDestino && (
+              <button
+                onClick={e => { e.stopPropagation(); irADestino(aviso) }}
+                style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', border: 'none', padding: '3px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>
+                {aviso.obra_id ? 'Abrir obra →' : 'Ver evento →'}
+              </button>
+            )}
+          </div>
+
+          {encuesta && (
+            <EncuestaWidget
+              encuesta={encuesta}
+              resultados={resultados}
+              miVoto={miVoto}
+              votar={votar}
+            />
+          )}
         </div>
       )}
     </div>
