@@ -14,6 +14,7 @@ const FILTROS = [
   { valor: 'horario',  label: 'Cambio de horario' },
   { valor: 'evento',   label: 'Evento' },
   { valor: 'urgente',  label: 'Urgente' },
+  { valor: 'encuesta', label: 'Encuesta' },
   { valor: 'general',  label: 'General' },
 ]
 
