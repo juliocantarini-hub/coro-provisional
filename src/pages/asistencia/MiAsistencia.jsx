@@ -43,16 +43,6 @@ export default function MiAsistencia() {
             </div>
           </div>
 
-          {racha >= 2 && (
-            <div style={{ textAlign: 'center', minWidth: '70px', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '20px' }}>
-              <div style={{ fontSize: '30px', lineHeight: 1 }}>
-                🔥 <span style={{ fontSize: '30px', fontWeight: '700', color: '#FFFFFF' }}>{racha}</span>
-              </div>
-              <div style={{ fontSize: '11px', color: 'rgba(159,225,203,0.8)', marginTop: '4px' }}>
-                {racha === 1 ? 'ensayo seguido' : 'ensayos seguidos'}
-              </div>
-            </div>
-          )}
           {/* Stats */}
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             {[
@@ -67,6 +57,17 @@ export default function MiAsistencia() {
               </div>
             ))}
           </div>
+
+          {racha >= 2 && (
+            <div style={{ textAlign: 'center', minWidth: '70px', marginLeft: 'auto', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '20px' }}>
+              <div style={{ fontSize: '30px', lineHeight: 1 }}>
+                ⭐ <span style={{ fontSize: '30px', fontWeight: '700', color: '#FFFFFF' }}>{racha}</span>
+              </div>
+              <div style={{ fontSize: '11px', color: 'rgba(159,225,203,0.8)', marginTop: '4px' }}>
+                {racha === 1 ? 'ensayo seguido' : 'ensayos seguidos'}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
