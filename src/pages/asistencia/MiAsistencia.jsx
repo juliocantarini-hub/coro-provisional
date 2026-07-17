@@ -1,5 +1,5 @@
 import { useAuth } from '../../hooks/useAuth'
-import { useHistorialAsistencia, calcularEstadisticas } from '../../hooks/useAsistencia'
+import { useHistorialAsistencia, calcularEstadisticas, calcularRacha } from '../../hooks/useAsistencia'
 
 const ESTADO_STYLE = {
   presente:    { bg: '#EAF3DE', color: '#27500A', txt: 'Presente',    emoji: '✓' },
@@ -11,6 +11,7 @@ export default function MiAsistencia() {
   const { perfil } = useAuth()
   const { historial, cargando } = useHistorialAsistencia(perfil?.id)
   const estadisticas = calcularEstadisticas(historial)
+  const racha = calcularRacha(historial)
 
   const totalPresentes = historial.filter(r => r.estado === 'presente').length
   const totalRegistros = historial.length
@@ -41,6 +42,17 @@ export default function MiAsistencia() {
               Asistencia general
             </div>
           </div>
+
+          {racha >= 2 && (
+            <div style={{ textAlign: 'center', minWidth: '70px', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '20px' }}>
+              <div style={{ fontSize: '30px', lineHeight: 1 }}>
+                🔥 <span style={{ fontSize: '30px', fontWeight: '700', color: '#FFFFFF' }}>{racha}</span>
+              </div>
+              <div style={{ fontSize: '11px', color: 'rgba(159,225,203,0.8)', marginTop: '4px' }}>
+                {racha === 1 ? 'ensayo seguido' : 'ensayos seguidos'}
+              </div>
+            </div>
+          )}
           {/* Stats */}
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             {[

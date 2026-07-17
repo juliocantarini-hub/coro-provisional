@@ -131,3 +131,16 @@ export function calcularEstadisticas(historial) {
       total: val.total,
     }))
 }
+
+export function calcularRacha(historial) {
+  const ordenado = [...historial]
+    .filter(r => r.listas_asistencia?.fecha)
+    .sort((a, b) => new Date(b.listas_asistencia.fecha) - new Date(a.listas_asistencia.fecha))
+
+  let racha = 0
+  for (const r of ordenado) {
+    if (r.estado === 'presente') racha++
+    else break
+  }
+  return racha
+}
