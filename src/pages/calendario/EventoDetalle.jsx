@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEvento, confirmarAsistencia, formatFecha, formatHora, esFuturo } from '../../hooks/useEventos'
 import { useAuth } from '../../hooks/useAuth'
+import { descargarICS } from '../../lib/ics'
 
 const TIPO_COLOR = {
   ensayo:    { bg: '#E1F5EE', color: '#04342C', dot: '#1D9E75' },
@@ -123,6 +124,11 @@ export default function EventoDetalle() {
               )}
               {evento.direccion && <span style={{ fontSize: '12px', color: '#888780' }}>{evento.direccion}</span>}
             </div>
+            <button onClick={() => descargarICS(evento)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '6px 12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#0F6E56', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zm-7-7h5v5h-5z"/></svg>
+              Exportar a tu calendario personal
+            </button>
           </div>
         </div>
       </div>
