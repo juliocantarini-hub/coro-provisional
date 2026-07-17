@@ -129,6 +129,9 @@ export default function EventoDetalle() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zm-7-7h5v5h-5z"/></svg>
               Exportar a tu calendario personal
             </button>
+            <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '5px 0 0', lineHeight: '1.4' }}>
+              Se descarga un archivo del evento. Abrilo desde tus descargas y elegí tu app de calendario (Google, Apple, Outlook) para agregarlo automáticamente.
+            </p>
           </div>
         </div>
       </div>
