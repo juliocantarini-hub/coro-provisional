@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
+import { usePresenciaDetalle } from '../../hooks/usePresencia'
 
 const ROLES   = ['cantante', 'director', 'admin']
 const VOCES   = ['soprano', 'contralto', 'tenor', 'bajo']
@@ -94,15 +94,13 @@ function imprimirListado(usuarios, camposSeleccionados) {
     </head>
     <body>
       <div class="encabezado">
-        <h1>${import.meta.env.VITE_CORO_NOMBRE || "Mi Coro"}</h1>
+        <h1>Coro Almafuerte</h1>
         ${director ? `<div class="director">Director/a: ${director.nombre}</div>` : ''}
         <div class="fecha">Generado el ${new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
       </div>
       ${seccion('Sopranos', porVoz.soprano)}
-      ${porVoz.mezzo?.length ? seccion('Mezzos', porVoz.mezzo) : ''}
       ${seccion('Contraltos', porVoz.contralto)}
       ${seccion('Tenores', porVoz.tenor)}
-      ${porVoz.baritono?.length ? seccion('Barítono', porVoz.baritono) : ''}
       ${seccion('Bajos', porVoz.bajo)}
       ${sinVoz.length ? seccion('Sin cuerda asignada', sinVoz) : ''}
       ${seccion('Dirección', directores)}
@@ -134,6 +132,8 @@ export default function Usuarios() {
   const [mostrarImprimir, setMostrarImprimir] = useState(false)
   const [camposImprimir, setCamposImprimir]   = useState(['nombre', 'telefono', 'mail'])
   const esMovil = useEsMovil()
+  const activosDetalle = usePresenciaDetalle()
+  const idsOnline = new Set(activosDetalle.map(a => a.id))
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -163,7 +163,6 @@ export default function Usuarios() {
     if (!editando) return
     setGuardando(true)
     const scrollY = window.scrollY
-    const id = editando.id
     const cambios = {
       rol: editando.rol,
       voz: editando.voz,
@@ -173,15 +172,10 @@ export default function Usuarios() {
       dni: editando.dni || null,
       telefono: editando.telefono || null,
     }
-    const { error } = await supabase.from('perfiles').update(cambios).eq('id', id)
+    await supabase.from('perfiles').update(cambios).eq('id', editando.id)
     setGuardando(false)
-    if (error) {
-      setMensaje('Error al guardar. Intentá de nuevo.')
-      setTimeout(() => setMensaje(''), 3000)
-      return
-    }
     setEditando(null)
-    actualizarLocal(id, cambios)
+    actualizarLocal(editando.id, cambios)
     setMensaje('Usuario actualizado.')
     setTimeout(() => setMensaje(''), 3000)
     requestAnimationFrame(() => window.scrollTo(0, scrollY))
@@ -252,18 +246,6 @@ export default function Usuarios() {
     }
   }
 
-  const navigate = useNavigate()
-  const location = useLocation()
-
-  // Mensaje desde CrearCantante
-  useEffect(() => {
-    if (location.state?.mensaje) {
-      setMensaje(location.state.mensaje)
-      setTimeout(() => setMensaje(''), 4000)
-      window.history.replaceState({}, '')
-    }
-  }, [])
-
   function abrirReset(u) {
     setResetPass(u)
     setNuevaPass('')
@@ -299,17 +281,10 @@ export default function Usuarios() {
             )}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => setMostrarImprimir(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
-            🖨 Imprimir listado
-          </button>
-          <button onClick={() => navigate('/admin/cantantes/nuevo')}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#0F6E56', color: '#FFFFFF', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-            Agregar cantante
-          </button>
-        </div>
+        <button onClick={() => setMostrarImprimir(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+          🖨 Imprimir listado
+        </button>
       </div>
 
       {mensaje && (
@@ -351,7 +326,12 @@ export default function Usuarios() {
               <div key={u.id} style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '14px', opacity: u.estado === 'inactivo' ? 0.5 : 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div>
-                    <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{u.nombre}</div>
+                    <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {u.nombre}
+                      {idsOnline.has(u.id) && (
+                        <span title="En línea" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1D9E75', display: 'inline-block', flexShrink: 0 }} />
+                      )}
+                    </div>
                     <div style={{ fontSize: '12px', color: '#888780', marginTop: '2px' }}>{u.mail || '—'}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -401,7 +381,12 @@ export default function Usuarios() {
             return (
               <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 90px 160px', padding: '11px 16px', alignItems: 'center', borderBottom: esUltimo ? 'none' : '1px solid #F1EFE8', opacity: u.estado === 'inactivo' ? 0.5 : 1 }}>
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A18' }}>{u.nombre}</div>
+                  <div style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A18', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {u.nombre}
+                    {idsOnline.has(u.id) && (
+                      <span title="En línea" style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#1D9E75', display: 'inline-block', flexShrink: 0 }} />
+                    )}
+                  </div>
                   <div style={{ fontSize: '11px', color: '#888780', marginTop: '1px' }}>{u.mail || '—'}</div>
                 </div>
                 <span style={{ fontSize: '10px', background: vc.bg, color: vc.color, padding: '2px 8px', borderRadius: '10px', fontWeight: '600', textTransform: 'capitalize', display: 'inline-block' }}>{u.voz || '—'}</span>
