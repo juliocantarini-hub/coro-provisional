@@ -91,6 +91,8 @@ function useEncuestaBase(fetchEncuesta, deps) {
   }
 
   // Solo para Admin: quién votó qué opción (el voto NO es anónimo)
+  // Join manual (no embed automático) porque perfiles tiene PK compuesta (id, coro_id)
+  // — el mismo id (ej. cuenta de soporte) puede repetirse en distintos coros.
   async function detalleVotos() {
     if (!encuesta) return []
 
@@ -153,8 +155,8 @@ export function useEncuestaPorId(encuestaId) {
   }, [encuestaId])
 }
 
-// Lado cantante: TODAS las encuestas abiertas del coro, con flag de si ya votó cada una
-// Usar tanto en el ítem "Encuestas" como en la tarjeta resumen de Inicio
+// Lado cantante: solo encuestas ABIERTAS del coro, con flag de si ya votó cada una
+// Usar en la tarjeta resumen de Inicio y en el badge del menú (conteo de pendientes)
 export function useEncuestasActivas() {
   const [encuestas, setEncuestas] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -179,6 +181,60 @@ export function useEncuestasActivas() {
       .order('creado_en', { ascending: false })
 
     const lista = encuestasData || []
+
+    if (lista.length && perfilId) {
+      const { data: votosData } = await supabase
+        .from('encuesta_votos')
+        .select('encuesta_id')
+        .eq('perfil_id', perfilId)
+        .in('encuesta_id', lista.map(e => e.id))
+
+      const votadas = new Set((votosData || []).map(v => v.encuesta_id))
+      setEncuestas(lista.map(e => ({ ...e, yaVote: votadas.has(e.id) })))
+    } else {
+      setEncuestas(lista.map(e => ({ ...e, yaVote: false })))
+    }
+
+    setCargando(false)
+  }, [])
+
+  useEffect(() => { cargar() }, [cargar])
+
+  return { encuestas, cargando, recargar: cargar }
+}
+
+// Lado cantante — vista dedicada "Encuestas": TODAS (abiertas arriba, cerradas abajo con sus resultados)
+export function useEncuestasCantante() {
+  const [encuestas, setEncuestas] = useState([])
+  const [cargando, setCargando] = useState(true)
+
+  const cargar = useCallback(async () => {
+    setCargando(true)
+    const coro = await getCoroActual()
+    if (!coro) {
+      setEncuestas([])
+      setCargando(false)
+      return
+    }
+
+    const { data: userData } = await supabase.auth.getUser()
+    const perfilId = userData?.user?.id || null
+
+    const { data: abiertasData } = await supabase
+      .from('encuestas')
+      .select('*, avisos(titulo)')
+      .eq('coro_id', coro.id)
+      .eq('estado', 'abierta')
+      .order('creado_en', { ascending: false })
+
+    const { data: cerradasData } = await supabase
+      .from('encuestas')
+      .select('*, avisos(titulo)')
+      .eq('coro_id', coro.id)
+      .eq('estado', 'cerrada')
+      .order('creado_en', { ascending: false })
+
+    const lista = [...(abiertasData || []), ...(cerradasData || [])]
 
     if (lista.length && perfilId) {
       const { data: votosData } = await supabase
@@ -241,7 +297,7 @@ async function enviarNotificacionEncuesta(coroId, pregunta) {
   }
 }
 
-// Para el lado admin: crear, cerrar y reabrir encuestas
+// Para el lado admin: crear, cerrar, reabrir y eliminar encuestas
 export function useCrearEncuesta() {
   async function crearEncuesta({ avisoId, coroId, pregunta, permiteMultiple, opciones }) {
     const { data: encuestaData, error } = await supabase
@@ -274,5 +330,13 @@ export function useCrearEncuesta() {
     await supabase.from('encuestas').update({ estado: 'abierta' }).eq('id', encuestaId)
   }
 
-  return { crearEncuesta, cerrarEncuesta, reabrirEncuesta }
+  async function eliminarEncuesta(encuestaId) {
+    // Orden importa por las FK: primero votos, después opciones, recién ahí la encuesta
+    await supabase.from('encuesta_votos').delete().eq('encuesta_id', encuestaId)
+    await supabase.from('encuesta_opciones').delete().eq('encuesta_id', encuestaId)
+    const { error } = await supabase.from('encuestas').delete().eq('id', encuestaId)
+    if (error) throw error
+  }
+
+  return { crearEncuesta, cerrarEncuesta, reabrirEncuesta, eliminarEncuesta }
 }

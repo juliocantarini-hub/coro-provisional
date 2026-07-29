@@ -145,10 +145,12 @@ function DetalleVotos({ encuestaId }) {
   )
 }
 
-function EncuestaAdminItem({ encuestaId }) {
+function EncuestaAdminItem({ encuestaId, onEliminada }) {
   const { encuesta, resultados, miVoto, votar, recargar } = useEncuestaPorId(encuestaId)
-  const { cerrarEncuesta, reabrirEncuesta } = useCrearEncuesta()
+  const { cerrarEncuesta, reabrirEncuesta, eliminarEncuesta } = useCrearEncuesta()
   const [verDetalle, setVerDetalle] = useState(false)
+  const [confirmEliminar, setConfirmEliminar] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
 
   if (!encuesta) return null
 
@@ -159,6 +161,12 @@ function EncuestaAdminItem({ encuestaId }) {
   async function handleReabrir() {
     await reabrirEncuesta(encuesta.id)
     recargar()
+  }
+  async function handleEliminar() {
+    setEliminando(true)
+    await eliminarEncuesta(encuesta.id)
+    setEliminando(false)
+    onEliminada()
   }
 
   return (
@@ -172,10 +180,31 @@ function EncuestaAdminItem({ encuestaId }) {
         onCerrar={handleCerrar}
         onReabrir={handleReabrir}
       />
-      <button onClick={() => setVerDetalle(v => !v)}
-        style={{ marginTop: '8px', fontSize: '11px', color: '#888780', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-        {verDetalle ? 'Ocultar detalle' : 'Mostrar detalle'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '8px' }}>
+        <button onClick={() => setVerDetalle(v => !v)}
+          style={{ fontSize: '11px', color: '#888780', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+          {verDetalle ? 'Ocultar detalle' : 'Mostrar detalle'}
+        </button>
+
+        {!confirmEliminar ? (
+          <button onClick={() => setConfirmEliminar(true)}
+            style={{ fontSize: '11px', color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+            Eliminar encuesta
+          </button>
+        ) : (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
+            <span style={{ color: '#5F5E5A' }}>¿Eliminar definitivamente?</span>
+            <button onClick={handleEliminar} disabled={eliminando}
+              style={{ color: '#FFFFFF', background: '#A32D2D', border: 'none', borderRadius: '5px', padding: '3px 9px', cursor: 'pointer', fontWeight: '500' }}>
+              {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
+            </button>
+            <button onClick={() => setConfirmEliminar(false)} disabled={eliminando}
+              style={{ color: '#5F5E5A', background: 'none', border: '1px solid #D3D1C7', borderRadius: '5px', padding: '3px 9px', cursor: 'pointer' }}>
+              Cancelar
+            </button>
+          </span>
+        )}
+      </div>
       {verDetalle && <DetalleVotos encuestaId={encuesta.id} />}
     </div>
   )
@@ -224,7 +253,7 @@ export default function EncuestasAdmin() {
       )}
 
       {!cargando && encuestas.map(e => (
-        <EncuestaAdminItem key={e.id} encuestaId={e.id} />
+        <EncuestaAdminItem key={e.id} encuestaId={e.id} onEliminada={recargar} />
       ))}
     </div>
   )

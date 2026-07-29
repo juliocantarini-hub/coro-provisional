@@ -1,4 +1,4 @@
-import { useEncuestasActivas, useEncuestaPorId } from '../hooks/useEncuestas'
+import { useEncuestasCantante, useEncuestaPorId } from '../hooks/useEncuestas'
 import EncuestaWidget from '../components/EncuestaWidget'
 
 function EncuestaCantanteItem({ encuestaId }) {
@@ -19,7 +19,7 @@ function EncuestaCantanteItem({ encuestaId }) {
 }
 
 export default function Encuestas() {
-  const { encuestas, cargando } = useEncuestasActivas()
+  const { encuestas, cargando } = useEncuestasCantante()
 
   return (
     <div>
@@ -28,7 +28,7 @@ export default function Encuestas() {
           Encuestas
         </h2>
         <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
-          {cargando ? 'Cargando...' : `${encuestas.length} encuesta${encuestas.length !== 1 ? 's' : ''} activa${encuestas.length !== 1 ? 's' : ''}`}
+          {cargando ? 'Cargando...' : `${encuestas.length} encuesta${encuestas.length !== 1 ? 's' : ''}`}
         </p>
       </div>
 
@@ -41,7 +41,7 @@ export default function Encuestas() {
 
       {!cargando && encuestas.length === 0 && (
         <div style={{ textAlign: 'center', padding: '32px', color: '#888780', fontSize: '13px' }}>
-          No hay encuestas activas por el momento.
+          Todavía no hay encuestas.
         </div>
       )}
 
