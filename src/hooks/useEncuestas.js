@@ -94,18 +94,33 @@ function useEncuestaBase(fetchEncuesta, deps) {
   async function detalleVotos() {
     if (!encuesta) return []
 
-    const { data } = await supabase
+    const { data: votosData } = await supabase
       .from('encuesta_votos')
-      .select('opcion_id, perfil_id, perfiles(nombre)')
+      .select('opcion_id, perfil_id')
       .eq('encuesta_id', encuesta.id)
 
-    const votosConNombre = data || []
+    const votosConPerfil = votosData || []
+    const perfilIds = [...new Set(votosConPerfil.map(v => v.perfil_id))]
+
+    let nombresPorId = {}
+    if (perfilIds.length) {
+      const { data: perfilesData } = await supabase
+        .from('perfiles')
+        .select('id, nombre')
+        .eq('coro_id', encuesta.coro_id)
+        .in('id', perfilIds)
+
+      nombresPorId = (perfilesData || []).reduce((acc, p) => {
+        acc[p.id] = p.nombre
+        return acc
+      }, {})
+    }
 
     return opciones.map(op => ({
       ...op,
-      votantes: votosConNombre
+      votantes: votosConPerfil
         .filter(v => v.opcion_id === op.id)
-        .map(v => v.perfiles?.nombre || 'Sin nombre')
+        .map(v => nombresPorId[v.perfil_id] || 'Sin nombre')
     }))
   }
 
