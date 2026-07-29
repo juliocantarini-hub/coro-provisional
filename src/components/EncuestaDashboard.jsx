@@ -1,8 +1,8 @@
-import { useEncuestaActiva, useCrearEncuesta } from '../hooks/useEncuestas'
+import { useEncuestasActivas, useEncuestaPorId, useCrearEncuesta } from '../hooks/useEncuestas'
 import EncuestaWidget from './EncuestaWidget'
 
-export default function EncuestaDashboard({ esAdmin = false }) {
-  const { encuesta, resultados, miVoto, votar, cargando, recargar } = useEncuestaActiva()
+function EncuestaDashboardItem({ encuestaId, esAdmin }) {
+  const { encuesta, resultados, miVoto, votar, cargando, recargar } = useEncuestaPorId(encuestaId)
   const { cerrarEncuesta } = useCrearEncuesta()
 
   if (cargando || !encuesta) return null
@@ -32,5 +32,19 @@ export default function EncuestaDashboard({ esAdmin = false }) {
         compacto
       />
     </div>
+  )
+}
+
+export default function EncuestaDashboard({ esAdmin = false }) {
+  const { encuestas, cargando } = useEncuestasActivas()
+
+  if (cargando || !encuestas.length) return null
+
+  return (
+    <>
+      {encuestas.map(e => (
+        <EncuestaDashboardItem key={e.id} encuestaId={e.id} esAdmin={esAdmin} />
+      ))}
+    </>
   )
 }

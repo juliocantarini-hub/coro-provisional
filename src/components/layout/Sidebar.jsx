@@ -3,12 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useAvisos } from '../../hooks/useAvisos'
 import { usePresencia } from '../../hooks/usePresencia'
+import { useEncuestasActivas } from '../../hooks/useEncuestas'
 
 const NAV_CANTANTE = [
   { ruta: '/',           label: 'Inicio',         icono: 'inicio' },
   { ruta: '/repertorio', label: 'Repertorio',     icono: 'musica' },
   { ruta: '/calendario', label: 'Calendario',     icono: 'calendario' },
   { ruta: '/avisos',     label: 'Avisos',         icono: 'campana', badge: true },
+  { ruta: '/encuestas',  label: 'Encuestas',      icono: 'encuestas', badgeEncuestas: true },
   { ruta: '/blog',       label: 'Textos',         icono: 'blog' },
   { ruta: '/asistencia', label: 'Mi asistencia',  icono: 'calendario' },
   { ruta: '/companeros', label: 'Mis compañeros', icono: 'usuarios', presencia: true },
@@ -22,6 +24,7 @@ const NAV_ADMIN = [
   { ruta: '/admin/asistencia',   label: 'Asistencia', icono: 'calendario' },
   { ruta: '/admin/estudio',      label: 'Estudio',    icono: 'estudio' },
   { ruta: '/admin/avisos',       label: 'Avisos',     icono: 'campana' },
+  { ruta: '/admin/encuestas',    label: 'Encuestas',  icono: 'encuestas' },
   { ruta: '/admin/blog',         label: 'Textos',     icono: 'blog' },
   { ruta: '/admin/usuarios',     label: 'Cantantes',  icono: 'usuarios', presencia: true },
   { ruta: '/admin/pagos',        label: 'Pagos',      icono: 'pagos' },
@@ -39,6 +42,7 @@ const ICONOS = {
   estudio:    "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z",
   asistente:  "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z",
   pagos: "M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z",
+  encuestas:  "M5 9h3v11H5zm11-5h3v16h-3zM10.5 13h3v8h-3z",
 }
 
 function getPadding() {
@@ -80,6 +84,8 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar }) {
   const { perfil, cerrarSesion, esAdmin, esDirector } = useAuth()
   const { noLeidos } = useAvisos()
   const activos = usePresencia()
+  const { encuestas: encuestasActivas } = useEncuestasActivas()
+  const encuestasPendientes = encuestasActivas.filter(e => !e.yaVote).length
   const [mostrarAyuda, setMostrarAyuda] = useState(false)
   const [zoom, setZoom] = useState(getZoom)
   const [padding, setPadding] = useState(getPadding)
@@ -170,6 +176,11 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar }) {
                 {item.badge && noLeidos > 0 && (
                   <span style={{ background: '#D85A30', color: 'white', fontSize: '10px', borderRadius: '10px', padding: '1px 6px' }}>
                     {noLeidos > 9 ? '9+' : noLeidos}
+                  </span>
+                )}
+                {item.badgeEncuestas && encuestasPendientes > 0 && (
+                  <span style={{ background: '#D85A30', color: 'white', fontSize: '10px', borderRadius: '10px', padding: '1px 6px' }}>
+                    {encuestasPendientes > 9 ? '9+' : encuestasPendientes}
                   </span>
                 )}
                 {item.presencia && cantidadActivos > 0 && (

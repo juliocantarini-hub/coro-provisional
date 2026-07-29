@@ -17,6 +17,7 @@ import ObraDetalle     from './pages/repertorio/ObraDetalle'
 import Calendario      from './pages/calendario/Calendario'
 import EventoDetalle   from './pages/calendario/EventoDetalle'
 import Avisos          from './pages/avisos/Avisos'
+import Encuestas       from './pages/Encuestas'
 import { Blog, ArticuloDetalle } from './pages/blog/Blog'
 import Perfil          from './pages/perfil/Perfil' 
 import MisCompaneros   from './pages/cantantes/MisCompaneros' 
@@ -31,6 +32,7 @@ import ObraForm        from './pages/admin/ObraForm'
 import EventosLista    from './pages/admin/EventosLista'
 import EventoForm      from './pages/admin/EventoForm'
 import { AvisosAdmin } from './pages/admin/AvisosAdmin'
+import EncuestasAdmin  from './pages/admin/EncuestasAdmin'
 import { ArticulosAdmin, ArticuloForm } from './pages/admin/ArticulosAdmin'
 import EstudioAdmin    from './pages/admin/EstudioAdmin'
 import AsistenteRepertorio from './pages/admin/AsistenteRepertorio'
@@ -70,6 +72,7 @@ export default function App() {
             <Route path="/calendario" element={<RutaProtegida><ConLayout><Calendario /></ConLayout></RutaProtegida>} />
             <Route path="/calendario/:id" element={<RutaProtegida><ConLayout><EventoDetalle /></ConLayout></RutaProtegida>} />
             <Route path="/avisos" element={<RutaProtegida><ConLayout><Avisos /></ConLayout></RutaProtegida>} />
+            <Route path="/encuestas" element={<RutaProtegida><ConLayout><Encuestas /></ConLayout></RutaProtegida>} />
             <Route path="/blog" element={<RutaProtegida><ConLayout><Blog /></ConLayout></RutaProtegida>} />
             <Route path="/blog/:id" element={<RutaProtegida><ConLayout><ArticuloDetalle /></ConLayout></RutaProtegida>} />
             <Route path="/asistencia" element={<RutaProtegida><ConLayout><MiAsistencia /></ConLayout></RutaProtegida>} />
@@ -88,6 +91,7 @@ export default function App() {
             <Route path="/admin/asistencia" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><AsistenciaAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/pagos" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><PagosAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/avisos" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><AvisosAdmin /></ConLayout></RutaProtegida>} />
+            <Route path="/admin/encuestas" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><EncuestasAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/blog" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ArticulosAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/blog/nuevo" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ArticuloForm /></ConLayout></RutaProtegida>} />
             <Route path="/admin/blog/:id" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ArticuloForm /></ConLayout></RutaProtegida>} />
