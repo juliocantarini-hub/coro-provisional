@@ -240,6 +240,9 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
 
   function set(campo) { return e => setForm(f => ({ ...f, [campo]: e.target.value })) }
 
+  const [obrasAbierto, setObrasAbierto] = useState(false)
+  const [eventosAbierto, setEventosAbierto] = useState(false)
+
   function toggleObra(id) {
     setObrasSeleccionadas(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
@@ -345,36 +348,54 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
           style={{ ...inputStyle, height: 'auto', padding: '10px 12px', resize: 'vertical', lineHeight: '1.6' }} />
       </Campo>
 
-      {/* Obras relacionadas — checkboxes */}
+      {/* Obras relacionadas — dropdown con checkboxes */}
       {obras.length > 0 && (
         <Campo label="Obras relacionadas (opcional)">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', paddingRight: '4px' }}>
-            {obras.map(o => {
-              const sel = obrasSeleccionadas.includes(o.id)
-              return (
-                <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '7px 10px', borderRadius: '8px', background: sel ? '#E1F5EE' : '#F8F7F3', border: `1px solid ${sel ? '#B4D8CE' : '#E8E6DF'}` }}>
-                  <input type="checkbox" checked={sel} onChange={() => toggleObra(o.id)} style={{ accentColor: '#0F6E56', width: '14px', height: '14px', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', color: '#1A1A18', fontWeight: sel ? '500' : '400' }}>{o.titulo}</span>
-                </label>
-              )
-            })}
+          <div style={{ position: 'relative' }}>
+            <button type="button" onClick={() => setObrasAbierto(v => !v)}
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: obrasAbierto ? '8px 8px 0 0' : '8px', padding: '0 12px', fontSize: '13px', color: obrasSeleccionadas.length ? '#1A1A18' : '#B4B2A9', background: '#FFFFFF', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{obrasSeleccionadas.length ? `${obrasSeleccionadas.length} obra${obrasSeleccionadas.length !== 1 ? 's' : ''} seleccionada${obrasSeleccionadas.length !== 1 ? 's' : ''}` : 'Ninguna'}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#888780" style={{ transform: obrasAbierto ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><path d="M7 10l5 5 5-5z"/></svg>
+            </button>
+            {obrasAbierto && (
+              <div style={{ border: '1px solid #D3D1C7', borderTop: 'none', borderRadius: '0 0 8px 8px', background: '#FFFFFF', maxHeight: '180px', overflowY: 'auto', position: 'absolute', width: '100%', zIndex: 10 }}>
+                {obras.map(o => {
+                  const sel = obrasSeleccionadas.includes(o.id)
+                  return (
+                    <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px 12px', background: sel ? '#E1F5EE' : '#FFFFFF', borderBottom: '1px solid #F1EFE8' }}>
+                      <input type="checkbox" checked={sel} onChange={() => toggleObra(o.id)} style={{ accentColor: '#0F6E56', width: '14px', height: '14px', flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', color: '#1A1A18', fontWeight: sel ? '500' : '400' }}>{o.titulo}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </Campo>
       )}
 
-      {/* Eventos relacionados — checkboxes */}
+      {/* Eventos relacionados — dropdown con checkboxes */}
       {eventos.length > 0 && (
         <Campo label="Eventos relacionados (opcional)">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', paddingRight: '4px' }}>
-            {eventos.map(e => {
-              const sel = eventosSeleccionados.includes(e.id)
-              return (
-                <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '7px 10px', borderRadius: '8px', background: sel ? '#E1F5EE' : '#F8F7F3', border: `1px solid ${sel ? '#B4D8CE' : '#E8E6DF'}` }}>
-                  <input type="checkbox" checked={sel} onChange={() => toggleEvento(e.id)} style={{ accentColor: '#0F6E56', width: '14px', height: '14px', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', color: '#1A1A18', fontWeight: sel ? '500' : '400' }}>{e.titulo}</span>
-                </label>
-              )
-            })}
+          <div style={{ position: 'relative' }}>
+            <button type="button" onClick={() => setEventosAbierto(v => !v)}
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: eventosAbierto ? '8px 8px 0 0' : '8px', padding: '0 12px', fontSize: '13px', color: eventosSeleccionados.length ? '#1A1A18' : '#B4B2A9', background: '#FFFFFF', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{eventosSeleccionados.length ? `${eventosSeleccionados.length} evento${eventosSeleccionados.length !== 1 ? 's' : ''} seleccionado${eventosSeleccionados.length !== 1 ? 's' : ''}` : 'Ninguno'}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#888780" style={{ transform: eventosAbierto ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><path d="M7 10l5 5 5-5z"/></svg>
+            </button>
+            {eventosAbierto && (
+              <div style={{ border: '1px solid #D3D1C7', borderTop: 'none', borderRadius: '0 0 8px 8px', background: '#FFFFFF', maxHeight: '180px', overflowY: 'auto', position: 'absolute', width: '100%', zIndex: 10 }}>
+                {eventos.map(e => {
+                  const sel = eventosSeleccionados.includes(e.id)
+                  return (
+                    <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px 12px', background: sel ? '#E1F5EE' : '#FFFFFF', borderBottom: '1px solid #F1EFE8' }}>
+                      <input type="checkbox" checked={sel} onChange={() => toggleEvento(e.id)} style={{ accentColor: '#0F6E56', width: '14px', height: '14px', flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', color: '#1A1A18', fontWeight: sel ? '500' : '400' }}>{e.titulo}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </Campo>
       )}
