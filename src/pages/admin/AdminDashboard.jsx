@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 import EncuestaDashboard from '../../components/EncuestaDashboard'
+import ResumenFinanciero from '../../components/ResumenFinanciero'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -62,6 +63,9 @@ export default function AdminDashboard() {
           <StatCard val={stats.asistPendientes} label="Asistencias pend." color={stats.asistPendientes > 0 ? '#D85A30' : '#888780'} bg={stats.asistPendientes > 0 ? '#FAECE7' : '#F1EFE8'} onClick={() => navigate('/admin/eventos')} />
         </div>
       )}
+
+      {/* Resumen financiero del mes — cuota + colectas activas */}
+      <ResumenFinanciero />
 
       {/* Encuesta activa — solo aparece si hay una encuesta abierta */}
       <EncuestaDashboard esAdmin={true} />
