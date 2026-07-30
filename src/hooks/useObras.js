@@ -238,3 +238,55 @@ export function useObrasAdmin() {
 
   return { obras, cargando, error, recargar: cargar }
 }
+
+// ─── Para el Dashboard del director: obras en estudio vs. dominadas ─────────
+// "Dominada" = más del 50% de los cantantes activos la marcó como "estudiada" en progreso_estudio
+export function useResumenEstudio() {
+  const [resumen, setResumen] = useState(null)
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    async function cargar() {
+      const coro = await getCoroActual()
+      if (!coro) { setCargando(false); return }
+
+      const [{ data: obras }, { count: totalCantantes }] = await Promise.all([
+        supabase
+          .from('obras')
+          .select('id, titulo, progreso_estudio(estado)')
+          .eq('coro_id', coro.id)
+          .eq('publicada', true),
+        supabase
+          .from('perfiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('coro_id', coro.id)
+          .eq('rol', 'cantante')
+          .eq('estado', 'activo'),
+      ])
+
+      const todasObras = obras || []
+      const total = totalCantantes || 0
+
+      let dominadas = 0, enEstudio = 0, sinIniciar = 0
+
+      todasObras.forEach(o => {
+        const estudiadas = (o.progreso_estudio || []).filter(p => p.estado === 'estudiada').length
+        if (total > 0 && estudiadas / total > 0.5) dominadas++
+        else if (estudiadas > 0) enEstudio++
+        else sinIniciar++
+      })
+
+      setResumen({
+        totalObras: todasObras.length,
+        totalCantantes: total,
+        dominadas,
+        enEstudio,
+        sinIniciar,
+      })
+      setCargando(false)
+    }
+    cargar()
+  }, [])
+
+  return { resumen, cargando }
+}
