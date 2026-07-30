@@ -270,9 +270,11 @@ export function useResumenEstudio() {
       let dominadas = 0, enEstudio = 0, sinIniciar = 0
 
       todasObras.forEach(o => {
-        const estudiadas = (o.progreso_estudio || []).filter(p => p.estado === 'estudiada').length
+        const regs = o.progreso_estudio || []
+        const estudiadas = regs.filter(p => p.estado === 'estudiada').length
+        const enProgreso = regs.filter(p => p.estado === 'en_progreso').length
         if (total > 0 && estudiadas / total > 0.5) dominadas++
-        else if (estudiadas > 0) enEstudio++
+        else if (estudiadas > 0 || enProgreso > 0) enEstudio++
         else sinIniciar++
       })
 

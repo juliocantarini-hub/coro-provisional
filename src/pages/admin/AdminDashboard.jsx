@@ -110,17 +110,19 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Asistencia promedio del mes */}
-      <AsistenciaMes />
+      <div style={{ marginTop: '32px' }}>
+        {/* Asistencia promedio del mes */}
+        <AsistenciaMes />
 
-      {/* Resumen financiero del mes — cuota + colectas activas */}
-      <ResumenFinanciero />
+        {/* Resumen financiero del mes — cuota + colectas activas */}
+        <ResumenFinanciero />
 
-      {/* Obras en estudio vs. dominadas */}
-      <ResumenEstudio />
+        {/* Obras en estudio vs. dominadas */}
+        <ResumenEstudio />
 
-      {/* Encuesta activa — solo aparece si hay una encuesta abierta */}
-      <EncuestaDashboard esAdmin={true} />
+        {/* Encuesta activa — solo aparece si hay una encuesta abierta */}
+        <EncuestaDashboard esAdmin={true} />
+      </div>
     </div>
   )
 }
