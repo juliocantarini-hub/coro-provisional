@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
@@ -242,6 +242,17 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
 
   const [obrasAbierto, setObrasAbierto] = useState(false)
   const [eventosAbierto, setEventosAbierto] = useState(false)
+  const obrasRef = useRef(null)
+  const eventosRef = useRef(null)
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (obrasRef.current && !obrasRef.current.contains(e.target)) setObrasAbierto(false)
+      if (eventosRef.current && !eventosRef.current.contains(e.target)) setEventosAbierto(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   function toggleObra(id) {
     setObrasSeleccionadas(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -351,7 +362,7 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
       {/* Obras relacionadas — dropdown con checkboxes */}
       {obras.length > 0 && (
         <Campo label="Obras relacionadas (opcional)">
-          <div style={{ position: 'relative' }}>
+          <div ref={obrasRef} style={{ position: 'relative' }}>
             <button type="button" onClick={() => setObrasAbierto(v => !v)}
               style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: obrasAbierto ? '8px 8px 0 0' : '8px', padding: '0 12px', fontSize: '13px', color: obrasSeleccionadas.length ? '#1A1A18' : '#B4B2A9', background: '#FFFFFF', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>{obrasSeleccionadas.length ? `${obrasSeleccionadas.length} obra${obrasSeleccionadas.length !== 1 ? 's' : ''} seleccionada${obrasSeleccionadas.length !== 1 ? 's' : ''}` : 'Ninguna'}</span>
@@ -377,7 +388,7 @@ function AvisoForm({ aviso, onGuardar, onCancelar }) {
       {/* Eventos relacionados — dropdown con checkboxes */}
       {eventos.length > 0 && (
         <Campo label="Eventos relacionados (opcional)">
-          <div style={{ position: 'relative' }}>
+          <div ref={eventosRef} style={{ position: 'relative' }}>
             <button type="button" onClick={() => setEventosAbierto(v => !v)}
               style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: eventosAbierto ? '8px 8px 0 0' : '8px', padding: '0 12px', fontSize: '13px', color: eventosSeleccionados.length ? '#1A1A18' : '#B4B2A9', background: '#FFFFFF', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>{eventosSeleccionados.length ? `${eventosSeleccionados.length} evento${eventosSeleccionados.length !== 1 ? 's' : ''} seleccionado${eventosSeleccionados.length !== 1 ? 's' : ''}` : 'Ninguno'}</span>
