@@ -32,7 +32,6 @@ export function useHistorialAsistencia(perfilId) {
     if (!perfilId) return
     const cargar = async () => {
       const coro = await getCoroActual()
-      // Primero obtenemos los IDs de listas de este coro
       const { data: listas } = await supabase
         .from('listas_asistencia')
         .select('id')
@@ -77,7 +76,7 @@ export function useRegistrosLista(listaId) {
   }, [listaId])
 
   useEffect(() => { cargar() }, [cargar])
-  return { registros, setRegistros, cantantes, cargando, recargar: cargar } // ← setRegistros expuesto
+  return { registros, setRegistros, cantantes, cargando, recargar: cargar }
 }
 
 export async function crearLista(fecha, descripcion) {
@@ -144,3 +143,20 @@ export function calcularRacha(historial) {
   }
   return racha
 }
+
+// Para el Dashboard del director: asistencia promedio del mes actual (todos los cantantes)
+export function useAsistenciaMesActual() {
+  const [resumen, setResumen] = useState(null)
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    async function cargar() {
+      const coro = await getCoroActual()
+      if (!coro) { setCargando(false); return }
+
+      const hoy = new Date()
+      const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const primerDia = fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
+      const ultimoDia = fmt(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0))
+
+      const { data: listas }

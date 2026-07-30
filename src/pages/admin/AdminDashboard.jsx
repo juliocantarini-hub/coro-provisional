@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 import EncuestaDashboard from '../../components/EncuestaDashboard'
 import ResumenFinanciero from '../../components/ResumenFinanciero'
+import AsistenciaMes from '../../components/AsistenciaMes'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -63,6 +64,9 @@ export default function AdminDashboard() {
           <StatCard val={stats.asistPendientes} label="Asistencias pend." color={stats.asistPendientes > 0 ? '#D85A30' : '#888780'} bg={stats.asistPendientes > 0 ? '#FAECE7' : '#F1EFE8'} onClick={() => navigate('/admin/eventos')} />
         </div>
       )}
+
+      {/* Asistencia promedio del mes */}
+      <AsistenciaMes />
 
       {/* Resumen financiero del mes — cuota + colectas activas */}
       <ResumenFinanciero />
