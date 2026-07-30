@@ -159,4 +159,37 @@ export function useAsistenciaMesActual() {
       const primerDia = fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
       const ultimoDia = fmt(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0))
 
-      const { data: listas }
+      const { data: listas } = await supabase
+        .from('listas_asistencia')
+        .select('id, fecha, registros_asistencia(estado)')
+        .eq('coro_id', coro.id)
+        .gte('fecha', primerDia)
+        .lte('fecha', ultimoDia)
+
+      const todas = listas || []
+      let presentes = 0, ausentes = 0, justificados = 0, total = 0
+
+      todas.forEach(l => {
+        (l.registros_asistencia || []).forEach(r => {
+          total++
+          if (r.estado === 'presente') presentes++
+          else if (r.estado === 'ausente') ausentes++
+          else if (r.estado === 'justificado') justificados++
+        })
+      })
+
+      setResumen({
+        cantidadEnsayos: todas.length,
+        total,
+        presentes,
+        ausentes,
+        justificados,
+        porcentaje: total > 0 ? Math.round((presentes / total) * 100) : 0,
+      })
+      setCargando(false)
+    }
+    cargar()
+  }, [])
+
+  return { resumen, cargando }
+}
