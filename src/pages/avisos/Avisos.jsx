@@ -40,14 +40,8 @@ export default function Avisos() {
     recargar()
   }
 
-  function irADestino(aviso) {
-    if (aviso.obra_id) navigate(`/repertorio/${aviso.obra_id}`)
-    else if (aviso.evento_id) navigate(`/calendario/${aviso.evento_id}`)
-  }
-
   return (
     <div>
-      {/* Cabecera */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
@@ -68,7 +62,6 @@ export default function Avisos() {
         )}
       </div>
 
-      {/* Filtros */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
         {FILTROS.map(f => (
           <button key={f.valor} onClick={() => setTipo(f.valor)} style={{
@@ -108,7 +101,6 @@ export default function Avisos() {
         </div>
       )}
 
-      {/* Lista */}
       {!cargando && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {avisos.map(aviso => (
@@ -117,7 +109,7 @@ export default function Avisos() {
               aviso={aviso}
               estaAbierto={avisoAbierto?.id === aviso.id}
               onAbrir={() => handleAbrir(aviso)}
-              irADestino={irADestino}
+              navigate={navigate}
             />
           ))}
         </div>
@@ -126,10 +118,12 @@ export default function Avisos() {
   )
 }
 
-function AvisoCard({ aviso, estaAbierto, onAbrir, irADestino }) {
+function AvisoCard({ aviso, estaAbierto, onAbrir, navigate }) {
   const tc = TIPO_AVISO[aviso.tipo] || TIPO_AVISO.material
-  const tieneDestino = aviso.obra_id || aviso.evento_id
   const { encuesta, resultados, miVoto, votar } = useEncuesta(estaAbierto ? aviso.id : null)
+
+  const obras = aviso.avisos_obras?.map(ao => ao.obras).filter(Boolean) || []
+  const eventos = aviso.avisos_eventos?.map(ae => ae.eventos).filter(Boolean) || []
 
   return (
     <div style={{
@@ -141,11 +135,7 @@ function AvisoCard({ aviso, estaAbierto, onAbrir, irADestino }) {
       opacity: aviso.leido && !estaAbierto ? 0.75 : 1,
       transition: 'border-color 0.12s',
     }}>
-      {/* Cabecera del aviso — siempre visible */}
-      <div
-        onClick={onAbrir}
-        style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}
-      >
+      <div onClick={onAbrir} style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '10px', fontWeight: '700', color: tc.color, background: tc.bg, padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
@@ -168,7 +158,6 @@ function AvisoCard({ aviso, estaAbierto, onAbrir, irADestino }) {
         </svg>
       </div>
 
-      {/* Contenido expandido */}
       {estaAbierto && (
         <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F1EFE8' }}>
           {aviso.cuerpo && (
@@ -176,21 +165,28 @@ function AvisoCard({ aviso, estaAbierto, onAbrir, irADestino }) {
               {aviso.cuerpo}
             </p>
           )}
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {aviso.obras && (
-              <span style={{ fontSize: '11px', color: '#888780' }}>Obra: {aviso.obras.titulo}</span>
-            )}
-            {aviso.eventos && (
-              <span style={{ fontSize: '11px', color: '#888780' }}>Evento: {aviso.eventos.titulo}</span>
-            )}
-            {tieneDestino && (
-              <button
-                onClick={e => { e.stopPropagation(); irADestino(aviso) }}
-                style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', border: 'none', padding: '3px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>
-                {aviso.obra_id ? 'Abrir obra →' : 'Ver evento →'}
-              </button>
-            )}
-          </div>
+
+          {obras.length > 0 && (
+            <div style={{ marginBottom: '8px' }}>
+              {obras.map(o => (
+                <button key={o.id} onClick={e => { e.stopPropagation(); navigate(`/repertorio/${o.id}`) }}
+                  style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', border: 'none', padding: '3px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', marginRight: '6px', marginBottom: '4px' }}>
+                  {o.titulo} →
+                </button>
+              ))}
+            </div>
+          )}
+
+          {eventos.length > 0 && (
+            <div style={{ marginBottom: '8px' }}>
+              {eventos.map(e => (
+                <button key={e.id} onClick={ev => { ev.stopPropagation(); navigate(`/calendario/${e.id}`) }}
+                  style={{ fontSize: '12px', color: '#378ADD', background: '#E6F1FB', border: 'none', padding: '3px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', marginRight: '6px', marginBottom: '4px' }}>
+                  {e.titulo} →
+                </button>
+              ))}
+            </div>
+          )}
 
           {encuesta && (
             <EncuestaWidget
