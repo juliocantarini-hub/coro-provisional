@@ -15,7 +15,7 @@ export function useAvisos(filtros = {}) {
       const coro = await getCoroActual()
       let query = supabase
         .from('avisos')
-        .select(`*, avisos_leidos!left(leido_en, perfil_id), obras(id, titulo), eventos(id, titulo)`)
+        .select(`*, avisos_leidos!left(leido_en, perfil_id), avisos_obras(obra_id, obras(id, titulo)), avisos_eventos(evento_id, eventos(id, titulo))`)
         .eq('coro_id', coro.id)
         .eq('publicado', true)
         .order('creado_en', { ascending: false })
@@ -66,7 +66,7 @@ export function useAvisosAdmin() {
     const coro = await getCoroActual()
     const { data, error: err } = await supabase
       .from('avisos')
-      .select('*, obras(titulo), eventos(titulo), avisos_leidos(perfil_id)')
+      .select('*, avisos_obras(obra_id, obras(titulo)), avisos_eventos(evento_id, eventos(titulo)), avisos_leidos(perfil_id)')
       .eq('coro_id', coro.id)
       .order('creado_en', { ascending: false })
     if (err) { setError(err.message); setCargando(false); return }
@@ -78,24 +78,50 @@ export function useAvisosAdmin() {
   return { avisos, cargando, error, recargar: cargar }
 }
 
-export async function crearAviso(datos) {
+export async function crearAviso(datos, obraIds = [], eventoIds = []) {
   const coro = await getCoroActual()
+  const { obra_id, evento_id, ...datosSin } = datos
   const { data, error } = await supabase
     .from('avisos')
-    .insert([{ ...datos, coro_id: coro.id }])
+    .insert([{ ...datosSin, coro_id: coro.id }])
     .select()
     .single()
-  return { ok: !error, data, error: error?.message }
+  if (error) return { ok: false, error: error.message }
+
+  const avisoId = data.id
+
+  if (obraIds.length) {
+    await supabase.from('avisos_obras').insert(obraIds.map(obra_id => ({ aviso_id: avisoId, obra_id })))
+  }
+  if (eventoIds.length) {
+    await supabase.from('avisos_eventos').insert(eventoIds.map(evento_id => ({ aviso_id: avisoId, evento_id })))
+  }
+
+  return { ok: true, data, error: null }
 }
 
-export async function actualizarAviso(id, datos) {
+export async function actualizarAviso(id, datos, obraIds = [], eventoIds = []) {
+  const { obra_id, evento_id, ...datosSin } = datos
   const { data, error } = await supabase
     .from('avisos')
-    .update(datos)
+    .update(datosSin)
     .eq('id', id)
     .select()
     .single()
-  return { ok: !error, data, error: error?.message }
+  if (error) return { ok: false, error: error.message }
+
+  // Reemplazar obras y eventos relacionados
+  await supabase.from('avisos_obras').delete().eq('aviso_id', id)
+  await supabase.from('avisos_eventos').delete().eq('aviso_id', id)
+
+  if (obraIds.length) {
+    await supabase.from('avisos_obras').insert(obraIds.map(obra_id => ({ aviso_id: id, obra_id })))
+  }
+  if (eventoIds.length) {
+    await supabase.from('avisos_eventos').insert(eventoIds.map(evento_id => ({ aviso_id: id, evento_id })))
+  }
+
+  return { ok: true, data, error: null }
 }
 
 export async function publicarAviso(id, publicado) {
@@ -127,5 +153,5 @@ export const TIPO_AVISO = {
   evento:   { label: 'Evento', bg: '#E6F1FB', color: '#042C53', dot: '#378ADD' },
   urgente:  { label: 'Urgente', bg: '#FCEBEB', color: '#501313', dot: '#E24B4A' },
   encuesta: { label: 'Encuesta', bg: '#F3EFF8', color: '#3B0764', dot: '#7C3AED' },
-  general:  { label: 'General', bg: '#F1EFE8', color: '#5F5E5A', dot: '#888780' },  
+  general:  { label: 'General', bg: '#F1EFE8', color: '#5F5E5A', dot: '#888780' },
 }
