@@ -5,7 +5,6 @@ import { getCoroActual } from '../../lib/coro'
 import EncuestaDashboard from '../../components/EncuestaDashboard'
 import ResumenFinanciero from '../../components/ResumenFinanciero'
 import AsistenciaMes from '../../components/AsistenciaMes'
-import ResumenEstudio from '../../components/ResumenEstudio'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
@@ -111,17 +110,14 @@ export default function AdminDashboard() {
       </div>
 
       <div style={{ marginTop: '32px' }}>
+        {/* Encuesta activa — solo aparece si hay una encuesta abierta */}
+        <EncuestaDashboard esAdmin={true} />
+
         {/* Asistencia promedio del mes */}
         <AsistenciaMes />
 
         {/* Resumen financiero del mes — cuota + colectas activas */}
         <ResumenFinanciero />
-
-        {/* Obras en estudio vs. dominadas */}
-        <ResumenEstudio />
-
-        {/* Encuesta activa — solo aparece si hay una encuesta abierta */}
-        <EncuestaDashboard esAdmin={true} />
       </div>
     </div>
   )
