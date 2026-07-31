@@ -18,6 +18,12 @@ const FILTROS = [
   { valor: 'general',  label: 'General' },
 ]
 
+function compartirWhatsApp(aviso, e) {
+  e.stopPropagation()
+  const texto = `📢 *${aviso.titulo}*${aviso.cuerpo ? '\n\n' + aviso.cuerpo : ''}`
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
+}
+
 export default function Avisos() {
   const navigate       = useNavigate()
   const { perfil }     = useAuth()
@@ -165,6 +171,12 @@ function AvisoCard({ aviso, estaAbierto, onAbrir, navigate }) {
               {aviso.cuerpo}
             </p>
           )}
+
+          <button onClick={e => compartirWhatsApp(aviso, e)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#128C7E', background: '#E7F8F2', border: 'none', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', marginBottom: '10px' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#128C7E"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.83 14.02c-.24.68-1.42 1.32-1.96 1.4-.5.08-1.14.11-1.84-.12-.42-.13-.97-.31-1.67-.61-2.93-1.27-4.85-4.22-5-4.42-.15-.2-1.19-1.58-1.19-3.02s.75-2.14 1.02-2.44c.27-.29.58-.36.78-.36.2 0 .39 0 .56.01.18.01.42-.07.65.5.24.58.82 2.01.89 2.15.07.15.12.32.02.51-.1.2-.15.32-.29.49-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.75 1.24 1.61 2 1.11.99 2.04 1.3 2.33 1.44.29.15.46.13.63-.08.17-.2.72-.84.91-1.13.19-.29.39-.24.65-.15.27.1 1.68.79 1.97.94.29.15.48.22.55.34.07.13.07.75-.17 1.43z"/></svg>
+            Compartir por WhatsApp
+          </button>
 
           {obras.length > 0 && (
             <div style={{ marginBottom: '8px' }}>
