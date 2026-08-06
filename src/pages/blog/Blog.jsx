@@ -6,6 +6,12 @@ import {
   CATEGORIAS, CATEGORIA_COLOR
 } from '../../hooks/useBlog'
 
+const IDIOMA_LABEL = {
+  latin: 'Latín', italiano: 'Italiano', espanol: 'Español',
+  aleman: 'Alemán', frances: 'Francés', ingles: 'Inglés',
+  portugues: 'Portugués', otro: 'otro idioma',
+}
+
 export function Blog() {
   const navigate = useNavigate()
   const [busqueda, setBusqueda] = useState('')
@@ -114,6 +120,9 @@ function ArticuloDestacado({ articulo, onClick }) {
         {articulo.drive_pdf_id && (
           <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>📄 PDF disponible</span>
         )}
+        {articulo.idioma && (
+          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>🎤 {IDIOMA_LABEL[articulo.idioma] || articulo.idioma}</span>
+        )}
       </div>
       <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', color: '#FFFFFF', margin: '0 0 8px', lineHeight: '1.4' }}>
         {articulo.titulo}
@@ -157,6 +166,7 @@ function ArticuloCard({ articulo, onClick }) {
         <div style={{ fontSize: '12px', color: '#888780', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {articulo.perfiles?.nombre && <span>{articulo.perfiles.nombre}</span>}
           <span>· {new Date(articulo.creado_en).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</span>
+          {articulo.idioma && <span style={{ color: '#378ADD' }}>· 🎤 {IDIOMA_LABEL[articulo.idioma] || articulo.idioma}</span>}
         </div>
       </div>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="#D3D1C7" style={{ flexShrink: 0 }}>
@@ -170,6 +180,45 @@ export function ArticuloDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { articulo, cargando, error } = useArticulo(id)
+  const [pronunciacion, setPronunciacion] = useState(null)
+  const [cargandoPron, setCargandoPron] = useState(false)
+  const [errorPron, setErrorPron] = useState('')
+
+  async function generarPronunciacion() {
+    if (!articulo.contenido) return
+    setCargandoPron(true)
+    setErrorPron('')
+    setPronunciacion(null)
+    try {
+      const idioma = IDIOMA_LABEL[articulo.idioma] || 'el idioma del texto'
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: `Sos un asistente de pronunciación para cantantes de coro. El siguiente texto está en ${idioma}. Para cada línea del texto, escribí la línea original y debajo su pronunciación fonética simplificada en español, para que un cantante que no conoce el idioma pueda pronunciarlo correctamente. Usá guiones para separar sílabas y mayúsculas para la sílaba acentuada. Formato exacto:
+
+[línea original]
+[pronunciación]
+
+[línea siguiente]
+[pronunciación]
+
+No agregues explicaciones ni comentarios, solo el texto con su pronunciación. Texto:\n\n${articulo.contenido}`
+          }]
+        })
+      })
+      const data = await response.json()
+      const texto = data.content?.[0]?.text || ''
+      setPronunciacion(texto)
+    } catch (e) {
+      setErrorPron('No se pudo generar la pronunciación. Intentá de nuevo.')
+    }
+    setCargandoPron(false)
+  }
 
   if (cargando) {
     return (
@@ -203,10 +252,11 @@ export function ArticuloDetalle() {
         <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 12px', lineHeight: '1.35' }}>
           {articulo.titulo}
         </h1>
-        <div style={{ fontSize: '13px', color: '#888780', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: '13px', color: '#888780', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
           {articulo.perfiles?.nombre && <span>Por {articulo.perfiles.nombre}</span>}
           <span>·</span>
           <span>{new Date(articulo.creado_en).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+          {articulo.idioma && <span style={{ color: '#378ADD' }}>· 🎤 {IDIOMA_LABEL[articulo.idioma] || articulo.idioma}</span>}
         </div>
       </div>
 
@@ -216,7 +266,6 @@ export function ArticuloDetalle() {
         </div>
       )}
 
-      {/* Botón imprimir */}
       {articulo.drive_pdf_id && (
         <div style={{ marginBottom: '12px' }}>
           <a href={driveUrlImprimir(articulo.drive_pdf_id)} target="_blank" rel="noopener noreferrer"
@@ -226,7 +275,6 @@ export function ArticuloDetalle() {
         </div>
       )}
 
-      {/* PDF de Drive */}
       {articulo.drive_pdf_id && (
         <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #E8E6DF', marginBottom: '24px' }}>
           <iframe
@@ -240,8 +288,45 @@ export function ArticuloDetalle() {
       )}
 
       {articulo.contenido && (
-        <div style={{ fontSize: '15px', color: '#3D3D3A', lineHeight: '1.75', whiteSpace: 'pre-wrap' }}>
+        <div style={{ fontSize: '15px', color: '#3D3D3A', lineHeight: '1.75', whiteSpace: 'pre-wrap', marginBottom: '24px' }}>
           {articulo.contenido}
+        </div>
+      )}
+
+      {/* Botón pronunciación */}
+      {articulo.contenido && articulo.idioma && (
+        <div style={{ marginTop: '8px' }}>
+          <button onClick={generarPronunciacion} disabled={cargandoPron}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: cargandoPron ? 'not-allowed' : 'pointer', background: pronunciacion ? '#E1F5EE' : '#0F6E56', color: pronunciacion ? '#04342C' : '#FFFFFF', fontSize: '13px', fontWeight: '500', transition: 'background 0.2s' }}>
+            {cargandoPron ? '⏳ Generando...' : pronunciacion ? '🎤 Regenerar pronunciación' : '🎤 Ver pronunciación'}
+          </button>
+
+          {errorPron && (
+            <div style={{ marginTop: '12px', fontSize: '13px', color: '#A32D2D' }}>{errorPron}</div>
+          )}
+
+          {pronunciacion && (
+            <div style={{ marginTop: '16px', background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
+                🎤 Guía de pronunciación
+              </div>
+              <div style={{ fontSize: '14px', color: '#1A1A18', lineHeight: '2', whiteSpace: 'pre-wrap' }}>
+                {pronunciacion.split('\n').map((linea, i) => {
+                  const esPronunciacion = i % 3 === 1
+                  return (
+                    <div key={i} style={{
+                      color: esPronunciacion ? '#0F6E56' : '#1A1A18',
+                      fontSize: esPronunciacion ? '13px' : '15px',
+                      fontFamily: esPronunciacion ? 'system-ui, sans-serif' : 'Georgia, serif',
+                      marginBottom: esPronunciacion ? '8px' : '2px',
+                    }}>
+                      {linea}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

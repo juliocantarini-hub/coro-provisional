@@ -93,6 +93,7 @@ export function ArticulosAdmin() {
                       <button onClick={() => toggleDestacado(art)} disabled={!!procesando}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', opacity: art.destacado ? 1 : 0.3, padding: 0 }}>⭐</button>
                       {art.drive_pdf_id && <span style={{ fontSize: '10px', color: '#0F6E56', fontWeight: '600' }}>📄 PDF</span>}
+                      {art.idioma && <span style={{ fontSize: '10px', color: '#378ADD', fontWeight: '600' }}>🎤 {art.idioma}</span>}
                     </div>
                   </div>
                 </div>
@@ -140,14 +141,15 @@ export function ArticulosAdmin() {
               <div key={art.id} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 80px 60px 80px 80px 100px', padding: '12px 16px', alignItems: 'center', borderBottom: i < articulos.length - 1 ? '1px solid #F1EFE8' : 'none', opacity: procesando === art.id ? 0.5 : 1 }}>
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A18' }}>{art.titulo}</div>
-                  <div style={{ fontSize: '11px', color: '#888780', marginTop: '2px' }}>
-                    {new Date(art.creado_en).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  <div style={{ fontSize: '11px', color: '#888780', marginTop: '2px', display: 'flex', gap: '6px' }}>
+                    {new Date(art.creado_en).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                    {art.idioma && <span style={{ color: '#378ADD' }}>· 🎤 {art.idioma}</span>}
                   </div>
                 </div>
-                <span style={{ background: cc.bg, color: cc.color, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '10px', justifySelf: 'start' }}>{catLabel}</span>
-                <span style={{ fontSize: '12px', color: '#5F5E5A' }}>{art.perfiles?.nombre?.split(' ')[0] || '—'}</span>
+                <span style={{ background: cc.bg, color: cc.color, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '10px', display: 'inline-block' }}>{catLabel}</span>
+                <span style={{ fontSize: '12px', color: '#888780' }}>{art.perfiles?.nombre?.split(' ')[0] || '—'}</span>
                 <div style={{ textAlign: 'center' }}>
-                  {art.drive_pdf_id ? <span style={{ fontSize: '13px' }}>📄</span> : <span style={{ color: '#D3D1C7' }}>—</span>}
+                  {art.drive_pdf_id ? <span style={{ fontSize: '14px' }}>📄</span> : <span style={{ fontSize: '12px', color: '#D3D1C7' }}>—</span>}
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <button onClick={() => toggleDestacado(art)} disabled={!!procesando}
@@ -161,11 +163,11 @@ export function ArticulosAdmin() {
                 </div>
                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                   <button onClick={() => navigate(`/admin/blog/${art.id}`)}
-                    style={{ padding: '5px 12px', fontSize: '12px', borderRadius: '6px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+                    style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
                     Editar
                   </button>
                   <button onClick={() => setConfirmEliminar(art)}
-                    style={{ padding: '5px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #F0C5B4', background: 'none', cursor: 'pointer', color: '#A32D2D' }}>✕</button>
+                    style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #F0C5B4', background: 'none', cursor: 'pointer', color: '#A32D2D' }}>✕</button>
                 </div>
               </div>
             )
@@ -195,7 +197,7 @@ export function ArticuloForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const esEdicion = !!id
-  const [form, setForm] = useState({ titulo: '', resumen: '', contenido: '', categoria: 'tecnica', destacado: false, drive_pdf_id: '' })
+  const [form, setForm] = useState({ titulo: '', resumen: '', contenido: '', categoria: 'tecnica', destacado: false, drive_pdf_id: '', idioma: '' })
   const [errores, setErrores] = useState({})
   const [cargando, setCargando] = useState(esEdicion)
   const [guardando, setGuardando] = useState(false)
@@ -213,6 +215,7 @@ export function ArticuloForm() {
         categoria: data.categoria || 'tecnica',
         destacado: data.destacado || false,
         drive_pdf_id: data.drive_pdf_id || '',
+        idioma: data.idioma || '',
       })
       setPublicado(data.publicado || false)
       setCargando(false)
@@ -232,6 +235,7 @@ export function ArticuloForm() {
       categoria: form.categoria,
       destacado: form.destacado,
       drive_pdf_id: form.drive_pdf_id || null,
+      idioma: form.idioma || null,
     }
     if (publicar) datos.publicado = true
     const { ok, data, error } = esEdicion ? await actualizarArticulo(id, datos) : await crearArticulo(datos)
@@ -281,6 +285,20 @@ export function ArticuloForm() {
 
       <Campo label="Contenido (opcional)">
         <textarea value={form.contenido} onChange={set('contenido')} placeholder="Podés escribir notas adicionales aquí..." rows={6} style={{ ...inputStyle, height: 'auto', padding: '12px', resize: 'vertical', lineHeight: '1.6' }} />
+      </Campo>
+
+      <Campo label="Idioma del texto (para pronunciación)">
+        <select value={form.idioma} onChange={set('idioma')} style={inputStyle}>
+          <option value="">— Sin especificar —</option>
+          <option value="latin">Latín</option>
+          <option value="italiano">Italiano</option>
+          <option value="espanol">Español</option>
+          <option value="aleman">Alemán</option>
+          <option value="frances">Francés</option>
+          <option value="ingles">Inglés</option>
+          <option value="portugues">Portugués</option>
+          <option value="otro">Otro</option>
+        </select>
       </Campo>
 
       <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '10px 0', marginBottom: '16px' }}>
