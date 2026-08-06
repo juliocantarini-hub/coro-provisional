@@ -185,43 +185,27 @@ export function ArticuloDetalle() {
   const [errorPron, setErrorPron] = useState('')
 
   async function generarPronunciacion() {
-    if (!articulo.contenido) return
-    setCargandoPron(true)
-    setErrorPron('')
-    setPronunciacion(null)
-    try {
-      const idioma = IDIOMA_LABEL[articulo.idioma] || 'el idioma del texto'
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+  if (!articulo.contenido) return
+  setCargandoPron(true)
+  setErrorPron('')
+  setPronunciacion(null)
+  try {
+    const response = await fetch('/api/pronunciacion', {
       method: 'POST',
-      headers: {
-     'Content-Type': 'application/json',
-     'anthropic-dangerous-direct-browser-ipc': 'true',
-   },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `Sos un asistente de pronunciación para cantantes de coro. El siguiente texto está en ${idioma}. Para cada línea del texto, escribí la línea original y debajo su pronunciación fonética simplificada en español, para que un cantante que no conoce el idioma pueda pronunciarlo correctamente. Usá guiones para separar sílabas y mayúsculas para la sílaba acentuada. Formato exacto:
-
-[línea original]
-[pronunciación]
-
-[línea siguiente]
-[pronunciación]
-
-No agregues explicaciones ni comentarios, solo el texto con su pronunciación. Texto:\n\n${articulo.contenido}`
-          }]
-        })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contenido: articulo.contenido,
+        idioma: IDIOMA_LABEL[articulo.idioma] || articulo.idioma
       })
-      const data = await response.json()
-      const texto = data.content?.[0]?.text || ''
-      setPronunciacion(texto)
-    } catch (e) {
-      setErrorPron('No se pudo generar la pronunciación. Intentá de nuevo.')
-    }
-    setCargandoPron(false)
+    })
+    const data = await response.json()
+    const texto = data.texto || ''
+    setPronunciacion(texto)
+  } catch (e) {
+    setErrorPron('No se pudo generar la pronunciación. Intentá de nuevo.')
   }
+  setCargandoPron(false)
+}
 
   if (cargando) {
     return (
