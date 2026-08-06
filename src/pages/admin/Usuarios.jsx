@@ -171,6 +171,7 @@ export default function Usuarios() {
       fecha_nacimiento: editando.fecha_nacimiento || null,
       dni: editando.dni || null,
       telefono: editando.telefono || null,
+      cuota_personalizada: editando.cuota_personalizada ?? null,
     }
     await supabase.from('perfiles').update(cambios).eq('id', editando.id)
     setGuardando(false)
@@ -534,6 +535,14 @@ export default function Usuarios() {
                 <input type="date" value={editando.fecha_nacimiento || ''} onChange={e => setEditando(ed => ({ ...ed, fecha_nacimiento: e.target.value }))}
                   style={inputStyle} />
               </div>
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={labelStyle}>Cuota personalizada (opcional)</label>
+              <input type="number" value={editando.cuota_personalizada ?? ''} onChange={e => setEditando(ed => ({ ...ed, cuota_personalizada: e.target.value === '' ? null : Number(e.target.value) }))}
+                placeholder="Dejar vacío = cuota estándar" style={inputStyle} />
+              <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '5px 0 0' }}>
+                Si se completa, este monto reemplaza la cuota estándar para esta persona todos los meses (ej: descuento por matrimonio).
+              </p>
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
               <button onClick={() => setEditando(null)} style={{ flex: 1, height: '40px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>

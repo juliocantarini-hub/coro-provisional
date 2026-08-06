@@ -138,6 +138,8 @@ setColectasPendientes(pendientes)
 }
 
 // Para el Dashboard del director: resumen financiero del mes actual (cuota + colectas puntuales activas)
+// La cuota respeta "cuota_personalizada" por cantante (ej: descuento por matrimonio) cuando está cargada;
+// las colectas puntuales siguen usando el monto único para todos, no admiten personalización.
 export function useResumenFinancieroMes() {
   const [resumen, setResumen] = useState(null)
   const [cargando, setCargando] = useState(true)
@@ -151,7 +153,7 @@ export function useResumenFinancieroMes() {
       const mes = hoy.getMonth() + 1
       const anio = hoy.getFullYear()
 
-      const [{ data: colectas }, { count: totalCantantes }] = await Promise.all([
+      const [{ data: colectas }, { data: cantantesList }] = await Promise.all([
         supabase
           .from('colectas')
           .select('*, colectas_registros(*)')
@@ -160,26 +162,51 @@ export function useResumenFinancieroMes() {
           .eq('anio', anio),
         supabase
           .from('perfiles')
-          .select('id', { count: 'exact', head: true })
+          .select('id, cuota_personalizada')
           .eq('coro_id', coro.id)
-          .eq('rol', 'cantante'),
+          .eq('rol', 'cantante')
+          .eq('estado', 'activo'),
       ])
 
       const activas = colectas || []
-      const total = totalCantantes || 0
+      const cantantes = cantantesList || []
+      const total = cantantes.length
       let esperado = 0, ingresado = 0, pagas = 0, impagas = 0, exentas = 0
 
       activas.forEach(c => {
         const regs = c.colectas_registros || []
-        const pagasC = regs.filter(r => r.estado === 'pagado').length
-        const exentasC = regs.filter(r => r.estado === 'exento').length
-        const impagasC = Math.max(total - pagasC - exentasC, 0)
 
-        esperado += c.monto * (total - exentasC)
-        ingresado += c.monto * pagasC
-        pagas += pagasC
-        exentas += exentasC
-        impagas += impagasC
+        if (c.tipo === 'cuota') {
+          // Cuota mensual: cada cantante puede tener un monto propio (cuota_personalizada)
+          cantantes.forEach(cant => {
+            const reg = regs.find(r => r.perfil_id === cant.id)
+            const estado = reg?.estado || 'pendiente'
+            const montoPersona = cant.cuota_personalizada ?? c.monto
+
+            if (estado === 'exento') {
+              exentas++
+            } else {
+              esperado += montoPersona
+              if (estado === 'pagado') {
+                ingresado += montoPersona
+                pagas++
+              } else {
+                impagas++
+              }
+            }
+          })
+        } else {
+          // Colecta puntual: monto único para todos, sin personalización
+          const pagasC = regs.filter(r => r.estado === 'pagado').length
+          const exentasC = regs.filter(r => r.estado === 'exento').length
+          const impagasC = Math.max(total - pagasC - exentasC, 0)
+
+          esperado += c.monto * (total - exentasC)
+          ingresado += c.monto * pagasC
+          pagas += pagasC
+          exentas += exentasC
+          impagas += impagasC
+        }
       })
 
       setResumen({
