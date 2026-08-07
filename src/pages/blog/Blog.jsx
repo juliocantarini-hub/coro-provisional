@@ -342,18 +342,23 @@ export function ArticuloDetalle() {
           </div>
           <div style={{ fontSize: '14px', color: '#1A1A18', lineHeight: '2' }}>
             {pronunciacion.split('\n').map((linea, i) => {
-              const esPronunciacion = i % 3 === 1
-              return (
-                <div key={i} style={{
-                  color: esPronunciacion ? '#0F6E56' : '#1A1A18',
-                  fontSize: esPronunciacion ? '13px' : '15px',
-                  fontFamily: esPronunciacion ? 'system-ui, sans-serif' : 'Georgia, serif',
-                  marginBottom: esPronunciacion ? '8px' : '2px',
-                }}>
-                  {linea}
-                </div>
-              )
-            })}
+  if (!linea.trim()) return <div key={i} style={{ height: '8px' }} />
+  const esTraduccion = linea.trim().startsWith('(') && linea.trim().endsWith(')')
+  const esFonetica = !esTraduccion && /[áéíóúÁÉÍÓÚ]/.test(linea) && linea === linea.toLowerCase().replace(/^[a-záéíóúüñ\s\-]+$/i, linea)
+  // Heurística: si tiene acento y no es traducción, probablemente es fonética
+  const tieneFonetica = !esTraduccion && (linea.includes('-') || /[áéíóú]/.test(linea))
+  return (
+    <div key={i} style={{
+      color: esTraduccion ? '#B4B2A9' : tieneFonetica ? '#0F6E56' : '#1A1A18',
+      fontSize: esTraduccion ? '12px' : tieneFonetica ? '13px' : '15px',
+      fontFamily: esTraduccion ? 'system-ui, sans-serif' : tieneFonetica ? 'system-ui, sans-serif' : 'Georgia, serif',
+      fontStyle: esTraduccion ? 'italic' : 'normal',
+      marginBottom: '2px',
+    }}>
+      {linea}
+    </div>
+  )
+})}
           </div>
         </div>
       )}
