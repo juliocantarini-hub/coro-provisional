@@ -247,6 +247,8 @@ export function ArticuloDetalle() {
     )
   }
 
+  const tieneIA = articulo.contenido && articulo.idioma
+
   return (
     <div style={{ maxWidth: '780px' }}>
       <button onClick={() => navigate('/blog')} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888780', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', marginBottom: '20px', padding: 0 }}>
@@ -254,35 +256,117 @@ export function ArticuloDetalle() {
         Volver a Textos
       </button>
 
+      {/* Cabecera */}
       <div style={{ marginBottom: '20px' }}>
-        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 12px', lineHeight: '1.35' }}>
+        <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 8px', lineHeight: '1.35' }}>
           {articulo.titulo}
         </h1>
         <div style={{ fontSize: '13px', color: '#888780', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
           {articulo.perfiles?.nombre && <span>Por {articulo.perfiles.nombre}</span>}
           <span>·</span>
           <span>{new Date(articulo.creado_en).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-          {articulo.idioma && <span style={{ color: '#378ADD' }}>· 🎤 {IDIOMA_LABEL[articulo.idioma] || articulo.idioma}</span>}
+          {articulo.idioma && (
+            <span style={{ background: '#E6F1FB', color: '#042C53', fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px' }}>
+              🎤 {IDIOMA_LABEL[articulo.idioma] || articulo.idioma}
+            </span>
+          )}
         </div>
       </div>
 
       {articulo.resumen && (
-        <div style={{ background: '#F8F7F3', borderLeft: '3px solid #1D9E75', borderRadius: '0 10px 10px 0', padding: '14px 16px', marginBottom: '24px', fontSize: '15px', color: '#3D3D3A', lineHeight: '1.6', fontStyle: 'italic' }}>
+        <div style={{ background: '#F8F7F3', borderLeft: '3px solid #1D9E75', borderRadius: '0 10px 10px 0', padding: '14px 16px', marginBottom: '20px', fontSize: '15px', color: '#3D3D3A', lineHeight: '1.6', fontStyle: 'italic' }}>
           {articulo.resumen}
         </div>
       )}
 
-      {articulo.drive_pdf_id && (
-        <div style={{ marginBottom: '12px' }}>
-          <a href={driveUrlImprimir(articulo.drive_pdf_id)} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: '12px', color: '#5F5E5A', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#F1EFE8', padding: '5px 12px', borderRadius: '8px', border: '1px solid #E8E6DF' }}>
-            🖨 Abrir para imprimir
-          </a>
+      {/* Panel de herramientas IA — solo si hay contenido e idioma */}
+      {tieneIA && (
+        <div style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
+            Herramientas
+          </div>
+
+          {/* Fila de botones */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: audioUrl ? '12px' : '0' }}>
+            <button onClick={generarAudio} disabled={cargandoAudio}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: cargandoAudio ? 'not-allowed' : 'pointer', background: '#378ADD', color: '#FFFFFF', fontSize: '13px', fontWeight: '500', opacity: cargandoAudio ? 0.7 : 1 }}>
+              {cargandoAudio ? '⏳ Generando...' : '🔊 Escuchar texto'}
+            </button>
+            <button onClick={generarPronunciacion} disabled={cargandoPron}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: cargandoPron ? 'not-allowed' : 'pointer', background: pronunciacion ? '#E1F5EE' : '#0F6E56', color: pronunciacion ? '#04342C' : '#FFFFFF', fontSize: '13px', fontWeight: '500', opacity: cargandoPron ? 0.7 : 1 }}>
+              {cargandoPron ? '⏳ Generando...' : pronunciacion ? '🎤 Regenerar pronunciación' : '🎤 Ver pronunciación'}
+            </button>
+          </div>
+
+          {/* Reproductor + velocidad */}
+          {audioUrl && (
+            <div style={{ marginTop: '12px' }}>
+              <audio
+                id="audio-texto"
+                controls
+                src={audioUrl}
+                style={{ width: '100%', height: '36px', marginBottom: '8px' }}
+                onLoadedMetadata={e => { e.target.playbackRate = velocidad }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', color: '#888780' }}>Velocidad:</span>
+                {[0.5, 0.75, 1, 1.25].map(v => (
+                  <button key={v} onClick={() => {
+                    setVelocidad(v)
+                    const audio = document.getElementById('audio-texto')
+                    if (audio) audio.playbackRate = v
+                  }}
+                    style={{
+                      padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
+                      background: velocidad === v ? '#378ADD' : '#F1EFE8',
+                      color: velocidad === v ? '#FFFFFF' : '#5F5E5A',
+                    }}>
+                    {v === 1 ? 'Normal' : `${v}x`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {errorPron && (
+            <div style={{ marginTop: '10px', fontSize: '13px', color: '#A32D2D' }}>{errorPron}</div>
+          )}
         </div>
       )}
 
+      {/* Guía de pronunciación */}
+      {pronunciacion && (
+        <div style={{ background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
+            🎤 Guía de pronunciación
+          </div>
+          <div style={{ fontSize: '14px', color: '#1A1A18', lineHeight: '2' }}>
+            {pronunciacion.split('\n').map((linea, i) => {
+              const esPronunciacion = i % 3 === 1
+              return (
+                <div key={i} style={{
+                  color: esPronunciacion ? '#0F6E56' : '#1A1A18',
+                  fontSize: esPronunciacion ? '13px' : '15px',
+                  fontFamily: esPronunciacion ? 'system-ui, sans-serif' : 'Georgia, serif',
+                  marginBottom: esPronunciacion ? '8px' : '2px',
+                }}>
+                  {linea}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* PDF */}
       {articulo.drive_pdf_id && (
-        <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #E8E6DF', marginBottom: '24px' }}>
+        <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #E8E6DF' }}>
+          <div style={{ display: 'flex', gap: '10px', padding: '10px 14px', background: '#F8F7F3', borderBottom: '1px solid #E8E6DF' }}>
+            <a href={driveUrlImprimir(articulo.drive_pdf_id)} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: '12px', color: '#5F5E5A', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#FFFFFF', padding: '5px 12px', borderRadius: '8px', border: '1px solid #E8E6DF' }}>
+              🖨 Abrir para imprimir
+            </a>
+          </div>
           <iframe
             src={'https://drive.google.com/file/d/' + articulo.drive_pdf_id + '/preview'}
             width="100%"
@@ -290,87 +374,6 @@ export function ArticuloDetalle() {
             allow="autoplay"
             style={{ border: 'none', display: 'block' }}
           />
-        </div>
-      )}
-
-      {articulo.contenido && (
-        <div style={{ fontSize: '15px', color: '#3D3D3A', lineHeight: '1.75', whiteSpace: 'pre-wrap', marginBottom: '24px' }}>
-          {articulo.contenido}
-        </div>
-      )}
-
-      {/* Botones TTS y pronunciación */}
-      {articulo.contenido && articulo.idioma && (
-        <div style={{ marginTop: '8px' }}>
-
-          {/* Botón escuchar */}
-<div style={{ marginBottom: '12px' }}>
-  <button onClick={generarAudio} disabled={cargandoAudio}
-    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: cargandoAudio ? 'not-allowed' : 'pointer', background: '#378ADD', color: '#FFFFFF', fontSize: '13px', fontWeight: '500', marginBottom: '10px' }}>
-    {cargandoAudio ? '⏳ Generando audio...' : '🔊 Escuchar texto'}
-  </button>
-  {audioUrl && (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <audio
-        id="audio-texto"
-        controls
-        src={audioUrl}
-        style={{ width: '100%', height: '36px' }}
-        onLoadedMetadata={e => { e.target.playbackRate = velocidad }}
-      />
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontSize: '12px', color: '#888780' }}>Velocidad:</span>
-        {[0.5, 0.75, 1, 1.25].map(v => (
-          <button key={v} onClick={() => {
-            setVelocidad(v)
-            const audio = document.getElementById('audio-texto')
-            if (audio) audio.playbackRate = v
-          }}
-            style={{
-              padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-              background: velocidad === v ? '#378ADD' : '#E8E6DF',
-              color: velocidad === v ? '#FFFFFF' : '#5F5E5A',
-            }}>
-            {v === 1 ? 'Normal' : `${v}x`}
-          </button>
-        ))}
-      </div>
-    </div>
-  )}
-</div>
-
-          {/* Botón pronunciación */}
-          <button onClick={generarPronunciacion} disabled={cargandoPron}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: cargandoPron ? 'not-allowed' : 'pointer', background: pronunciacion ? '#E1F5EE' : '#0F6E56', color: pronunciacion ? '#04342C' : '#FFFFFF', fontSize: '13px', fontWeight: '500', transition: 'background 0.2s' }}>
-            {cargandoPron ? '⏳ Generando...' : pronunciacion ? '🎤 Regenerar pronunciación' : '🎤 Ver pronunciación'}
-          </button>
-
-          {errorPron && (
-            <div style={{ marginTop: '12px', fontSize: '13px', color: '#A32D2D' }}>{errorPron}</div>
-          )}
-
-          {pronunciacion && (
-            <div style={{ marginTop: '16px', background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '20px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
-                🎤 Guía de pronunciación
-              </div>
-              <div style={{ fontSize: '14px', color: '#1A1A18', lineHeight: '2', whiteSpace: 'pre-wrap' }}>
-                {pronunciacion.split('\n').map((linea, i) => {
-                  const esPronunciacion = i % 3 === 1
-                  return (
-                    <div key={i} style={{
-                      color: esPronunciacion ? '#0F6E56' : '#1A1A18',
-                      fontSize: esPronunciacion ? '13px' : '15px',
-                      fontFamily: esPronunciacion ? 'system-ui, sans-serif' : 'Georgia, serif',
-                      marginBottom: esPronunciacion ? '8px' : '2px',
-                    }}>
-                      {linea}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
