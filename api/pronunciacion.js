@@ -7,15 +7,17 @@ export default async function handler(req) {
 
   const { contenido, idioma } = await req.json()
 
-  const prompt = `Sos un asistente de pronunciación para cantantes de coro. El siguiente texto está en ${idioma}. Para cada línea del texto, escribí la línea original y debajo su pronunciación fonética simplificada en español, para que un cantante que no conoce el idioma pueda pronunciarlo correctamente. Usá guiones para separar sílabas y mayúsculas para la sílaba acentuada. Formato exacto:
+  const prompt = `Sos un asistente de pronunciación para cantantes de coro. El siguiente texto está en ${idioma}. Para cada línea del texto, escribí la línea original, debajo su pronunciación fonética simplificada en español y debajo la traducción al español. Usá guiones para separar sílabas y mayúsculas para la sílaba acentuada. Formato exacto (respetá las líneas en blanco entre grupos):
 
 [línea original]
 [pronunciación]
+([traducción])
 
 [línea siguiente]
 [pronunciación]
+([traducción])
 
-No agregues explicaciones ni comentarios, solo el texto con su pronunciación. Texto:\n\n${contenido}`
+No agregues explicaciones ni comentarios, solo el texto con su pronunciación y traducción. Texto:\n\n${contenido}`
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -26,7 +28,7 @@ No agregues explicaciones ni comentarios, solo el texto con su pronunciación. T
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1000,
+      max_tokens: 1500,
     })
   })
 

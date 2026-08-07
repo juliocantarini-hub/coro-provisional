@@ -279,13 +279,13 @@ export function ArticuloForm() {
         )}
       </Campo>
 
-      <Campo label="Resumen (opcional)">
-        <textarea value={form.resumen} onChange={set('resumen')} placeholder="Breve descripción..." rows={2} style={{ ...inputStyle, height: 'auto', padding: '10px 12px', resize: 'vertical' }} />
-      </Campo>
+      <Campo label="Texto a pronunciar">
+      <textarea value={form.contenido} onChange={set('contenido')} placeholder="Pegá aquí el texto de la obra línea por línea..." rows={6} style={{ ...inputStyle, height: 'auto', padding: '12px', resize: 'vertical', lineHeight: '1.6' }} />
+     </Campo>
 
-      <Campo label="Contenido (opcional)">
-        <textarea value={form.contenido} onChange={set('contenido')} placeholder="Podés escribir notas adicionales aquí..." rows={6} style={{ ...inputStyle, height: 'auto', padding: '12px', resize: 'vertical', lineHeight: '1.6' }} />
-      </Campo>
+     <Campo label="Nota (opcional)">
+     <textarea value={form.resumen} onChange={set('resumen')} placeholder="Contexto, indicaciones o comentarios sobre el texto..." rows={2} style={{ ...inputStyle, height: 'auto', padding: '10px 12px', resize: 'vertical' }} />
+    </Campo>
 
       <Campo label="Idioma del texto (para pronunciación)">
         <select value={form.idioma} onChange={set('idioma')} style={inputStyle}>
