@@ -185,6 +185,7 @@ export function ArticuloDetalle() {
   const [errorPron, setErrorPron] = useState('')
   const [audioUrl, setAudioUrl] = useState(null)
   const [cargandoAudio, setCargandoAudio] = useState(false)
+  const [velocidad, setVelocidad] = useState(1)
 
   async function generarPronunciacion() {
     if (!articulo.contenido) return
@@ -303,15 +304,40 @@ export function ArticuloDetalle() {
         <div style={{ marginTop: '8px' }}>
 
           {/* Botón escuchar */}
-          <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <button onClick={generarAudio} disabled={cargandoAudio}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: cargandoAudio ? 'not-allowed' : 'pointer', background: '#378ADD', color: '#FFFFFF', fontSize: '13px', fontWeight: '500' }}>
-              {cargandoAudio ? '⏳ Generando audio...' : '🔊 Escuchar texto'}
-            </button>
-            {audioUrl && (
-              <audio controls src={audioUrl} style={{ height: '36px', flex: 1, minWidth: '200px' }} />
-            )}
-          </div>
+<div style={{ marginBottom: '12px' }}>
+  <button onClick={generarAudio} disabled={cargandoAudio}
+    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: cargandoAudio ? 'not-allowed' : 'pointer', background: '#378ADD', color: '#FFFFFF', fontSize: '13px', fontWeight: '500', marginBottom: '10px' }}>
+    {cargandoAudio ? '⏳ Generando audio...' : '🔊 Escuchar texto'}
+  </button>
+  {audioUrl && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <audio
+        id="audio-texto"
+        controls
+        src={audioUrl}
+        style={{ width: '100%', height: '36px' }}
+        onLoadedMetadata={e => { e.target.playbackRate = velocidad }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontSize: '12px', color: '#888780' }}>Velocidad:</span>
+        {[0.5, 0.75, 1, 1.25].map(v => (
+          <button key={v} onClick={() => {
+            setVelocidad(v)
+            const audio = document.getElementById('audio-texto')
+            if (audio) audio.playbackRate = v
+          }}
+            style={{
+              padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
+              background: velocidad === v ? '#378ADD' : '#E8E6DF',
+              color: velocidad === v ? '#FFFFFF' : '#5F5E5A',
+            }}>
+            {v === 1 ? 'Normal' : `${v}x`}
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
 
           {/* Botón pronunciación */}
           <button onClick={generarPronunciacion} disabled={cargandoPron}
