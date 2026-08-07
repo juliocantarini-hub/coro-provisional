@@ -183,29 +183,47 @@ export function ArticuloDetalle() {
   const [pronunciacion, setPronunciacion] = useState(null)
   const [cargandoPron, setCargandoPron] = useState(false)
   const [errorPron, setErrorPron] = useState('')
+  const [audioUrl, setAudioUrl] = useState(null)
+  const [cargandoAudio, setCargandoAudio] = useState(false)
 
   async function generarPronunciacion() {
-  if (!articulo.contenido) return
-  setCargandoPron(true)
-  setErrorPron('')
-  setPronunciacion(null)
-  try {
-    const response = await fetch('/api/pronunciacion', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contenido: articulo.contenido,
-        idioma: IDIOMA_LABEL[articulo.idioma] || articulo.idioma
+    if (!articulo.contenido) return
+    setCargandoPron(true)
+    setErrorPron('')
+    setPronunciacion(null)
+    try {
+      const response = await fetch('/api/pronunciacion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contenido: articulo.contenido,
+          idioma: IDIOMA_LABEL[articulo.idioma] || articulo.idioma
+        })
       })
-    })
-    const data = await response.json()
-    const texto = data.texto || ''
-    setPronunciacion(texto)
-  } catch (e) {
-    setErrorPron('No se pudo generar la pronunciación. Intentá de nuevo.')
+      const data = await response.json()
+      setPronunciacion(data.texto || '')
+    } catch (e) {
+      setErrorPron('No se pudo generar la pronunciación. Intentá de nuevo.')
+    }
+    setCargandoPron(false)
   }
-  setCargandoPron(false)
-}
+
+  async function generarAudio() {
+    setCargandoAudio(true)
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: articulo.contenido })
+      })
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setAudioUrl(url)
+    } catch (e) {
+      console.error('Error TTS:', e)
+    }
+    setCargandoAudio(false)
+  }
 
   if (cargando) {
     return (
@@ -280,9 +298,22 @@ export function ArticuloDetalle() {
         </div>
       )}
 
-      {/* Botón pronunciación */}
+      {/* Botones TTS y pronunciación */}
       {articulo.contenido && articulo.idioma && (
         <div style={{ marginTop: '8px' }}>
+
+          {/* Botón escuchar */}
+          <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <button onClick={generarAudio} disabled={cargandoAudio}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: cargandoAudio ? 'not-allowed' : 'pointer', background: '#378ADD', color: '#FFFFFF', fontSize: '13px', fontWeight: '500' }}>
+              {cargandoAudio ? '⏳ Generando audio...' : '🔊 Escuchar texto'}
+            </button>
+            {audioUrl && (
+              <audio controls src={audioUrl} style={{ height: '36px', flex: 1, minWidth: '200px' }} />
+            )}
+          </div>
+
+          {/* Botón pronunciación */}
           <button onClick={generarPronunciacion} disabled={cargandoPron}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: cargandoPron ? 'not-allowed' : 'pointer', background: pronunciacion ? '#E1F5EE' : '#0F6E56', color: pronunciacion ? '#04342C' : '#FFFFFF', fontSize: '13px', fontWeight: '500', transition: 'background 0.2s' }}>
             {cargandoPron ? '⏳ Generando...' : pronunciacion ? '🎤 Regenerar pronunciación' : '🎤 Ver pronunciación'}
