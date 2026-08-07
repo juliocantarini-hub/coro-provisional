@@ -31,7 +31,7 @@ No agregues explicaciones ni comentarios, solo el texto con su pronunciación. T
   const data = await response.json()
   const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
-  return new Response(JSON.stringify({ texto }), {
+  return new Response(JSON.stringify({ texto, debug: data }), {
     headers: { 'Content-Type': 'application/json' }
   })
 }
