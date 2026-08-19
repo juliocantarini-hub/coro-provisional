@@ -7,17 +7,17 @@ export default async function handler(req) {
 
   const { contenido, idioma } = await req.json()
 
-  const prompt = `Sos un asistente de pronunciación para cantantes de coro. El siguiente texto está en ${idioma}. Para cada línea del texto, escribí la línea original, debajo su pronunciación fonética simplificada en español y debajo la traducción al español. Usá guiones para separar sílabas y mayúsculas para la sílaba acentuada. Formato exacto (respetá las líneas en blanco entre grupos):
+  const prompt = `Sos un asistente de pronunciación para cantantes de coro. El siguiente texto está en ${idioma}. Para cada línea del texto, escribí tres líneas con estos prefijos exactos:
+O: [línea original]
+F: [pronunciación fonética simplificada en español, con guiones entre sílabas y la sílaba acentuada en MAYÚSCULAS]
+T: [traducción al español entre paréntesis]
 
-[línea original]
-[pronunciación]
-([traducción])
+Dejá una línea en blanco entre cada grupo. No agregues explicaciones ni comentarios. Ejemplo de formato:
+O: Kyrie eleison
+F: KI-ri-e e-LEI-son
+T: (Señor, ten piedad)
 
-[línea siguiente]
-[pronunciación]
-([traducción])
-
-No agregues explicaciones ni comentarios, solo el texto con su pronunciación y traducción. Texto:\n\n${contenido}`
+Texto:\n\n${contenido}`
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

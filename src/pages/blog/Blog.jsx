@@ -256,7 +256,6 @@ export function ArticuloDetalle() {
         Volver a Textos
       </button>
 
-      {/* Cabecera */}
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 8px', lineHeight: '1.35' }}>
           {articulo.titulo}
@@ -279,14 +278,11 @@ export function ArticuloDetalle() {
         </div>
       )}
 
-      {/* Panel de herramientas IA — solo si hay contenido e idioma */}
       {tieneIA && (
         <div style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <div style={{ fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
             Herramientas
           </div>
-
-          {/* Fila de botones */}
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: audioUrl ? '12px' : '0' }}>
             <button onClick={generarAudio} disabled={cargandoAudio}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: cargandoAudio ? 'not-allowed' : 'pointer', background: '#378ADD', color: '#FFFFFF', fontSize: '13px', fontWeight: '500', opacity: cargandoAudio ? 0.7 : 1 }}>
@@ -298,7 +294,6 @@ export function ArticuloDetalle() {
             </button>
           </div>
 
-          {/* Reproductor + velocidad */}
           {audioUrl && (
             <div style={{ marginTop: '12px' }}>
               <audio
@@ -334,7 +329,6 @@ export function ArticuloDetalle() {
         </div>
       )}
 
-      {/* Guía de pronunciación */}
       {pronunciacion && (
         <div style={{ background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
           <div style={{ fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
@@ -342,28 +336,28 @@ export function ArticuloDetalle() {
           </div>
           <div style={{ fontSize: '14px', color: '#1A1A18', lineHeight: '2' }}>
             {pronunciacion.split('\n').map((linea, i) => {
-  if (!linea.trim()) return <div key={i} style={{ height: '8px' }} />
-  const esTraduccion = linea.trim().startsWith('(') && linea.trim().endsWith(')')
-  const esFonetica = !esTraduccion && /[áéíóúÁÉÍÓÚ]/.test(linea) && linea === linea.toLowerCase().replace(/^[a-záéíóúüñ\s\-]+$/i, linea)
-  // Heurística: si tiene acento y no es traducción, probablemente es fonética
-  const tieneFonetica = !esTraduccion && (linea.includes('-') || /[áéíóú]/.test(linea))
-  return (
-    <div key={i} style={{
-      color: esTraduccion ? '#B4B2A9' : tieneFonetica ? '#0F6E56' : '#1A1A18',
-      fontSize: esTraduccion ? '12px' : tieneFonetica ? '13px' : '15px',
-      fontFamily: esTraduccion ? 'system-ui, sans-serif' : tieneFonetica ? 'system-ui, sans-serif' : 'Georgia, serif',
-      fontStyle: esTraduccion ? 'italic' : 'normal',
-      marginBottom: '2px',
-    }}>
-      {linea}
-    </div>
-  )
-})}
+              if (!linea.trim()) return <div key={i} style={{ height: '10px' }} />
+              const esOriginal = linea.startsWith('O: ')
+              const esFonetica = linea.startsWith('F: ')
+              const esTraduccion = linea.startsWith('T: ')
+              const texto = linea.replace(/^[OFT]: /, '')
+              if (!esOriginal && !esFonetica && !esTraduccion) return null
+              return (
+                <div key={i} style={{
+                  color: esOriginal ? '#1A1A18' : esFonetica ? '#0F6E56' : '#B4B2A9',
+                  fontSize: esOriginal ? '15px' : esFonetica ? '13px' : '12px',
+                  fontFamily: esOriginal ? 'Georgia, serif' : 'system-ui, sans-serif',
+                  fontStyle: esTraduccion ? 'italic' : 'normal',
+                  marginBottom: esOriginal ? '2px' : esFonetica ? '2px' : '0',
+                }}>
+                  {texto}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* PDF */}
       {articulo.drive_pdf_id && (
         <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #E8E6DF' }}>
           <div style={{ display: 'flex', gap: '10px', padding: '10px 14px', background: '#F8F7F3', borderBottom: '1px solid #E8E6DF' }}>
