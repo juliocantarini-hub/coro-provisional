@@ -41,22 +41,27 @@ export default function EstudioAdmin() {
       return
     }
 
-    const { data: actividad } = await supabase
-      .from('actividad_estudio')
-      .select('usuario_id, obra_id, tipo')
+    const { data: resumen } = await supabase
+      .rpc('get_actividad_estudio_resumen', { p_coro_id: coro.id })
+
+    const resumenMap = {}
+    for (const r of resumen || []) {
+      resumenMap[r.usuario_id] = r
+    }
 
     const stats = cantantes.map(c => {
-      const actos = actividad?.filter(a => a.usuario_id === c.id && a.tipo === 'apertura') || []
-      const obrasUnicas = new Set(actos.map(a => a.obra_id))
-      const totalEntradas = actos.length
+      const r = resumenMap[c.id]
+      const obrasUnicas   = r ? Number(r.obras_unicas)   : 0
+      const totalEntradas = r ? Number(r.total_entradas) : 0
 
-      const pctCobertura  = countObras > 0 ? (obrasUnicas.size / countObras) * 100 : 0
-      const pctFrecuencia = countObras > 0 ? (Math.min(totalEntradas, countObras) / countObras) * 100 : 0
-      const porcentaje    = Math.round((pctCobertura + pctFrecuencia) / 2)
+      const pctCobertura      = countObras > 0 ? (obrasUnicas / countObras) * 100 : 0
+      const promedioAperturas = obrasUnicas > 0 ? totalEntradas / obrasUnicas : 0
+      const pctFrecuencia     = Math.min((promedioAperturas / 30) * 100, 100)
+      const porcentaje        = Math.min(100, Math.round((pctCobertura + pctFrecuencia) / 2))
 
       return {
         ...c,
-        obrasVisitadas: obrasUnicas.size,
+        obrasVisitadas: obrasUnicas,
         totalEntradas,
         porcentaje,
       }

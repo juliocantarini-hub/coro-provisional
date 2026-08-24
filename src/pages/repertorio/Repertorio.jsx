@@ -64,10 +64,11 @@ function useDedicacion(usuarioId, obras) {
         .eq('tipo', 'apertura')
         .in('obra_id', obraIds)
       if (!data) return
-      const obrasUnicas = new Set(data.map(a => a.obra_id))
-      const pctCobertura  = (obrasUnicas.size / totalObras) * 100
-      const pctFrecuencia = (Math.min(data.length, totalObras) / totalObras) * 100
-      setPorcentaje(Math.round((pctCobertura + pctFrecuencia) / 2))
+      const obrasUnicas      = new Set(data.map(a => a.obra_id))
+      const pctCobertura      = (obrasUnicas.size / totalObras) * 100
+      const promedioAperturas = obrasUnicas.size > 0 ? data.length / obrasUnicas.size : 0
+      const pctFrecuencia     = Math.min((promedioAperturas / 30) * 100, 100)
+      setPorcentaje(Math.min(100, Math.round((pctCobertura + pctFrecuencia) / 2)))
     }
     cargar()
   }, [usuarioId, obras])
