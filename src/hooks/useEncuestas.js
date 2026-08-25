@@ -13,8 +13,8 @@ function useEncuestaBase(fetchEncuesta, deps) {
   const cargar = useCallback(async () => {
     setCargando(true)
 
-    const { data: userData } = await supabase.auth.getUser()
-    const perfilId = userData?.user?.id || null
+    const { data: userData } = await supabase.auth.getSession()
+    const perfilId = userData?.session?.user?.id || null
     setMiPerfilId(perfilId)
 
     const encuestaData = await fetchEncuesta()
@@ -170,8 +170,8 @@ export function useEncuestasActivas() {
       return
     }
 
-    const { data: userData } = await supabase.auth.getUser()
-    const perfilId = userData?.user?.id || null
+    const { data: userData } = await supabase.auth.getSession()
+    const perfilId = userData?.session?.user?.id || null
 
     const { data: encuestasData } = await supabase
       .from('encuestas')
@@ -217,8 +217,8 @@ export function useEncuestasCantante() {
       return
     }
 
-    const { data: userData } = await supabase.auth.getUser()
-    const perfilId = userData?.user?.id || null
+    const { data: userData } = await supabase.auth.getSession()
+    const perfilId = userData?.session?.user?.id || null
 
     const { data: abiertasData } = await supabase
       .from('encuestas')
