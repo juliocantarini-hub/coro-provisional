@@ -283,14 +283,33 @@ export default function EjercicioPlayer({ ejercicio }) {
       {contadorTexto && (
         <p style={{ fontSize: 24, fontWeight: "bold", margin: "8px 0" }}>{contadorTexto}</p>
       )}
-      {!reproduciendo ? (
-        <button onClick={reproducir}>Reproducir</button>
+        {!reproduciendo ? (
+        <button
+          onClick={reproducir}
+          aria-label="Reproducir"
+          style={{
+            width: 44, height: 44, borderRadius: "50%", border: "none",
+            background: "#1D9E75", color: "white", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </button>
       ) : (
         <button
           onClick={esCronometroManual ? detenerCronometro : detener}
-          style={{ backgroundColor: "#c0392b", color: "white" }}
+          aria-label="Detener"
+          style={{
+            width: 44, height: 44, borderRadius: "50%", border: "none",
+            background: "#c0392b", color: "white", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
         >
-          ■ Detener
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+            <rect x="6" y="6" width="12" height="12" rx="1" />
+          </svg>
         </button>
       )}
       {tienePiano && <PianoVisual notaActiva={notaActiva} />}
