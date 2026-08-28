@@ -12,6 +12,7 @@ import ResetContrasena     from './pages/auth/ResetContrasena'
 
 // Cantante
 import Inicio          from './pages/Inicio'
+import Entrenamiento   from './pages/entrenamiento/Entrenamiento'
 import Repertorio      from './pages/repertorio/Repertorio'
 import ObraDetalle     from './pages/repertorio/ObraDetalle'
 import Calendario      from './pages/calendario/Calendario'
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="/" element={<RutaProtegida><ConLayout><Inicio /></ConLayout></RutaProtegida>} />
             <Route path="/repertorio" element={<RutaProtegida><ConLayout><Repertorio /></ConLayout></RutaProtegida>} />
             <Route path="/repertorio/:id" element={<RutaProtegida><ConLayout><ObraDetalle /></ConLayout></RutaProtegida>} />
+            <Route path="/entrenamiento" element={<RutaProtegida><ConLayout><Entrenamiento /></ConLayout></RutaProtegida>} />
             <Route path="/calendario" element={<RutaProtegida><ConLayout><Calendario /></ConLayout></RutaProtegida>} />
             <Route path="/calendario/:id" element={<RutaProtegida><ConLayout><EventoDetalle /></ConLayout></RutaProtegida>} />
             <Route path="/avisos" element={<RutaProtegida><ConLayout><Avisos /></ConLayout></RutaProtegida>} />

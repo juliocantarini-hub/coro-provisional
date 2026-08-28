@@ -8,6 +8,7 @@ import { useEncuestasActivas } from '../../hooks/useEncuestas'
 const NAV_CANTANTE = [
   { ruta: '/',           label: 'Inicio',         icono: 'inicio' },
   { ruta: '/repertorio', label: 'Repertorio',     icono: 'musica' },
+  { ruta: '/entrenamiento', label: 'Entrenamiento', icono: 'entrenamiento' },
   { ruta: '/calendario', label: 'Calendario',     icono: 'calendario' },
   { ruta: '/avisos',     label: 'Avisos',         icono: 'campana', badge: true },
   { ruta: '/encuestas',  label: 'Encuestas',      icono: 'encuestas', badgeEncuestas: true },
@@ -33,6 +34,7 @@ const NAV_ADMIN = [
 const ICONOS = {
   inicio:     "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
   musica:     "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z",
+  entrenamiento: "M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z",
   calendario: "M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z",
   campana:    "M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z",
   blog:       "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z",
