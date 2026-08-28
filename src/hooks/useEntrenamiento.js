@@ -111,3 +111,30 @@ export function useRachaEntrenamiento() {
 
   return { racha, cargando }
 }
+// ─── Ejercicios completados hoy ──────────────────────────────────────────────
+export function useEjerciciosHoy() {
+  const { usuario } = useAuth()
+  const [cantidad, setCantidad] = useState(0)
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    async function cargar() {
+      if (!usuario) { setCargando(false); return }
+
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+
+      const { count, error } = await supabase
+        .from('actividad_entrenamiento')
+        .select('id', { count: 'exact', head: true })
+        .eq('cantante_id', usuario.id)
+        .gte('completado_en', hoy.toISOString())
+
+      if (!error) setCantidad(count || 0)
+      setCargando(false)
+    }
+    cargar()
+  }, [usuario])
+
+  return { cantidad, cargando }
+}

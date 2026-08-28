@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useEjerciciosEntrenamiento, useRachaEntrenamiento } from '../../hooks/useEntrenamiento'
+import { useEjerciciosEntrenamiento, useEjerciciosHoy } from '../../hooks/useEntrenamiento'
 import EjercicioPlayer from '../../components/EjercicioPlayer'
 import PianoInteractivo from '../../components/PianoInteractivo'
 
@@ -16,7 +16,7 @@ const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'agilidad', 'rango', 'afi
 
 export default function Entrenamiento() {
   const { porCategoria, cargando, error, recargar } = useEjerciciosEntrenamiento()
-  const { racha } = useRachaEntrenamiento()
+  const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
   const [categoriaActiva, setCategoriaActiva] = useState('')
 
   const categoriasConDatos = ORDEN_CATEGORIAS.filter(cat => porCategoria[cat]?.length > 0)
@@ -33,17 +33,18 @@ export default function Entrenamiento() {
             Ejercicios de técnica vocal para practicar a tu ritmo
           </p>
         </div>
-        {racha > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FBF3DF', border: '1px solid #E8DBAE', borderRadius: '20px', padding: '5px 12px' }}>
-            <span style={{ fontSize: '16px' }}>🔥</span>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#8A6D1D' }}>
-              {racha} {racha === 1 ? 'día' : 'días'} seguidos
-            </span>
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {ejerciciosHoy > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FBF3DF', border: '1px solid #E8DBAE', borderRadius: '20px', padding: '5px 12px' }}>
+              <span style={{ fontSize: '16px' }}>🔥</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#8A6D1D' }}>
+                Entrenaste con {ejerciciosHoy} {ejerciciosHoy === 1 ? 'ejercicio' : 'ejercicios'} hoy
+              </span>
+            </div>
+          )}
+          <PianoInteractivo />
+        </div>
       </div>
-
-      <PianoInteractivo />
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setCategoriaActiva('')} style={{
