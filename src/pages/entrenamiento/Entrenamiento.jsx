@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useEjerciciosEntrenamiento, useRachaEntrenamiento } from '../../hooks/useEntrenamiento'
 import EjercicioPlayer from '../../components/EjercicioPlayer'
+import PianoInteractivo from '../../components/PianoInteractivo'
 
 const CATEGORIAS = {
   respiracion:  { label: 'Respiración',  color: '#0F6E56', bg: '#E1F5EE' },
@@ -41,6 +42,8 @@ export default function Entrenamiento() {
           </div>
         )}
       </div>
+
+      <PianoInteractivo />
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setCategoriaActiva('')} style={{
