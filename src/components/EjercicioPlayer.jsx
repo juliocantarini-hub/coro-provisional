@@ -35,6 +35,12 @@ export default function EjercicioPlayer({ ejercicio }) {
     Tone.Transport.cancel();
     Tone.Transport.stop();
     Tone.Draw.cancel();
+    const { sampler } = getPianoSampler();
+    if (sampler) {
+      sampler.releaseAll();
+      sampler.disconnect();
+      sampler.toDestination();
+    }
     limpiarTimers();
     setContadorTexto(null);
     setNotaActiva(null);

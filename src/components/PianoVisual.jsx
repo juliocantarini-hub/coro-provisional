@@ -1,6 +1,6 @@
 const TECLAS_BLANCAS = ["C", "D", "E", "F", "G", "A", "B"];
 const TECLAS_NEGRAS = { C: "C#", D: "D#", F: "F#", G: "G#", A: "A#" };
-const OCTAVAS = [2, 3, 4];
+const OCTAVAS = [2, 3, 4, 5];
 const TOTAL_TECLAS_BLANCAS = OCTAVAS.length * TECLAS_BLANCAS.length;
 
 export default function PianoVisual({ notaActiva }) {
