@@ -25,6 +25,18 @@ export default function Entrenamiento() {
 
   return (
     <div>
+      <style>{`
+        @media (max-width: 768px) {
+          .boton-piano-mobile {
+            position: fixed !important;
+            top: 12px !important;
+            right: 12px !important;
+            left: auto !important;
+            z-index: 55 !important;
+          }
+        }
+      `}</style>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
@@ -43,7 +55,9 @@ export default function Entrenamiento() {
               </span>
             </div>
           )}
-          <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
+          <div className="boton-piano-mobile">
+            <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
+          </div>
         </div>
       </div>
 
