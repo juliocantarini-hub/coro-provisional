@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import * as Tone from "tone";
 import PianoVisual from "./PianoVisual";
 import { registrarActividadEntrenamiento } from "../hooks/useEntrenamiento";
+import { getPianoSampler } from "../lib/pianoSampler";
 
 function transportarNota(notaBase, semitonos) {
   return Tone.Frequency(notaBase).transpose(semitonos).toNote();
@@ -11,7 +12,6 @@ export default function EjercicioPlayer({ ejercicio }) {
   const [reproduciendo, setReproduciendo] = useState(false);
   const [contadorTexto, setContadorTexto] = useState(null);
   const [notaActiva, setNotaActiva] = useState(null);
-  const synthRef = useRef(null);
   const timeoutRef = useRef(null);
   const intervalRef = useRef(null);
   const cronometroRef = useRef(null);
@@ -35,7 +35,6 @@ export default function EjercicioPlayer({ ejercicio }) {
     Tone.Transport.cancel();
     Tone.Transport.stop();
     Tone.Draw.cancel();
-    if (synthRef.current) { synthRef.current.dispose(); synthRef.current = null; }
     limpiarTimers();
     setContadorTexto(null);
     setNotaActiva(null);
@@ -128,8 +127,9 @@ export default function EjercicioPlayer({ ejercicio }) {
     if (patron.tipo === "cronometro_exhalacion") { ejecutarCronometro(); return; }
     if (patron.tipo === "instruccion_libre") { ejecutarTimerSimple(); return; }
 
-    const synth = new Tone.Synth().toDestination();
-    synthRef.current = synth;
+    const { sampler, listo } = getPianoSampler();
+    await listo;
+    const synth = sampler;
 
     const tempo = patron.tempo_bpm || 80;
     const duracionNota = 60 / tempo;
@@ -182,14 +182,9 @@ export default function EjercicioPlayer({ ejercicio }) {
         break;
       }
       case "nota_sostenida_deslizante": {
-        synth.portamento = 0.5;
-        synth.triggerAttack(patron.nota_inicial, ahora);
-        setNotaActiva(patron.nota_inicial);
-        synth.setNote(patron.nota_final, ahora + 0.1);
-        Tone.Draw.schedule(() => setNotaActiva(patron.nota_final), ahora + 0.1);
-        tiempoAcumulado = 1.5;
-        synth.triggerRelease(ahora + tiempoAcumulado);
-        Tone.Draw.schedule(() => setNotaActiva(null), ahora + tiempoAcumulado);
+        tocar(patron.nota_inicial, 0.5, ahora);
+        tocar(patron.nota_final, 0.8, ahora + 0.5);
+        tiempoAcumulado = 1.3;
         break;
       }
       case "nota_sostenida_dinamica": {
@@ -199,20 +194,13 @@ export default function EjercicioPlayer({ ejercicio }) {
         break;
       }
       case "glissando": {
-        synth.portamento = 0.8;
-        synth.triggerAttack(patron.nota_inicial, ahora);
-        setNotaActiva(patron.nota_inicial);
-        synth.setNote(patron.nota_final, ahora + 0.2);
-        Tone.Draw.schedule(() => setNotaActiva(patron.nota_final), ahora + 0.2);
+        tocar(patron.nota_inicial, 0.6, ahora);
+        tocar(patron.nota_final, 0.6, ahora + 0.6);
+        tiempoAcumulado = 1.2;
         if (patron.ida_y_vuelta) {
-          synth.setNote(patron.nota_inicial, ahora + 1.2);
-          Tone.Draw.schedule(() => setNotaActiva(patron.nota_inicial), ahora + 1.2);
-          tiempoAcumulado = 2.2;
-        } else {
-          tiempoAcumulado = 1.2;
+          tocar(patron.nota_inicial, 0.6, ahora + tiempoAcumulado);
+          tiempoAcumulado += 0.6;
         }
-        synth.triggerRelease(ahora + tiempoAcumulado);
-        Tone.Draw.schedule(() => setNotaActiva(null), ahora + tiempoAcumulado);
         break;
       }
       case "intervalo": {
@@ -265,8 +253,6 @@ export default function EjercicioPlayer({ ejercicio }) {
     }
 
     timeoutRef.current = setTimeout(() => {
-      synth.dispose();
-      synthRef.current = null;
       setNotaActiva(null);
       setReproduciendo(false);
       registrarActividadEntrenamiento(ejercicio.id);
@@ -283,7 +269,7 @@ export default function EjercicioPlayer({ ejercicio }) {
       {contadorTexto && (
         <p style={{ fontSize: 24, fontWeight: "bold", margin: "8px 0" }}>{contadorTexto}</p>
       )}
-        {!reproduciendo ? (
+      {!reproduciendo ? (
         <button
           onClick={reproducir}
           aria-label="Reproducir"

@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import * as Tone from "tone";
+import { getPianoSampler } from "../lib/pianoSampler";
 
 const TECLAS_BLANCAS = ["C", "D", "E", "F", "G", "A", "B"];
 const TECLAS_NEGRAS = { C: "C#", D: "D#", F: "F#", G: "G#", A: "A#" };
@@ -30,21 +31,14 @@ export function BotonPiano({ abierto, onClick }) {
 export default function PianoInteractivo({ abierto }) {
   const [transporteOctava, setTransporteOctava] = useState(0);
   const [notaActiva, setNotaActiva] = useState(null);
-  const synthRef = useRef(null);
-
-  function getSynth() {
-    if (!synthRef.current) {
-      synthRef.current = new Tone.Synth().toDestination();
-    }
-    return synthRef.current;
-  }
 
   async function tocarNota(tecla, octava) {
     await Tone.start();
     const octavaFinal = octava + transporteOctava;
     const nota = `${tecla}${octavaFinal}`;
-    const synth = getSynth();
-    synth.triggerAttackRelease(nota, "4n");
+    const { sampler, listo } = getPianoSampler();
+    await listo;
+    sampler.triggerAttackRelease(nota, "4n");
     setNotaActiva(nota);
     setTimeout(() => setNotaActiva((actual) => (actual === nota ? null : actual)), 400);
   }
