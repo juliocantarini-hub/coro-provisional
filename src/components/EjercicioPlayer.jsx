@@ -246,6 +246,20 @@ export default function EjercicioPlayer({ ejercicio }) {
         }
         break;
       }
+      case "patron_ritmico": {
+        const dur16 = (60 / tempo) / 4;
+        const ciclos = patron.transporte_por_ciclo || [0];
+        ciclos.forEach((transporteCiclo) => {
+          const notaBase = transportarNota(patron.nota_inicial, transporteCiclo);
+          patron.notas_semitonos.forEach((semitono, i) => {
+            const nota = transportarNota(notaBase, semitono);
+            const durNota = (patron.duraciones_16avos?.[i] || 1) * dur16;
+            tocar(nota, durNota, ahora + tiempoAcumulado);
+            tiempoAcumulado += durNota;
+          });
+        });
+        break;
+      }
       default: {
         tiempoAcumulado = 0.1;
         break;
