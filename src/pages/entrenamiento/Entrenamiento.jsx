@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useEjerciciosEntrenamiento, useEjerciciosHoy } from '../../hooks/useEntrenamiento'
 import EjercicioPlayer from '../../components/EjercicioPlayer'
-import PianoInteractivo from '../../components/PianoInteractivo'
+import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
 
 const CATEGORIAS = {
   respiracion:  { label: 'Respiración',  color: '#0F6E56', bg: '#E1F5EE' },
@@ -18,6 +18,7 @@ export default function Entrenamiento() {
   const { porCategoria, cargando, error, recargar } = useEjerciciosEntrenamiento()
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
   const [categoriaActiva, setCategoriaActiva] = useState('')
+  const [pianoAbierto, setPianoAbierto] = useState(false)
 
   const categoriasConDatos = ORDEN_CATEGORIAS.filter(cat => porCategoria[cat]?.length > 0)
   const categoriasAMostrar = categoriaActiva ? [categoriaActiva] : categoriasConDatos
@@ -42,9 +43,11 @@ export default function Entrenamiento() {
               </span>
             </div>
           )}
-          <PianoInteractivo />
+          <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
         </div>
       </div>
+
+      <PianoInteractivo abierto={pianoAbierto} />
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setCategoriaActiva('')} style={{
