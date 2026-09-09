@@ -52,12 +52,19 @@ export default function EjercicioPlayer({ ejercicio }) {
     Tone.Draw.schedule(() => setNotaActiva((actual) => (actual === nota ? null : actual)), tiempoInicio + duracionSeg);
   }
 
+  function beep(frecuencia = 660) {
+    const osc = new Tone.Synth({ oscillator: { type: "sine" }, volume: -10 }).toDestination();
+    osc.triggerAttackRelease(frecuencia, 0.15);
+    setTimeout(() => osc.dispose(), 300);
+  }
+
   function ejecutarContador() {
-    const fases = ["Inhalá", "Sostené", "Exhalá"];
+    const fases = patron.fases || ["Inhalá", "Sostené", "Exhalá"];
     const segundos = patron.patron_segundos || [4, 4, 4];
     const repeticiones = patron.repeticiones || 1;
     let repActual = 0, faseActual = 0, segRestantes = segundos[0];
     setContadorTexto(`${fases[0]}: ${segRestantes}`);
+    beep(880);
     intervalRef.current = setInterval(() => {
       segRestantes--;
       if (segRestantes > 0) {
@@ -70,6 +77,7 @@ export default function EjercicioPlayer({ ejercicio }) {
           if (repActual >= repeticiones) {
             clearInterval(intervalRef.current);
             setContadorTexto("¡Listo!");
+            beep(440);
             timeoutRef.current = setTimeout(() => {
               registrarActividadEntrenamiento(ejercicio.id);
               detener();
@@ -79,6 +87,7 @@ export default function EjercicioPlayer({ ejercicio }) {
         }
         segRestantes = segundos[faseActual];
         setContadorTexto(`${fases[faseActual]}: ${segRestantes}`);
+        beep(880);
       }
     }, 1000);
   }
