@@ -5,6 +5,8 @@ import { registrarActividadEntrenamiento } from "../hooks/useEntrenamiento";
 import { getPianoSampler } from "../lib/pianoSampler";
 import { tomarControlReproduccion, liberarControlReproduccion } from "../lib/reproductorActivo";
 
+const VELOCIDADES = [0.5, 0.75, 1, 1.5, 2];
+
 function transportarNota(notaBase, semitonos) {
   return Tone.Frequency(notaBase).transpose(semitonos).toNote();
 }
@@ -13,6 +15,7 @@ export default function EjercicioPlayer({ ejercicio }) {
   const [reproduciendo, setReproduciendo] = useState(false);
   const [contadorTexto, setContadorTexto] = useState(null);
   const [notaActiva, setNotaActiva] = useState(null);
+  const [velocidad, setVelocidad] = useState(1);
   const timeoutRef = useRef(null);
   const intervalRef = useRef(null);
   const cronometroRef = useRef(null);
@@ -149,16 +152,16 @@ export default function EjercicioPlayer({ ejercicio }) {
     Tone.Transport.stop();
     Tone.Transport.position = 0;
 
-    const tempo = patron.tempo_bpm || 80;
+    const tempo = (patron.tempo_bpm || 80) * velocidad;
     const duracionNota = 60 / tempo;
     const repeticiones = patron.repeticiones || 1;
     const transporte = patron.transporte_semitonos_por_repeticion || 0;
     let tiempoAcumulado = 0;
 
     function tocar(nota, duracion, inicioRelativo) {
-      const durSeg = typeof duracion === "number" ? duracion : duracionNota;
+      const durSeg = typeof duracion === "number" ? duracion / velocidad : duracionNota;
       Tone.Transport.scheduleOnce((time) => {
-        synth.triggerAttackRelease(nota, duracion, time);
+        synth.triggerAttackRelease(nota, durSeg, time);
         marcarNotaEnTiempo(nota, time, durSeg);
       }, inicioRelativo);
     }
@@ -196,45 +199,48 @@ export default function EjercicioPlayer({ ejercicio }) {
         break;
       }
       case "nota_sostenida": {
-        const duracion = patron.duracion_referencia_seg || 3;
+        const duracion = (patron.duracion_referencia_seg || 3) / velocidad;
         tocar(patron.nota, duracion, 0);
         tiempoAcumulado = duracion;
         break;
       }
       case "nota_sostenida_deslizante": {
-        tocar(patron.nota_inicial, 0.5, 0);
-        tocar(patron.nota_final, 0.8, 0.5);
-        tiempoAcumulado = 1.3;
+        const d1 = 0.5 / velocidad, d2 = 0.8 / velocidad;
+        tocar(patron.nota_inicial, d1, 0);
+        tocar(patron.nota_final, d2, d1);
+        tiempoAcumulado = d1 + d2;
         break;
       }
       case "nota_sostenida_dinamica": {
-        const duracion = patron.duracion_seg || 8;
+        const duracion = (patron.duracion_seg || 8) / velocidad;
         tocar(patron.nota, duracion, 0);
         tiempoAcumulado = duracion;
         break;
       }
       case "glissando": {
-        tocar(patron.nota_inicial, 0.6, 0);
-        tocar(patron.nota_final, 0.6, 0.6);
-        tiempoAcumulado = 1.2;
+        const d = 0.6 / velocidad;
+        tocar(patron.nota_inicial, d, 0);
+        tocar(patron.nota_final, d, d);
+        tiempoAcumulado = d * 2;
         if (patron.ida_y_vuelta) {
-          tocar(patron.nota_inicial, 0.6, tiempoAcumulado);
-          tiempoAcumulado += 0.6;
+          tocar(patron.nota_inicial, d, tiempoAcumulado);
+          tiempoAcumulado += d;
         }
         break;
       }
       case "intervalo": {
+        const pausa = 0.3 / velocidad;
         tocar(patron.nota_base, duracionNota, 0);
-        tiempoAcumulado = duracionNota + 0.3;
+        tiempoAcumulado = duracionNota + pausa;
         (patron.intervalos_semitonos || []).forEach((semi) => {
           const nota = transportarNota(patron.nota_base, semi);
           tocar(nota, duracionNota, tiempoAcumulado);
-          tiempoAcumulado += duracionNota + 0.3;
+          tiempoAcumulado += duracionNota + pausa;
         });
         break;
       }
       case "intervalo_armonico": {
-        const duracion = 2;
+        const duracion = 2 / velocidad;
         (patron.notas_base_semitonos || [0, 7]).forEach((semi) => {
           const nota = transportarNota(patron.nota_inicial, semi);
           tocar(nota, duracion, 0);
@@ -252,17 +258,19 @@ export default function EjercicioPlayer({ ejercicio }) {
         break;
       }
       case "nota_unica_doble_ataque": {
-        tocar(patron.nota, 0.6, 0);
-        tocar(patron.nota, 0.6, 1.2);
-        tiempoAcumulado = 1.8;
+        const d = 0.6 / velocidad, pausa = 1.2 / velocidad;
+        tocar(patron.nota, d, 0);
+        tocar(patron.nota, d, pausa);
+        tiempoAcumulado = pausa + d;
         break;
       }
       case "secuencia_rapida": {
         const nota = patron.nota_inicial || "C3";
         const reps = patron.repeticiones || 3;
+        const d = 0.3 / velocidad, paso = 0.4 / velocidad;
         for (let i = 0; i < reps; i++) {
-          tocar(nota, 0.3, tiempoAcumulado);
-          tiempoAcumulado += 0.4;
+          tocar(nota, d, tiempoAcumulado);
+          tiempoAcumulado += paso;
         }
         break;
       }
@@ -300,6 +308,7 @@ export default function EjercicioPlayer({ ejercicio }) {
 
   const esCronometroManual = patron.tipo === "cronometro_exhalacion";
   const tienePiano = !["contador", "cronometro_exhalacion", "instruccion_libre"].includes(patron.tipo);
+  const tieneVelocidad = !["contador", "cronometro_exhalacion", "instruccion_libre"].includes(patron.tipo);
 
   return (
     <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 8, marginBottom: 12 }}>
@@ -308,35 +317,60 @@ export default function EjercicioPlayer({ ejercicio }) {
       {contadorTexto && (
         <p style={{ fontSize: 24, fontWeight: "bold", margin: "8px 0" }}>{contadorTexto}</p>
       )}
-      {!reproduciendo ? (
-        <button
-          onClick={reproducir}
-          aria-label="Reproducir"
-          style={{
-            width: 44, height: 44, borderRadius: "50%", border: "none",
-            background: "#1D9E75", color: "white", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        </button>
-      ) : (
-        <button
-          onClick={esCronometroManual ? detenerCronometro : detener}
-          aria-label="Detener"
-          style={{
-            width: 44, height: 44, borderRadius: "50%", border: "none",
-            background: "#c0392b", color: "white", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-            <rect x="6" y="6" width="12" height="12" rx="1" />
-          </svg>
-        </button>
-      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        {!reproduciendo ? (
+          <button
+            onClick={reproducir}
+            aria-label="Reproducir"
+            style={{
+              width: 44, height: 44, borderRadius: "50%", border: "none",
+              background: "#1D9E75", color: "white", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            onClick={esCronometroManual ? detenerCronometro : detener}
+            aria-label="Detener"
+            style={{
+              width: 44, height: 44, borderRadius: "50%", border: "none",
+              background: "#c0392b", color: "white", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+              <rect x="6" y="6" width="12" height="12" rx="1" />
+            </svg>
+          </button>
+        )}
+
+        {tieneVelocidad && (
+          <div style={{ display: "flex", gap: 4 }}>
+            {VELOCIDADES.map((v) => (
+              <button
+                key={v}
+                onClick={() => setVelocidad(v)}
+                disabled={reproduciendo}
+                style={{
+                  padding: "5px 9px", borderRadius: 6, fontSize: 12,
+                  border: `1px solid ${velocidad === v ? "#1D9E75" : "#D3D1C7"}`,
+                  background: velocidad === v ? "#E1F5EE" : "#FFFFFF",
+                  color: velocidad === v ? "#04342C" : "#5F5E5A",
+                  fontWeight: velocidad === v ? 600 : 400,
+                  cursor: reproduciendo ? "default" : "pointer",
+                  opacity: reproduciendo ? 0.6 : 1,
+                }}
+              >
+                {v}x
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       {tienePiano && <PianoVisual notaActiva={notaActiva} />}
     </div>
   );
