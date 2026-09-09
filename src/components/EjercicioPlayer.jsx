@@ -3,6 +3,7 @@ import * as Tone from "tone";
 import PianoVisual from "./PianoVisual";
 import { registrarActividadEntrenamiento } from "../hooks/useEntrenamiento";
 import { getPianoSampler } from "../lib/pianoSampler";
+import { tomarControlReproduccion, liberarControlReproduccion } from "../lib/reproductorActivo";
 
 function transportarNota(notaBase, semitonos) {
   return Tone.Frequency(notaBase).transpose(semitonos).toNote();
@@ -32,19 +33,16 @@ export default function EjercicioPlayer({ ejercicio }) {
   }
 
   function detener() {
-    Tone.Transport.cancel();
+    Tone.Transport.cancel(0);
     Tone.Transport.stop();
     Tone.Draw.cancel();
     const { sampler } = getPianoSampler();
-    if (sampler) {
-      sampler.releaseAll();
-      sampler.disconnect();
-      sampler.toDestination();
-    }
+    if (sampler) sampler.releaseAll();
     limpiarTimers();
     setContadorTexto(null);
     setNotaActiva(null);
     setReproduciendo(false);
+    liberarControlReproduccion(detener);
   }
 
   function marcarNotaEnTiempo(nota, tiempoInicio, duracionSeg) {
@@ -136,6 +134,7 @@ export default function EjercicioPlayer({ ejercicio }) {
 
   async function reproducir() {
     await Tone.start();
+    tomarControlReproduccion(detener);
     setReproduciendo(true);
 
     if (patron.tipo === "contador") { ejecutarContador(); return; }
@@ -146,16 +145,22 @@ export default function EjercicioPlayer({ ejercicio }) {
     await listo;
     const synth = sampler;
 
+    Tone.Transport.cancel(0);
+    Tone.Transport.stop();
+    Tone.Transport.position = 0;
+
     const tempo = patron.tempo_bpm || 80;
     const duracionNota = 60 / tempo;
     const repeticiones = patron.repeticiones || 1;
     const transporte = patron.transporte_semitonos_por_repeticion || 0;
     let tiempoAcumulado = 0;
-    const ahora = Tone.now();
 
-    function tocar(nota, duracion, inicio) {
-      synth.triggerAttackRelease(nota, duracion, inicio);
-      marcarNotaEnTiempo(nota, inicio, typeof duracion === "number" ? duracion : duracionNota);
+    function tocar(nota, duracion, inicioRelativo) {
+      const durSeg = typeof duracion === "number" ? duracion : duracionNota;
+      Tone.Transport.scheduleOnce((time) => {
+        synth.triggerAttackRelease(nota, duracion, time);
+        marcarNotaEnTiempo(nota, time, durSeg);
+      }, inicioRelativo);
     }
 
     switch (patron.tipo) {
@@ -165,7 +170,7 @@ export default function EjercicioPlayer({ ejercicio }) {
           const notaBase = transportarNota(patron.nota_inicial, transporte * rep);
           patron.notas_semitonos.forEach((semitono) => {
             const nota = transportarNota(notaBase, semitono);
-            tocar(nota, "8n", ahora + tiempoAcumulado);
+            tocar(nota, "8n", tiempoAcumulado);
             tiempoAcumulado += duracionNota;
           });
         }
@@ -176,7 +181,7 @@ export default function EjercicioPlayer({ ejercicio }) {
           const esAlterado = patron.grado_alterado && (i + 1) === patron.grado_alterado;
           const ajuste = esAlterado ? -1 : 0;
           const nota = transportarNota(patron.nota_inicial, semitono + ajuste);
-          tocar(nota, "8n", ahora + tiempoAcumulado);
+          tocar(nota, "8n", tiempoAcumulado);
           tiempoAcumulado += duracionNota;
         });
         break;
@@ -185,45 +190,45 @@ export default function EjercicioPlayer({ ejercicio }) {
         patron.notas_semitonos.forEach((semitono) => {
           const nota = transportarNota(patron.nota_inicial, semitono);
           const duracionUsada = patron.articulacion === "legato" ? duracionNota * 0.95 : duracionNota * 0.7;
-          tocar(nota, duracionUsada, ahora + tiempoAcumulado);
+          tocar(nota, duracionUsada, tiempoAcumulado);
           tiempoAcumulado += duracionNota;
         });
         break;
       }
       case "nota_sostenida": {
         const duracion = patron.duracion_referencia_seg || 3;
-        tocar(patron.nota, duracion, ahora);
+        tocar(patron.nota, duracion, 0);
         tiempoAcumulado = duracion;
         break;
       }
       case "nota_sostenida_deslizante": {
-        tocar(patron.nota_inicial, 0.5, ahora);
-        tocar(patron.nota_final, 0.8, ahora + 0.5);
+        tocar(patron.nota_inicial, 0.5, 0);
+        tocar(patron.nota_final, 0.8, 0.5);
         tiempoAcumulado = 1.3;
         break;
       }
       case "nota_sostenida_dinamica": {
         const duracion = patron.duracion_seg || 8;
-        tocar(patron.nota, duracion, ahora);
+        tocar(patron.nota, duracion, 0);
         tiempoAcumulado = duracion;
         break;
       }
       case "glissando": {
-        tocar(patron.nota_inicial, 0.6, ahora);
-        tocar(patron.nota_final, 0.6, ahora + 0.6);
+        tocar(patron.nota_inicial, 0.6, 0);
+        tocar(patron.nota_final, 0.6, 0.6);
         tiempoAcumulado = 1.2;
         if (patron.ida_y_vuelta) {
-          tocar(patron.nota_inicial, 0.6, ahora + tiempoAcumulado);
+          tocar(patron.nota_inicial, 0.6, tiempoAcumulado);
           tiempoAcumulado += 0.6;
         }
         break;
       }
       case "intervalo": {
-        tocar(patron.nota_base, duracionNota, ahora);
+        tocar(patron.nota_base, duracionNota, 0);
         tiempoAcumulado = duracionNota + 0.3;
         (patron.intervalos_semitonos || []).forEach((semi) => {
           const nota = transportarNota(patron.nota_base, semi);
-          tocar(nota, duracionNota, ahora + tiempoAcumulado);
+          tocar(nota, duracionNota, tiempoAcumulado);
           tiempoAcumulado += duracionNota + 0.3;
         });
         break;
@@ -232,7 +237,7 @@ export default function EjercicioPlayer({ ejercicio }) {
         const duracion = 2;
         (patron.notas_base_semitonos || [0, 7]).forEach((semi) => {
           const nota = transportarNota(patron.nota_inicial, semi);
-          tocar(nota, duracion, ahora);
+          tocar(nota, duracion, 0);
         });
         tiempoAcumulado = duracion;
         break;
@@ -241,14 +246,14 @@ export default function EjercicioPlayer({ ejercicio }) {
         const gradosSemitonos = { I: 0, IV: 5, V: 7 };
         (patron.grados || ["I", "IV", "V", "I"]).forEach((grado) => {
           const nota = transportarNota(patron.nota_inicial, gradosSemitonos[grado] ?? 0);
-          tocar(nota, duracionNota, ahora + tiempoAcumulado);
+          tocar(nota, duracionNota, tiempoAcumulado);
           tiempoAcumulado += duracionNota;
         });
         break;
       }
       case "nota_unica_doble_ataque": {
-        tocar(patron.nota, 0.6, ahora);
-        tocar(patron.nota, 0.6, ahora + 1.2);
+        tocar(patron.nota, 0.6, 0);
+        tocar(patron.nota, 0.6, 1.2);
         tiempoAcumulado = 1.8;
         break;
       }
@@ -256,7 +261,7 @@ export default function EjercicioPlayer({ ejercicio }) {
         const nota = patron.nota_inicial || "C3";
         const reps = patron.repeticiones || 3;
         for (let i = 0; i < reps; i++) {
-          tocar(nota, 0.3, ahora + tiempoAcumulado);
+          tocar(nota, 0.3, tiempoAcumulado);
           tiempoAcumulado += 0.4;
         }
         break;
@@ -269,7 +274,7 @@ export default function EjercicioPlayer({ ejercicio }) {
           patron.notas_semitonos.forEach((semitono, i) => {
             const nota = transportarNota(notaBase, semitono);
             const durNota = (patron.duraciones_16avos?.[i] || 1) * dur16;
-            tocar(nota, durNota, ahora + tiempoAcumulado);
+            tocar(nota, durNota, tiempoAcumulado);
             tiempoAcumulado += durNota;
           });
         });
@@ -281,11 +286,16 @@ export default function EjercicioPlayer({ ejercicio }) {
       }
     }
 
-    timeoutRef.current = setTimeout(() => {
-      setNotaActiva(null);
-      setReproduciendo(false);
-      registrarActividadEntrenamiento(ejercicio.id);
-    }, (tiempoAcumulado + 0.5) * 1000);
+    Tone.Transport.scheduleOnce((time) => {
+      Tone.Draw.schedule(() => {
+        setNotaActiva(null);
+        setReproduciendo(false);
+        registrarActividadEntrenamiento(ejercicio.id);
+        liberarControlReproduccion(detener);
+      }, time);
+    }, tiempoAcumulado + 0.3);
+
+    Tone.Transport.start();
   }
 
   const esCronometroManual = patron.tipo === "cronometro_exhalacion";
