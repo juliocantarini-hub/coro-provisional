@@ -189,13 +189,18 @@ export default function EjercicioPlayer({ ejercicio }) {
         });
         break;
       }
-      case "frase": {
-        patron.notas_semitonos.forEach((semitono) => {
-          const nota = transportarNota(patron.nota_inicial, semitono);
-          const duracionUsada = patron.articulacion === "legato" ? duracionNota * 0.95 : duracionNota * 0.7;
-          tocar(nota, duracionUsada, tiempoAcumulado);
-          tiempoAcumulado += duracionNota;
-        });
+        case "frase": {
+        const repsFrase = patron.repeticiones || 1;
+        const transFrase = patron.transporte_semitonos_por_repeticion || 0;
+        for (let rep = 0; rep < repsFrase; rep++) {
+          const notaBaseFrase = transportarNota(patron.nota_inicial, transFrase * rep);
+          patron.notas_semitonos.forEach((semitono) => {
+            const nota = transportarNota(notaBaseFrase, semitono);
+            const duracionUsada = patron.articulacion === "legato" ? duracionNota * 0.95 : duracionNota * 0.7;
+            tocar(nota, duracionUsada, tiempoAcumulado);
+            tiempoAcumulado += duracionNota;
+          });
+        }
         break;
       }
       case "nota_sostenida": {
