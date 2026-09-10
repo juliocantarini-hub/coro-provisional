@@ -269,13 +269,18 @@ export default function EjercicioPlayer({ ejercicio }) {
         tiempoAcumulado = pausa + d;
         break;
       }
-      case "secuencia_rapida": {
-        const nota = patron.nota_inicial || "C3";
+            case "secuencia_rapida": {
+        const notaBaseSeq = patron.nota_inicial || "C3";
         const reps = patron.repeticiones || 3;
+        const ciclosSeq = patron.ciclos_transporte || 1;
+        const transSeq = patron.transporte_semitonos_por_repeticion || 0;
         const d = 0.3 / velocidad, paso = 0.4 / velocidad;
-        for (let i = 0; i < reps; i++) {
-          tocar(nota, d, tiempoAcumulado);
-          tiempoAcumulado += paso;
+        for (let ciclo = 0; ciclo < ciclosSeq; ciclo++) {
+          const nota = transportarNota(notaBaseSeq, transSeq * ciclo);
+          for (let i = 0; i < reps; i++) {
+            tocar(nota, d, tiempoAcumulado);
+            tiempoAcumulado += paso;
+          }
         }
         break;
       }
