@@ -6,13 +6,10 @@ import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
 const CATEGORIAS = {
   respiracion:  { label: 'Respiración',  color: '#0F6E56', bg: '#E1F5EE' },
   resonancia:   { label: 'Resonancia',   color: '#378ADD', bg: '#E6F1FB' },
-  agilidad:     { label: 'Agilidad',     color: '#D85A30', bg: '#FBEAE3' },
-  rango:        { label: 'Rango',        color: '#8B5CF6', bg: '#F1EAFB' },
-  afinacion:    { label: 'Afinación',    color: '#B8860B', bg: '#FBF3DF' },
   vocalizacion: { label: 'Vocalización', color: '#C0392B', bg: '#FBE5E3' },
 }
 
-const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'agilidad', 'rango', 'afinacion', 'vocalizacion']
+const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'vocalizacion']
 
 export default function Entrenamiento() {
   const { porCategoria, cargando, error, recargar } = useEjerciciosEntrenamiento()
