@@ -188,6 +188,7 @@ export async function publicarEvento(id, publicado) {
 }
 
 export async function eliminarEvento(id) {
+  await supabase.from('avisos_eventos').delete().eq('evento_id', id)
   const { error } = await supabase.from('eventos').delete().eq('id', id)
   return { ok: !error, error: error?.message }
 }
