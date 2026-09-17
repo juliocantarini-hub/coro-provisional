@@ -46,7 +46,7 @@ export default function Entrenamiento() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {ejerciciosHoy > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FBF3DF', border: '1px solid #E8DBAE', borderRadius: '20px', padding: '5px 12px' }}>
-              <span style={{ fontSize: '16px' }}>🔥</span>
+              <span style={{ fontSize: '16px' }}>⭐</span>
               <span style={{ fontSize: '13px', fontWeight: '600', color: '#8A6D1D' }}>
                 Entrenaste con {ejerciciosHoy} {ejerciciosHoy === 1 ? 'ejercicio' : 'ejercicios'} hoy
               </span>
