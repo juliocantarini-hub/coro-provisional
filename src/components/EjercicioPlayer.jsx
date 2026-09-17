@@ -342,7 +342,7 @@ export default function EjercicioPlayer({ ejercicio }) {
   return (
     <div style={{ padding: 16, border: "1px solid #ddd", borderRadius: 8, marginBottom: 12 }}>
       <h3>{ejercicio.nombre}</h3>
-      <p>{ejercicio.instruccion_texto}</p>
+       <p style={{ marginBottom: 14 }}>{ejercicio.instruccion_texto}</p>
       {contadorTexto && (
         <p style={{ fontSize: 24, fontWeight: "bold", margin: "8px 0" }}>{contadorTexto}</p>
       )}
