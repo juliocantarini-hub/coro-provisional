@@ -93,7 +93,7 @@ export default function EjercicioPlayer({ ejercicio }) {
     }, 1000);
   }
 
-  function ejecutarCronometro() {
+  function iniciarStopwatchExhalacion() {
     let segundos = 0;
     setContadorTexto(`0s  (mejor: ${mejorMarcaRef.current}s)`);
     cronometroRef.current = setInterval(() => {
@@ -102,17 +102,31 @@ export default function EjercicioPlayer({ ejercicio }) {
     }, 1000);
   }
 
+  function ejecutarCronometro() {
+    let segundosInhalar = 4;
+    setContadorTexto(`Inhalá: ${segundosInhalar}`);
+    beep(880);
+    intervalRef.current = setInterval(() => {
+      segundosInhalar--;
+      if (segundosInhalar > 0) {
+        setContadorTexto(`Inhalá: ${segundosInhalar}`);
+      } else {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+        beep(660);
+        iniciarStopwatchExhalacion();
+      }
+    }, 1000);
+  }
+
   function detenerCronometro() {
-    if (cronometroRef.current) {
-      clearInterval(cronometroRef.current);
-      const segundosFinales = parseInt(contadorTexto) || 0;
-      if (segundosFinales > mejorMarcaRef.current) {
-        mejorMarcaRef.current = segundosFinales;
-        localStorage.setItem(`mejor-marca-${ejercicio.id}`, segundosFinales);
-      }
-      if (segundosFinales > 0) {
-        registrarActividadEntrenamiento(ejercicio.id, segundosFinales);
-      }
+    const segundosFinales = parseInt(contadorTexto) || 0;
+    if (segundosFinales > mejorMarcaRef.current) {
+      mejorMarcaRef.current = segundosFinales;
+      localStorage.setItem(`mejor-marca-${ejercicio.id}`, segundosFinales);
+    }
+    if (segundosFinales > 0) {
+      registrarActividadEntrenamiento(ejercicio.id, segundosFinales);
     }
     detener();
   }
@@ -189,7 +203,7 @@ export default function EjercicioPlayer({ ejercicio }) {
         });
         break;
       }
-        case "frase": {
+      case "frase": {
         const repsFrase = patron.repeticiones || 1;
         const transFrase = patron.transporte_semitonos_por_repeticion || 0;
         for (let rep = 0; rep < repsFrase; rep++) {
@@ -274,7 +288,7 @@ export default function EjercicioPlayer({ ejercicio }) {
         tiempoAcumulado = pausa + d;
         break;
       }
-            case "secuencia_rapida": {
+      case "secuencia_rapida": {
         const notaBaseSeq = patron.nota_inicial || "C3";
         const reps = patron.repeticiones || 3;
         const ciclosSeq = patron.ciclos_transporte || 1;
