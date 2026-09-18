@@ -242,13 +242,19 @@ export default function EjercicioPlayer({ ejercicio }) {
         break;
       }
       case "glissando": {
+        const repsGli = patron.repeticiones || 1;
+        const transGli = patron.transporte_semitonos_por_repeticion || 0;
         const d = 0.6 / velocidad;
-        tocar(patron.nota_inicial, d, 0);
-        tocar(patron.nota_final, d, d);
-        tiempoAcumulado = d * 2;
-        if (patron.ida_y_vuelta) {
-          tocar(patron.nota_inicial, d, tiempoAcumulado);
-          tiempoAcumulado += d;
+        for (let rep = 0; rep < repsGli; rep++) {
+          const notaIni = transportarNota(patron.nota_inicial, transGli * rep);
+          const notaFin = transportarNota(patron.nota_final, transGli * rep);
+          tocar(notaIni, d, tiempoAcumulado);
+          tocar(notaFin, d, tiempoAcumulado + d);
+          tiempoAcumulado += d * 2;
+          if (patron.ida_y_vuelta) {
+            tocar(notaIni, d, tiempoAcumulado);
+            tiempoAcumulado += d;
+          }
         }
         break;
       }
