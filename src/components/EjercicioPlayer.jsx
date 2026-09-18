@@ -219,8 +219,13 @@ export default function EjercicioPlayer({ ejercicio }) {
       }
       case "nota_sostenida": {
         const duracion = (patron.duracion_referencia_seg || 3) / velocidad;
-        tocar(patron.nota, duracion, 0);
-        tiempoAcumulado = duracion;
+        const repsSost = patron.repeticiones || 1;
+        const transSost = patron.transporte_semitonos_por_repeticion || 0;
+        for (let rep = 0; rep < repsSost; rep++) {
+          const notaRep = transportarNota(patron.nota, transSost * rep);
+          tocar(notaRep, duracion, tiempoAcumulado);
+          tiempoAcumulado += duracion + 0.2;
+        }
         break;
       }
       case "nota_sostenida_deslizante": {
