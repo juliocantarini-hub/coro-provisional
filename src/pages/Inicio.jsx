@@ -7,16 +7,19 @@ import { useAvisos, tiempoRelativo, TIPO_AVISO } from '../hooks/useAvisos'
 import { useArticulos } from '../hooks/useBlog'
 import MisPagos from '../components/MisPagos'
 import EncuestaDashboard from '../components/EncuestaDashboard'
+import MensajeSorpresa from '../components/MensajeSorpresa'
+import { useMensajeSorpresa } from '../hooks/useMensajeSorpresa'
 
 const ORDEN_ESTADO = { concierto: 0, activo: 1, estudio: 2 }
 
 export default function Inicio() {
   const navigate = useNavigate()
   const { perfil } = useAuth()
-  const { eventos } = useEventos({ soloFuturos: true })
+  const { eventos, cargando: cargandoEventos } = useEventos({ soloFuturos: true })
   const { obras }   = useObras()
   const { avisos, noLeidos } = useAvisos()
   const { articulos } = useArticulos({ limite: 3 })
+  const { mensaje: mensajeSorpresa, cerrar: cerrarSorpresa } = useMensajeSorpresa(perfil, eventos, cargandoEventos)
 
   const proximoEvento = eventos[0]
   const avisosRecientes = avisos.slice(0, 3)
@@ -74,6 +77,9 @@ export default function Inicio() {
           </div>
         )}
       </div>
+
+      {/* Mensaje sorpresa — aparece solo en ciertas situaciones (ver src/lib/sorpresas.js) */}
+      <MensajeSorpresa mensaje={mensajeSorpresa} onCerrar={cerrarSorpresa} />
 
       {/* Stats rápidas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>

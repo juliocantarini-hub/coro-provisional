@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import { supabase } from '../../lib/supabase'
 import { usePushSubscription } from '../../hooks/usePushSubscription'
+import { useAuth } from '../../hooks/useAuth'
+import { useRegistrarAcceso } from '../../hooks/useMensajeSorpresa'
 
 function useEsMovil() {
   const [esMovil, setEsMovil] = useState(window.innerWidth <= 768)
@@ -30,6 +32,7 @@ export default function AppLayout({ children }) {
   )
   const [zoom, setZoom] = useState(getZoom)
   const [user, setUser] = useState(null)
+  const { perfil } = useAuth()
 
   useEffect(() => {
     const fn = () => setZoom(getZoom())
@@ -48,6 +51,7 @@ export default function AppLayout({ children }) {
   }, [])
 
   usePushSubscription(user)
+  useRegistrarAcceso(perfil)
 
   function toggleAdmin(valor) {
     setSeccionAdmin(valor)
