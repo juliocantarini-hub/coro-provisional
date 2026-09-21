@@ -36,6 +36,7 @@ import { AvisosAdmin } from './pages/admin/AvisosAdmin'
 import EncuestasAdmin  from './pages/admin/EncuestasAdmin'
 import { ArticulosAdmin, ArticuloForm } from './pages/admin/ArticulosAdmin'
 import EstudioAdmin    from './pages/admin/EstudioAdmin'
+import EstadisticaAdmin from './pages/admin/EstadisticaAdmin'
 import AsistenteRepertorio from './pages/admin/AsistenteRepertorio'
 import PagosAdmin from './pages/admin/PagosAdmin'
 import CrearCantante from './pages/admin/CrearCantante'
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="/admin/blog/nuevo" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ArticuloForm /></ConLayout></RutaProtegida>} />
             <Route path="/admin/blog/:id" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ArticuloForm /></ConLayout></RutaProtegida>} />
             <Route path="/admin/estudio" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><EstudioAdmin /></ConLayout></RutaProtegida>} />
+            <Route path="/admin/estadistica" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><EstadisticaAdmin /></ConLayout></RutaProtegida>} />
 
             <Route path="/admin/asistente" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><AsistenteRepertorio /></ConLayout></RutaProtegida>} />
 

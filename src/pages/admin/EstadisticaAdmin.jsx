@@ -1,0 +1,467 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../../lib/supabase'
+import { getCoroActual } from '../../lib/coro'
+import { ETIQUETAS_SECCION } from '../../lib/actividad'
+
+const PERIODOS = [
+  { dias: 7,   label: '7 días' },
+  { dias: 30,  label: '30 días' },
+  { dias: 90,  label: '3 meses' },
+  { dias: 365, label: '12 meses' },
+]
+
+const ORDENES = [
+  { valor: 'ingresos',  label: 'Más ingresos' },
+  { valor: 'reciente',  label: 'Ingresó hace poco' },
+  { valor: 'inactivos', label: 'Sin ingresar primero' },
+  { valor: 'nombre',    label: 'Nombre' },
+]
+
+const COLUMNAS = '1.5fr 80px 90px 90px 160px 1.4fr'
+
+function esMovil() {
+  return window.innerWidth <= 768
+}
+
+// ─── Formatos ────────────────────────────────────────────────────────────────
+
+function horaLocal(iso) {
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function capitalizar(texto) {
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+function inicioDeDia(fecha) {
+  return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate())
+}
+
+function ultimoIngreso(iso) {
+  if (!iso) return { texto: 'Sin ingresos', nivel: 'nulo' }
+  const fecha = new Date(iso)
+  const dias = Math.round((inicioDeDia(new Date()) - inicioDeDia(fecha)) / 86400000)
+  const corta = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+  if (dias <= 0) return { texto: `Hoy ${horaLocal(iso)}`, nivel: 'ok' }
+  if (dias === 1) return { texto: `Ayer ${horaLocal(iso)}`, nivel: 'ok' }
+  return { texto: `Hace ${dias} días · ${corta}`, nivel: dias <= 3 ? 'ok' : dias <= 14 ? 'medio' : 'bajo' }
+}
+
+const COLOR_NIVEL = { ok: '#1D9E75', medio: '#D85A30', bajo: '#A32D2D', nulo: '#B4B2A9' }
+
+// ─── Pantalla ────────────────────────────────────────────────────────────────
+
+export default function EstadisticaAdmin() {
+  const [periodo, setPeriodo]     = useState(30)
+  const [datos, setDatos]         = useState([])
+  const [cargando, setCargando]   = useState(true)
+  const [error, setError]         = useState(null) // null | 'sql' | 'general'
+  const [coroId, setCoroId]       = useState(null)
+  const [desde, setDesde]         = useState(null)
+  const [busqueda, setBusqueda]   = useState('')
+  const [orden, setOrden]         = useState('ingresos')
+  const [soloCantantes, setSoloCantantes] = useState(false)
+  const [abierto, setAbierto]     = useState(null)
+  const movil = esMovil()
+
+  const cargar = useCallback(async () => {
+    setCargando(true)
+    setError(null)
+    try {
+      const coro = await getCoroActual()
+      if (!coro) throw new Error('No se pudo identificar el coro.')
+      const desdeISO = new Date(Date.now() - periodo * 86400000).toISOString()
+      const { data, error: err } = await supabase.rpc('estadistica_accesos', {
+        p_coro_id: coro.id,
+        p_desde: desdeISO,
+      })
+      if (err) throw err
+      setCoroId(coro.id)
+      setDesde(desdeISO)
+      setDatos((data || []).map(d => ({
+        ...d,
+        ingresos: Number(d.ingresos),
+        dias_activos: Number(d.dias_activos),
+        vistas: Number(d.vistas),
+      })))
+    } catch (err) {
+      console.error('Estadística:', err)
+      const msg = `${err?.code || ''} ${err?.message || ''}`
+      setError(/PGRST202|42883|estadistica_accesos/.test(msg) ? 'sql' : 'general')
+      setDatos([])
+    } finally {
+      setCargando(false)
+    }
+  }, [periodo])
+
+  useEffect(() => { cargar() }, [cargar])
+
+  const base = soloCantantes ? datos.filter(d => d.rol === 'cantante') : datos
+  const q = busqueda.trim().toLowerCase()
+  const filtrados = base
+    .filter(d => !q || d.nombre?.toLowerCase().includes(q) || d.voz?.toLowerCase().includes(q))
+    .sort(comparador(orden))
+
+  const conActividad  = base.filter(d => d.ingresos > 0).length
+  const totalIngresos = base.reduce((s, d) => s + d.ingresos, 0)
+  const totalVistas   = base.reduce((s, d) => s + d.vistas, 0)
+  const sinDatos      = !cargando && !error && base.every(d => d.ingresos === 0 && d.vistas === 0)
+
+  return (
+    <div>
+      {/* Encabezado */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>Estadística de accesos</h2>
+          <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
+            {cargando ? 'Cargando...' : error ? '' : `${conActividad} de ${base.length} ingresaron en los últimos ${PERIODOS.find(p => p.dias === periodo)?.label}`}
+          </p>
+        </div>
+        <button onClick={cargar}
+          style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+          ↻ Actualizar
+        </button>
+      </div>
+
+      {/* Período */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+        {PERIODOS.map(p => (
+          <button key={p.dias} onClick={() => { setPeriodo(p.dias); setAbierto(null) }}
+            style={{
+              padding: '6px 14px', fontSize: '12px', borderRadius: '16px', cursor: 'pointer', fontWeight: '500',
+              border: periodo === p.dias ? '1px solid #0F6E56' : '1px solid #D3D1C7',
+              background: periodo === p.dias ? '#0F6E56' : '#FFFFFF',
+              color: periodo === p.dias ? '#FFFFFF' : '#5F5E5A',
+            }}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {error === 'sql' && (
+        <Aviso color="#712B13" bg="#FAECE7" titulo="Falta activar la estadística en Supabase">
+          Todavía no se ejecutó el SQL de estadística en este proyecto de Supabase. Ejecutá el archivo <b>supabase/estadistica_accesos.sql</b> en el SQL Editor y volvé a tocar “Actualizar”.
+        </Aviso>
+      )}
+      {error === 'general' && (
+        <Aviso color="#A32D2D" bg="#FCEBEB" titulo="No pudimos cargar la estadística">
+          Revisá tu conexión e intentá de nuevo con “Actualizar”.
+        </Aviso>
+      )}
+
+      {!error && (
+        <>
+          {/* Totales */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+            <Total valor={conActividad} label="Cantantes que ingresaron" color="#0F6E56" bg="#E1F5EE" />
+            <Total valor={totalIngresos} label="Ingresos en total" color="#378ADD" bg="#E6F1FB" />
+            <Total valor={totalVistas} label="Pantallas vistas" color="#7C3AED" bg="#F3EFF8" />
+          </div>
+
+          {/* Filtros */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '16px' }}>
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar cantante..."
+              style={{ flex: '1 1 200px', maxWidth: '300px', height: '36px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', outline: 'none', background: '#FFFFFF', boxSizing: 'border-box' }} />
+            <select value={orden} onChange={e => setOrden(e.target.value)}
+              style={{ height: '36px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 10px', fontSize: '13px', background: '#FFFFFF', color: '#1A1A18' }}>
+              {ORDENES.map(o => <option key={o.valor} value={o.valor}>{o.label}</option>)}
+            </select>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#5F5E5A', cursor: 'pointer' }}>
+              <input type="checkbox" checked={soloCantantes} onChange={e => setSoloCantantes(e.target.checked)} />
+              Solo cantantes
+            </label>
+          </div>
+        </>
+      )}
+
+      {cargando && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[1, 2, 3, 4].map(i => <div key={i} style={{ height: '64px', background: '#F1EFE8', borderRadius: '10px', animation: 'pulse 1.5s ease-in-out infinite' }} />)}
+          <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+        </div>
+      )}
+
+      {sinDatos && (
+        <Aviso color="#04342C" bg="#E1F5EE" titulo="Todavía no hay actividad registrada en este período">
+          Los datos empiezan a juntarse desde que se publicó esta función. Cuando los cantantes vayan usando la app, van a aparecer acá.
+        </Aviso>
+      )}
+
+      {/* MÓVIL: tarjetas */}
+      {!cargando && !error && movil && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {filtrados.map(d => {
+            const u = ultimoIngreso(d.ultimo_ingreso)
+            const expandido = abierto === d.perfil_id
+            return (
+              <div key={d.perfil_id} style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden' }}>
+                <div onClick={() => setAbierto(expandido ? null : d.perfil_id)} style={{ padding: '14px', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '10px' }}>
+                    <Nombre d={d} />
+                    <span style={{ fontSize: '12px', color: '#0F6E56' }}>{expandido ? '▲' : '▼'}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '10px' }}>
+                    <Cifra label="Ingresos" valor={d.ingresos} />
+                    <Cifra label="Días activos" valor={d.dias_activos} />
+                    <Cifra label="Pantallas" valor={d.vistas} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#5F5E5A', marginBottom: '8px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_NIVEL[u.nivel], flexShrink: 0 }} />
+                    {u.texto}
+                  </div>
+                  <TopSecciones secciones={d.secciones} />
+                </div>
+                {expandido && <Historial perfilId={d.perfil_id} coroId={coroId} desde={desde} />}
+              </div>
+            )
+          })}
+          {filtrados.length === 0 && !sinDatos && <Vacio />}
+        </div>
+      )}
+
+      {/* DESKTOP: tabla */}
+      {!cargando && !error && !movil && (
+        <div style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: COLUMNAS, padding: '10px 16px', background: '#F8F7F3', borderBottom: '1px solid #E8E6DF', fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+            <span>Cantante</span>
+            <span>Ingresos</span>
+            <span>Días activos</span>
+            <span>Pantallas</span>
+            <span>Último ingreso</span>
+            <span>Más visto</span>
+          </div>
+          {filtrados.length === 0 && <Vacio />}
+          {filtrados.map((d, i) => {
+            const u = ultimoIngreso(d.ultimo_ingreso)
+            const expandido = abierto === d.perfil_id
+            return (
+              <div key={d.perfil_id} style={{ borderBottom: i < filtrados.length - 1 ? '1px solid #F1EFE8' : 'none' }}>
+                <div onClick={() => setAbierto(expandido ? null : d.perfil_id)}
+                  style={{ display: 'grid', gridTemplateColumns: COLUMNAS, padding: '12px 16px', alignItems: 'center', cursor: 'pointer', background: expandido ? '#F8F7F3' : 'transparent' }}>
+                  <Nombre d={d} />
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#1A1A18' }}>{d.ingresos}</span>
+                  <span style={{ fontSize: '13px', color: '#5F5E5A' }}>{d.dias_activos}</span>
+                  <span style={{ fontSize: '13px', color: '#5F5E5A' }}>{d.vistas}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#5F5E5A' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_NIVEL[u.nivel], flexShrink: 0 }} />
+                    {u.texto}
+                  </span>
+                  <TopSecciones secciones={d.secciones} />
+                </div>
+                {expandido && <Historial perfilId={d.perfil_id} coroId={coroId} desde={desde} />}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Orden ───────────────────────────────────────────────────────────────────
+
+function comparador(orden) {
+  const tiempo = d => (d.ultimo_ingreso ? new Date(d.ultimo_ingreso).getTime() : null)
+  const porNombre = (a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')
+  return (a, b) => {
+    if (orden === 'nombre') return porNombre(a, b)
+    if (orden === 'reciente') {
+      const ta = tiempo(a), tb = tiempo(b)
+      if (ta === null && tb === null) return porNombre(a, b)
+      if (ta === null) return 1
+      if (tb === null) return -1
+      return tb - ta
+    }
+    if (orden === 'inactivos') {
+      const ta = tiempo(a), tb = tiempo(b)
+      if (ta === null && tb === null) return porNombre(a, b)
+      if (ta === null) return -1
+      if (tb === null) return 1
+      return ta - tb
+    }
+    return (b.ingresos - a.ingresos) || (b.vistas - a.vistas) || porNombre(a, b)
+  }
+}
+
+// ─── Piezas chicas ───────────────────────────────────────────────────────────
+
+function Nombre({ d }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A18', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {d.nombre || '—'}
+        {d.rol !== 'cantante' && (
+          <span style={{ marginLeft: '6px', fontSize: '10px', fontWeight: '600', color: '#712B13', background: '#FAECE7', padding: '1px 7px', borderRadius: '8px', textTransform: 'capitalize' }}>{d.rol}</span>
+        )}
+      </div>
+      <div style={{ fontSize: '11px', color: '#888780', textTransform: 'capitalize', marginTop: '1px' }}>{d.voz || '—'}</div>
+    </div>
+  )
+}
+
+function TopSecciones({ secciones }) {
+  const items = Object.entries(secciones || {}).sort((a, b) => b[1] - a[1]).slice(0, 3)
+  if (items.length === 0) return <span style={{ fontSize: '12px', color: '#B4B2A9' }}>—</span>
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+      {items.map(([clave, n]) => (
+        <span key={clave} style={{ fontSize: '11px', color: '#04342C', background: '#E1F5EE', padding: '2px 8px', borderRadius: '10px', whiteSpace: 'nowrap' }}>
+          {ETIQUETAS_SECCION[clave] || clave} · {n}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function Total({ valor, label, color, bg }) {
+  return (
+    <div style={{ background: bg, borderRadius: '12px', padding: '14px' }}>
+      <div style={{ fontSize: '24px', fontWeight: '600', color, lineHeight: 1 }}>{valor}</div>
+      <div style={{ fontSize: '11px', color, opacity: 0.8, marginTop: '4px' }}>{label}</div>
+    </div>
+  )
+}
+
+function Cifra({ label, valor }) {
+  return (
+    <div style={{ flex: 1, textAlign: 'center' }}>
+      <div style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A18' }}>{valor}</div>
+      <div style={{ fontSize: '10px', color: '#B4B2A9', marginTop: '1px' }}>{label}</div>
+    </div>
+  )
+}
+
+function Aviso({ titulo, color, bg, children }) {
+  return (
+    <div style={{ background: bg, borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
+      <div style={{ fontSize: '13px', fontWeight: '600', color, marginBottom: '4px' }}>{titulo}</div>
+      <div style={{ fontSize: '12px', color, lineHeight: 1.5 }}>{children}</div>
+    </div>
+  )
+}
+
+function Vacio() {
+  return <div style={{ padding: '28px', textAlign: 'center', color: '#888780', fontSize: '13px' }}>No hay cantantes para mostrar.</div>
+}
+
+// ─── Historial de una persona ────────────────────────────────────────────────
+
+const TABLAS = { obra: 'obras', evento: 'eventos', aviso: 'avisos', texto: 'textos' }
+const ID_VALIDO = /^([0-9a-f-]{36}|\d+)$/i
+const PASO = 150
+
+const COLOR_TIPO = { sesion: '#0F6E56', seccion: '#B4B2A9', obra: '#1D9E75', evento: '#378ADD', aviso: '#D85A30', texto: '#7C3AED' }
+
+function describir(f, titulos) {
+  const seccion = ETIQUETAS_SECCION[f.detalle] || f.detalle || 'una pantalla'
+  const titulo = titulos[`${f.tipo}:${f.ref_id}`]
+  switch (f.tipo) {
+    case 'sesion':  return 'Ingresó a la app'
+    case 'seccion': return `Vio ${seccion}`
+    case 'obra':    return titulo ? `Abrió la obra “${titulo}”` : 'Abrió una obra'
+    case 'evento':  return titulo ? `Abrió el evento “${titulo}”` : 'Abrió un evento'
+    case 'aviso':   return titulo ? `Abrió el aviso “${titulo}”` : 'Abrió un aviso'
+    case 'texto':   return titulo ? `Leyó el texto “${titulo}”` : 'Leyó un texto'
+    default:        return f.tipo
+  }
+}
+
+function agruparPorDia(filas) {
+  const grupos = []
+  for (const f of filas) {
+    const fecha = new Date(f.creado_en)
+    const clave = `${fecha.getFullYear()}-${fecha.getMonth()}-${fecha.getDate()}`
+    let g = grupos[grupos.length - 1]
+    if (!g || g.clave !== clave) {
+      g = { clave, fecha, items: [] }
+      grupos.push(g)
+    }
+    g.items.push(f)
+  }
+  return grupos
+}
+
+function Historial({ perfilId, coroId, desde }) {
+  const [filas, setFilas]       = useState([])
+  const [titulos, setTitulos]   = useState({})
+  const [cargando, setCargando] = useState(true)
+  const [hayMas, setHayMas]     = useState(false)
+  const [limite, setLimite]     = useState(PASO)
+  const [error, setError]       = useState(false)
+
+  useEffect(() => {
+    let cancelado = false
+
+    async function cargar() {
+      setCargando(true)
+      setError(false)
+      const { data, error: err } = await supabase
+        .from('actividad_app')
+        .select('id, tipo, ref_id, detalle, creado_en')
+        .eq('coro_id', coroId)
+        .eq('perfil_id', perfilId)
+        .gte('creado_en', desde)
+        .order('creado_en', { ascending: false })
+        .limit(limite + 1)
+
+      if (cancelado) return
+      if (err) { setError(true); setCargando(false); return }
+
+      const visibles = (data || []).slice(0, limite)
+
+      // Buscamos los títulos de las obras / eventos / avisos / textos que abrió
+      const nuevos = {}
+      await Promise.all(Object.entries(TABLAS).map(async ([tipo, tabla]) => {
+        const ids = [...new Set(
+          visibles.filter(f => f.tipo === tipo && ID_VALIDO.test(f.ref_id || '')).map(f => f.ref_id)
+        )]
+        if (ids.length === 0) return
+        const { data: filasTabla } = await supabase.from(tabla).select('id, titulo').in('id', ids)
+        for (const r of filasTabla || []) nuevos[`${tipo}:${r.id}`] = r.titulo
+      }))
+
+      if (cancelado) return
+      setTitulos(nuevos)
+      setFilas(visibles)
+      setHayMas((data || []).length > limite)
+      setCargando(false)
+    }
+
+    cargar()
+    return () => { cancelado = true }
+  }, [perfilId, coroId, desde, limite])
+
+  const grupos = agruparPorDia(filas)
+
+  return (
+    <div style={{ padding: '4px 16px 16px', background: '#F8F7F3', borderTop: '1px solid #F1EFE8' }}>
+      {cargando && filas.length === 0 && <p style={{ fontSize: '12px', color: '#888780', margin: '12px 0 0' }}>Cargando historial...</p>}
+      {error && <p style={{ fontSize: '12px', color: '#A32D2D', margin: '12px 0 0' }}>No pudimos cargar el historial.</p>}
+      {!cargando && !error && filas.length === 0 && (
+        <p style={{ fontSize: '12px', color: '#888780', margin: '12px 0 0' }}>Sin actividad registrada en este período.</p>
+      )}
+
+      {grupos.map(g => (
+        <div key={g.clave} style={{ marginTop: '12px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: '#5F5E5A', marginBottom: '4px' }}>
+            {capitalizar(g.fecha.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}
+          </div>
+          {g.items.map(f => (
+            <div key={f.id} style={{ display: 'flex', alignItems: 'baseline', gap: '10px', padding: '3px 0' }}>
+              <span style={{ fontSize: '11px', color: '#888780', width: '38px', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{horaLocal(f.creado_en)}</span>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: COLOR_TIPO[f.tipo] || '#B4B2A9', flexShrink: 0, alignSelf: 'center' }} />
+              <span style={{ fontSize: '12px', color: '#1A1A18', fontWeight: f.tipo === 'sesion' ? '600' : '400' }}>{describir(f, titulos)}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {hayMas && (
+        <button onClick={() => setLimite(l => l + PASO)}
+          style={{ marginTop: '12px', padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+          Ver más
+        </button>
+      )}
+    </div>
+  )
+}

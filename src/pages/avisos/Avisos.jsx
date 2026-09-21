@@ -7,6 +7,7 @@ import {
 } from '../../hooks/useAvisos'
 import { useEncuesta } from '../../hooks/useEncuestas'
 import EncuestaWidget from '../../components/EncuestaWidget'
+import { registrarActividad } from '../../lib/actividad'
 
 const FILTROS = [
   { valor: '',         label: 'Todos' },
@@ -35,6 +36,9 @@ export default function Avisos() {
     if (!aviso.leido && perfil) {
       await marcarLeido(aviso.id, perfil.id)
       recargar()
+    }
+    if (avisoAbierto?.id !== aviso.id) {
+      registrarActividad('aviso', { refId: aviso.id, detalle: 'avisos' })
     }
     setAvisoAbierto(avisoAbierto?.id === aviso.id ? null : aviso)
   }
