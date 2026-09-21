@@ -203,31 +203,16 @@ export default function EstadisticaAdmin() {
       {/* MÓVIL: tarjetas */}
       {!cargando && !error && movil && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {filtrados.map(d => {
-            const u = ultimoIngreso(d.ultimo_ingreso)
-            const expandido = abierto === d.perfil_id
-            return (
-              <div key={d.perfil_id} style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden' }}>
-                <div onClick={() => setAbierto(expandido ? null : d.perfil_id)} style={{ padding: '14px', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '10px' }}>
-                    <Nombre d={d} />
-                    <span style={{ fontSize: '12px', color: '#0F6E56' }}>{expandido ? '▲' : '▼'}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '10px' }}>
-                    <Cifra label="Ingresos" valor={d.ingresos} />
-                    <Cifra label="Días activos" valor={d.dias_activos} />
-                    <Cifra label="Pantallas" valor={d.vistas} />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#5F5E5A', marginBottom: '8px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_NIVEL[u.nivel], flexShrink: 0 }} />
-                    {u.texto}
-                  </div>
-                  <TopSecciones secciones={d.secciones} />
-                </div>
-                {expandido && <Historial perfilId={d.perfil_id} coroId={coroId} desde={desde} />}
-              </div>
-            )
-          })}
+          {filtrados.map(d => (
+            <TarjetaMovil
+              key={d.perfil_id}
+              d={d}
+              expandido={abierto === d.perfil_id}
+              onToggle={() => setAbierto(abierto === d.perfil_id ? null : d.perfil_id)}
+              coroId={coroId}
+              desde={desde}
+            />
+          ))}
           {filtrados.length === 0 && !sinDatos && <Vacio />}
         </div>
       )}
@@ -335,11 +320,94 @@ function Total({ valor, label, color, bg }) {
   )
 }
 
-function Cifra({ label, valor }) {
+// Tarjeta de cada persona en el celular:
+// cabecera (iniciales, nombre, voz y última actividad), tres cifras juntas y lo más visto.
+// Sin actividad, la tarjeta se reduce a una línea para no llenar la pantalla de ceros.
+function TarjetaMovil({ d, expandido, onToggle, coroId, desde }) {
+  const u = ultimoIngreso(d.ultimo_ingreso)
+  const activo = d.ultimo_ingreso != null
+  const iniciales = (d.nombre || '?').split(' ').map(n => (n.match(/[\p{L}\p{N}]/u) || [''])[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
+  const voz = d.voz ? capitalizar(d.voz) : null
+  const alPulsar = e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() }
+  }
+
   return (
-    <div style={{ flex: 1, textAlign: 'center' }}>
-      <div style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A18' }}>{valor}</div>
-      <div style={{ fontSize: '10px', color: '#B4B2A9', marginTop: '1px' }}>{label}</div>
+    <div style={{
+      background: '#FFFFFF', borderRadius: '14px', overflow: 'hidden',
+      border: `1px solid ${expandido ? '#9FE1CB' : '#E8E6DF'}`,
+      boxShadow: expandido ? '0 2px 10px rgba(15,110,86,0.10)' : 'none',
+    }}>
+      <div
+        role="button" tabIndex={0} aria-expanded={expandido}
+        onClick={onToggle} onKeyDown={alPulsar}
+        style={{ padding: '14px', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', outline: 'none' }}
+      >
+        {/* Cabecera */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '14px', fontWeight: '600',
+            background: activo ? '#E1F5EE' : '#F1EFE8', color: activo ? '#0F6E56' : '#888780',
+          }}>{iniciales}</div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {d.nombre || '—'}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: '8px', rowGap: '3px', marginTop: '3px', fontSize: '12px', color: '#5F5E5A' }}>
+              {d.rol !== 'cantante' && (
+                <span style={{ fontSize: '10px', fontWeight: '600', color: '#712B13', background: '#FAECE7', padding: '1px 7px', borderRadius: '8px', textTransform: 'capitalize' }}>{d.rol}</span>
+              )}
+              {voz && <span style={{ color: '#888780' }}>{voz}</span>}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_NIVEL[u.nivel], flexShrink: 0 }} />
+                {u.texto}
+              </span>
+            </div>
+          </div>
+
+          <span aria-hidden="true" style={{
+            width: '30px', height: '30px', borderRadius: '50%', flexShrink: 0, background: '#F1EFE8',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#0F6E56"
+              style={{ transform: expandido ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+              <path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+            </svg>
+          </span>
+        </div>
+
+        {activo && (
+          <>
+            {/* Cifras */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', background: '#F8F7F3', borderRadius: '10px', marginTop: '12px' }}>
+              <Cifra label="Ingresos" valor={d.ingresos} />
+              <Cifra label="Días activos" valor={d.dias_activos} separada />
+              <Cifra label="Pantallas" valor={d.vistas} separada />
+            </div>
+
+            {/* Lo más visto */}
+            {Object.keys(d.secciones || {}).length > 0 && (
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>Más visto</div>
+                <TopSecciones secciones={d.secciones} />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {expandido && <Historial perfilId={d.perfil_id} coroId={coroId} desde={desde} />}
+    </div>
+  )
+}
+
+function Cifra({ label, valor, separada }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '10px 4px', borderLeft: separada ? '1px solid #E8E6DF' : 'none' }}>
+      <div style={{ fontSize: '18px', fontWeight: '600', color: '#1A1A18', lineHeight: 1.1 }}>{valor}</div>
+      <div style={{ fontSize: '11px', color: '#888780', marginTop: '3px' }}>{label}</div>
     </div>
   )
 }
