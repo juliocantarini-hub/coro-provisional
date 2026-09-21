@@ -6,6 +6,7 @@ import {
   MENSAJES, TIPOS_DEL_DIA,
   tipoPorAusencia, esCumple, eventoDeHoy,
   armarTexto, indiceAlAzar, fechaLocal,
+  MAX_MENSAJES_POR_SESION,
 } from '../lib/sorpresas'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,10 +35,12 @@ function guardar(tipoStorage, clave, valor) {
 
 // Estado de esta visita. Vive en memoria y en sessionStorage, así un F5 no hace
 // perder un mensaje que todavía no se cerró.
-// { perfilId, ausencia, decidido: { tipo, idx } | null, cerrado }
+// { perfilId, ausencia, decidido: { tipo, idx } | null, cerrado,
+//   mostrados (mensajes ya mostrados en esta visita, de Inicio o de cualquier pantalla),
+//   secciones ({ repertorio: true, ... } pantallas ya evaluadas en esta visita) }
 let estado = null
 
-function obtenerEstado(perfil) {
+export function obtenerEstado(perfil) {
   if (!perfil?.id) return null
   if (estado?.perfilId === perfil.id) return estado
   const guardado = leer('sessionStorage', CLAVE_SESION)
@@ -46,6 +49,21 @@ function obtenerEstado(perfil) {
     : { perfilId: perfil.id, ausencia: tipoPorAusencia(perfil), decidido: null, cerrado: false }
   guardar('sessionStorage', CLAVE_SESION, estado)
   return estado
+}
+
+export function guardarEstado() {
+  if (estado) guardar('sessionStorage', CLAVE_SESION, estado)
+}
+
+// Cuántos mensajes ya se le mostraron en esta visita a la app
+export function mostradosEnSesion(est) {
+  if (!est) return 0
+  return est.mostrados ?? (est.decidido?.tipo ? 1 : 0)
+}
+
+export function registrarMostrado(est) {
+  est.mostrados = mostradosEnSesion(est) + 1
+  guardarEstado()
 }
 
 // ─── Registro del último acceso ──────────────────────────────────────────────
@@ -102,6 +120,13 @@ function yaMostradoHoy(perfilId, tipo) {
 }
 
 function decidir(perfil, est, eventos) {
+  // Si en esta visita ya se mostró un mensaje (por ejemplo el de otra pantalla), no se suma otro
+  if (mostradosEnSesion(est) >= MAX_MENSAJES_POR_SESION) {
+    est.decidido = { tipo: null, idx: 0 }
+    guardar('sessionStorage', CLAVE_SESION, est)
+    return est.decidido
+  }
+
   // Orden de prioridad: cumple > concierto > ausencia > ensayo
   const candidatos = []
   if (esCumple(perfil)) candidatos.push('cumple')
@@ -116,7 +141,9 @@ function decidir(perfil, est, eventos) {
     guardar('localStorage', CLAVE_DIA + perfil.id, `${fechaLocal()}|${tipo}`)
   }
 
+  const previos = mostradosEnSesion(est)
   est.decidido = { tipo, idx: tipo ? indiceAlAzar(tipo) : 0 }
+  if (tipo) est.mostrados = previos + 1
   guardar('sessionStorage', CLAVE_SESION, est)
   return est.decidido
 }
