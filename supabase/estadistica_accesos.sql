@@ -32,6 +32,11 @@ CREATE INDEX IF NOT EXISTS actividad_app_perfil_fecha_idx
 -- ─── 2. Permisos ────────────────────────────────────────────────────
 ALTER TABLE public.actividad_app ENABLE ROW LEVEL SECURITY;
 
+-- Permisos de tabla para las personas con sesión iniciada. En algunos proyectos de
+-- Supabase no vienen por defecto; sin esto la estadística da error y no se guarda nada.
+-- (Qué filas puede ver o borrar cada quien lo siguen decidiendo las políticas de abajo.)
+GRANT SELECT, INSERT, DELETE ON public.actividad_app TO authenticated;
+
 -- Cada persona solo puede registrar su propia actividad, en su propio coro
 DROP POLICY IF EXISTS "actividad_insert_propia" ON public.actividad_app;
 CREATE POLICY "actividad_insert_propia"
