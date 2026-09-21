@@ -117,10 +117,15 @@ export default function EstadisticaAdmin() {
             {cargando ? 'Cargando...' : error ? '' : `${conActividad} de ${base.length} ingresaron en los últimos ${PERIODOS.find(p => p.dias === periodo)?.label}`}
           </p>
         </div>
-        <button onClick={cargar}
-          style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
-          ↻ Actualizar
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={cargar}
+            style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+            ↻ Actualizar
+          </button>
+          {coroId && !error && (
+            <ReiniciarEstadistica coroId={coroId} onListo={() => { setAbierto(null); cargar() }} />
+          )}
+        </div>
       </div>
 
       {/* Período */}
@@ -183,7 +188,7 @@ export default function EstadisticaAdmin() {
 
       {sinDatos && (
         <Aviso color="#04342C" bg="#E1F5EE" titulo="Todavía no hay actividad registrada en este período">
-          Los datos empiezan a juntarse desde que se publicó esta función. Cuando los cantantes vayan usando la app, van a aparecer acá.
+          A medida que los cantantes usen la app, sus ingresos y pantallas vistas van a aparecer acá.
         </Aviso>
       )}
 
@@ -463,5 +468,114 @@ function Historial({ perfilId, coroId, desde }) {
         </button>
       )}
     </div>
+  )
+}
+
+// ─── Reiniciar (borrar) la estadística ───────────────────────────────────────
+
+const PALABRA_CONFIRMAR = 'BORRAR'
+
+function ReiniciarEstadistica({ coroId, onListo }) {
+  const [abierta, setAbierta]   = useState(false)
+  const [total, setTotal]       = useState(null) // cuántos registros se van a borrar
+  const [texto, setTexto]       = useState('')
+  const [borrando, setBorrando] = useState(false)
+  const [error, setError]       = useState(null)
+
+  async function abrir() {
+    setAbierta(true)
+    setTexto('')
+    setError(null)
+    setTotal(null)
+    const { count, error: err } = await supabase
+      .from('actividad_app')
+      .select('*', { count: 'exact', head: true })
+      .eq('coro_id', coroId)
+    if (err) { setError('No pudimos contar los registros. Intentá de nuevo.'); return }
+    setTotal(count || 0)
+  }
+
+  function cerrar() {
+    if (!borrando) setAbierta(false)
+  }
+
+  async function borrar() {
+    setBorrando(true)
+    setError(null)
+    const { count, error: err } = await supabase
+      .from('actividad_app')
+      .delete({ count: 'exact' })
+      .eq('coro_id', coroId)
+    setBorrando(false)
+
+    if (err) { setError('No se pudo borrar. Intentá de nuevo.'); return }
+    // Sin permiso, Supabase no da error: simplemente no borra nada
+    if (total > 0 && (count || 0) === 0) {
+      setError('No se borró nada. Falta ejecutar en Supabase el SQL con el permiso de borrado (archivo supabase/estadistica_accesos.sql).')
+      return
+    }
+    setAbierta(false)
+    onListo()
+  }
+
+  const confirmado  = texto.trim().toUpperCase() === PALABRA_CONFIRMAR
+  const puedeBorrar = confirmado && !borrando && total !== null && total > 0
+
+  return (
+    <>
+      <button onClick={abrir}
+        style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #E5B5A8', background: 'none', cursor: 'pointer', color: '#A32D2D', fontWeight: '500' }}>
+        Reiniciar estadística
+      </button>
+
+      {abierta && (
+        <div onClick={cerrar}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true"
+            style={{ background: '#FFFFFF', borderRadius: '14px', padding: '22px', maxWidth: '430px', width: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 10px' }}>
+              ¿Reiniciar la estadística?
+            </h3>
+
+            <p style={{ fontSize: '13px', color: '#5F5E5A', lineHeight: 1.6, margin: '0 0 10px' }}>
+              {total === null && !error && 'Contando registros...'}
+              {total === 0 && 'No hay registros para borrar.'}
+              {total > 0 && (
+                <>
+                  Se van a borrar <b>{total}</b> registros de actividad de todas las personas de este coro: ingresos, pantallas vistas e historial. <b>Esta acción no se puede deshacer.</b>
+                </>
+              )}
+            </p>
+
+            {total > 0 && (
+              <>
+                <p style={{ fontSize: '13px', color: '#5F5E5A', margin: '0 0 6px' }}>
+                  Para confirmar, escribí <b>{PALABRA_CONFIRMAR}</b>:
+                </p>
+                <input value={texto} onChange={e => setTexto(e.target.value)} autoFocus
+                  placeholder={PALABRA_CONFIRMAR}
+                  style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              </>
+            )}
+
+            {error && (
+              <p style={{ fontSize: '12px', color: '#A32D2D', background: '#FCEBEB', borderRadius: '8px', padding: '8px 10px', lineHeight: 1.5, margin: '12px 0 0' }}>{error}</p>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '18px' }}>
+              <button onClick={cerrar} disabled={borrando}
+                style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#5F5E5A' }}>
+                Cancelar
+              </button>
+              <button onClick={borrar} disabled={!puedeBorrar}
+                style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', border: 'none', fontWeight: '600',
+                  background: puedeBorrar ? '#A32D2D' : '#E8E6DF', color: puedeBorrar ? '#FFFFFF' : '#B4B2A9', cursor: puedeBorrar ? 'pointer' : 'not-allowed' }}>
+                {borrando ? 'Borrando...' : 'Borrar todo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

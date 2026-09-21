@@ -57,6 +57,19 @@ USING (
   )
 );
 
+-- Directores y admins pueden reiniciar la estadística (borrar la actividad de su coro)
+DROP POLICY IF EXISTS "actividad_delete_directores" ON public.actividad_app;
+CREATE POLICY "actividad_delete_directores"
+ON public.actividad_app FOR DELETE TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.perfiles p
+    WHERE p.id = auth.uid()
+      AND p.coro_id = actividad_app.coro_id
+      AND p.rol IN ('director', 'admin')
+  )
+);
+
 -- ─── 3. Resumen por cantante (lo usa la pantalla Estadística) ───────
 -- Devuelve una fila por persona del coro, con o sin actividad en el período.
 -- Se usa una función (y no una consulta directa) porque Supabase entrega
