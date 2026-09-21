@@ -54,7 +54,7 @@ export const MENSAJES = {
     textos: [
       '¡Feliz cumple, {nombre}! Que tengas un lindo día!',
       '¡Feliz cumple, {nombre}! Que sea un gran día!',
-      '¡Feliz cumple, {nombre}! Lo mejor para vos!'',
+      '¡Feliz cumple, {nombre}! Lo mejor para vos!',
     ],
   },
 
