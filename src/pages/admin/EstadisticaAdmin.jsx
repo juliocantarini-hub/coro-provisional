@@ -12,8 +12,8 @@ const PERIODOS = [
 
 const ORDENES = [
   { valor: 'ingresos',  label: 'Más ingresos' },
-  { valor: 'reciente',  label: 'Ingresó hace poco' },
-  { valor: 'inactivos', label: 'Sin ingresar primero' },
+  { valor: 'reciente',  label: 'Actividad reciente' },
+  { valor: 'inactivos', label: 'Sin actividad primero' },
   { valor: 'nombre',    label: 'Nombre' },
 ]
 
@@ -38,7 +38,7 @@ function inicioDeDia(fecha) {
 }
 
 function ultimoIngreso(iso) {
-  if (!iso) return { texto: 'Sin ingresos', nivel: 'nulo' }
+  if (!iso) return { texto: 'Sin actividad', nivel: 'nulo' }
   const fecha = new Date(iso)
   const dias = Math.round((inicioDeDia(new Date()) - inicioDeDia(fecha)) / 86400000)
   const corta = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
@@ -122,6 +122,14 @@ export default function EstadisticaAdmin() {
             style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
             ↻ Actualizar
           </button>
+          {coroId && !error && (
+            <button
+              onClick={() => descargarResumen(base.slice().sort(comparador(orden)), PERIODOS.find(p => p.dias === periodo)?.label)}
+              disabled={cargando || base.length === 0}
+              style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+              ↓ Descargar resumen
+            </button>
+          )}
           {coroId && !error && (
             <ReiniciarEstadistica coroId={coroId} onListo={() => { setAbierto(null); cargar() }} />
           )}
@@ -232,7 +240,7 @@ export default function EstadisticaAdmin() {
             <span>Ingresos</span>
             <span>Días activos</span>
             <span>Pantallas</span>
-            <span>Último ingreso</span>
+            <span>Última actividad</span>
             <span>Más visto</span>
           </div>
           {filtrados.length === 0 && <Vacio />}
@@ -549,6 +557,9 @@ function ReiniciarEstadistica({ coroId, onListo }) {
 
             {total > 0 && (
               <>
+                <p style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', borderRadius: '8px', padding: '8px 10px', lineHeight: 1.5, margin: '0 0 12px' }}>
+                  Antes de borrar, cerrá esta ventana, elegí “12 meses” y tocá “Descargar resumen” para guardar una copia.
+                </p>
                 <p style={{ fontSize: '13px', color: '#5F5E5A', margin: '0 0 6px' }}>
                   Para confirmar, escribí <b>{PALABRA_CONFIRMAR}</b>:
                 </p>
@@ -578,4 +589,53 @@ function ReiniciarEstadistica({ coroId, onListo }) {
       )}
     </>
   )
+}
+
+// ─── Descargar resumen (CSV) ─────────────────────────────────────────────────
+
+const SEPARADOR = ';' // Excel en español separa las columnas con punto y coma
+
+function celdaCsv(valor) {
+  let s = String(valor ?? '')
+  if (/^[=+\-@]/.test(s)) s = "'" + s // evita que Excel lo interprete como fórmula
+  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+function fechaHoraCsv(iso) {
+  if (!iso) return ''
+  const fecha = new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return `${fecha} ${horaLocal(iso)}`
+}
+
+function descargarResumen(filas, periodoLabel) {
+  const encabezado = ['Nombre', 'Voz', 'Rol', 'Ingresos', 'Días activos', 'Pantallas vistas', 'Última actividad', 'Secciones más vistas']
+  const lineas = filas.map(d => [
+    d.nombre,
+    d.voz,
+    d.rol,
+    d.ingresos,
+    d.dias_activos,
+    d.vistas,
+    fechaHoraCsv(d.ultimo_ingreso),
+    Object.entries(d.secciones || {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([clave, n]) => `${ETIQUETAS_SECCION[clave] || clave}: ${n}`)
+      .join(' | '),
+  ])
+  const csv = [encabezado, ...lineas].map(f => f.map(celdaCsv).join(SEPARADOR)).join('\r\n')
+
+  const hoy = new Date()
+  const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+  const periodo = (periodoLabel || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '-')
+
+  // El BOM inicial hace que Excel respete las tildes
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const enlace = document.createElement('a')
+  enlace.href = url
+  enlace.download = `estadistica-accesos-${periodo}-${fecha}.csv`
+  document.body.appendChild(enlace)
+  enlace.click()
+  enlace.remove()
+  URL.revokeObjectURL(url)
 }

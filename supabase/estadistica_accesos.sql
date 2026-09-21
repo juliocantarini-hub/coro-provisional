@@ -101,7 +101,7 @@ AS $$
            COUNT(*) FILTER (WHERE act.tipo = 'sesion')  AS ingresos,
            COUNT(*) FILTER (WHERE act.tipo <> 'sesion') AS vistas,
            COUNT(DISTINCT (act.creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date) AS dias_activos,
-           MAX(act.creado_en) FILTER (WHERE act.tipo = 'sesion') AS ultimo_ingreso
+           MAX(act.creado_en) AS ultimo_ingreso -- último movimiento de cualquier tipo
     FROM act
     GROUP BY act.perfil_id
   ),
