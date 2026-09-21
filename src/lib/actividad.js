@@ -81,17 +81,17 @@ export function establecerPerfilActivo(perfilId) {
 
 export async function registrarActividad(tipo, { refId = null, detalle = null } = {}) {
   const perfilId = perfilActivo
-  if (!perfilId || deshabilitado) return
+  if (!perfilId || deshabilitado) return false
 
   // Evita duplicados seguidos (por ejemplo, doble render en desarrollo)
   const clave = `${tipo}|${refId ?? ''}|${detalle ?? ''}`
   const ahora = Date.now()
-  if (clave === ultimo.clave && ahora - ultimo.ms < 3000) return
+  if (clave === ultimo.clave && ahora - ultimo.ms < 3000) return false
   ultimo = { clave, ms: ahora }
 
   try {
     const coro = await getCoroActual()
-    if (!coro) return
+    if (!coro) return false
     const { error } = await supabase.from('actividad_app').insert({
       coro_id: coro.id,
       perfil_id: perfilId,
@@ -101,21 +101,37 @@ export async function registrarActividad(tipo, { refId = null, detalle = null } 
     })
     if (error) throw error
     fallos = 0
+    return true
   } catch (err) {
     fallos += 1
     if (fallos >= MAX_FALLOS) deshabilitado = true
     console.warn('No se pudo registrar la actividad:', err?.message || err)
+    return false
   }
 }
 
-// Registra un "ingreso" si pasaron más de 30 minutos desde el anterior
-export function registrarSesionSiCorresponde() {
+let sesionEnCurso = false
+
+// Registra un "ingreso" si pasaron más de 30 minutos desde el anterior.
+// Solo se anota como hecho cuando se guardó de verdad; si falla, se reintenta.
+export async function registrarSesionSiCorresponde() {
   const perfilId = perfilActivo
-  if (!perfilId) return
+  if (!perfilId || sesionEnCurso) return
   const clave = `corum_sesion_log_${perfilId}`
   let previo = 0
   try { previo = Number(window.localStorage.getItem(clave)) || 0 } catch { /* sin storage */ }
   if (Date.now() - previo < MIN_ENTRE_SESIONES) return
-  try { window.localStorage.setItem(clave, String(Date.now())) } catch { /* sin storage */ }
-  registrarActividad('sesion')
+
+  sesionEnCurso = true
+  const guardado = await registrarActividad('sesion')
+  sesionEnCurso = false
+  if (guardado) {
+    try { window.localStorage.setItem(clave, String(Date.now())) } catch { /* sin storage */ }
+  }
+}
+
+// Después de reiniciar la estadística: el próximo ingreso de esta persona vuelve a contarse
+export function olvidarUltimaSesion() {
+  if (!perfilActivo) return
+  try { window.localStorage.removeItem(`corum_sesion_log_${perfilActivo}`) } catch { /* sin storage */ }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
-import { ETIQUETAS_SECCION } from '../../lib/actividad'
+import { ETIQUETAS_SECCION, olvidarUltimaSesion } from '../../lib/actividad'
 
 const PERIODOS = [
   { dias: 7,   label: '7 días' },
@@ -522,6 +522,7 @@ function ReiniciarEstadistica({ coroId, onListo }) {
       setError('No se borró nada. Falta ejecutar en Supabase el SQL con el permiso de borrado (archivo supabase/estadistica_accesos.sql).')
       return
     }
+    olvidarUltimaSesion()
     setAbierta(false)
     onListo()
   }
