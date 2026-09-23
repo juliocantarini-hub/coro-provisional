@@ -115,6 +115,17 @@ function imprimirListado(usuarios, camposSeleccionados) {
   setTimeout(() => ventana.print(), 500)
 }
 
+function IndicadorPush({ cantidad }) {
+  const activo = cantidad > 0
+  return (
+    <span
+      title={activo ? `Recibe notificaciones push (${cantidad} dispositivo${cantidad !== 1 ? 's' : ''})` : 'No recibe notificaciones push'}
+      style={{ fontSize: '11px', opacity: activo ? 1 : 0.3, flexShrink: 0, lineHeight: 1 }}>
+      {activo ? '🔔' : '🔕'}
+    </span>
+  )
+}
+
 export default function Usuarios() {
   const [usuarios, setUsuarios]     = useState([])
   const [cargando, setCargando]     = useState(true)
@@ -134,12 +145,24 @@ export default function Usuarios() {
   const esMovil = useEsMovil()
   const activosDetalle = usePresenciaDetalle()
   const idsOnline = new Set(activosDetalle.map(a => a.id))
+  const [pushPorPerfil, setPushPorPerfil] = useState(new Map())
 
   const cargar = useCallback(async () => {
     setCargando(true)
     const coro = await getCoroActual()
     const { data } = await supabase.from('perfiles').select('*').eq('coro_id', coro.id).order('nombre')
     setUsuarios(data || [])
+
+    const ids = (data || []).map(u => u.id)
+    const { data: subs } = ids.length
+      ? await supabase.from('push_suscripciones').select('perfil_id').in('perfil_id', ids)
+      : { data: [] }
+    const conteo = new Map()
+    for (const s of subs || []) {
+      conteo.set(s.perfil_id, (conteo.get(s.perfil_id) || 0) + 1)
+    }
+    setPushPorPerfil(conteo)
+
     setCargando(false)
   }, [])
 
@@ -332,6 +355,7 @@ export default function Usuarios() {
                       {idsOnline.has(u.id) && (
                         <span title="En línea" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1D9E75', display: 'inline-block', flexShrink: 0 }} />
                       )}
+                      <IndicadorPush cantidad={pushPorPerfil.get(u.id) || 0} />
                     </div>
                     <div style={{ fontSize: '12px', color: '#888780', marginTop: '2px' }}>{u.mail || '—'}</div>
                   </div>
@@ -387,6 +411,7 @@ export default function Usuarios() {
                     {idsOnline.has(u.id) && (
                       <span title="En línea" style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#1D9E75', display: 'inline-block', flexShrink: 0 }} />
                     )}
+                    <IndicadorPush cantidad={pushPorPerfil.get(u.id) || 0} />
                   </div>
                   <div style={{ fontSize: '11px', color: '#888780', marginTop: '1px' }}>{u.mail || '—'}</div>
                 </div>
