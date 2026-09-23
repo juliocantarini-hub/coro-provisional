@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { suscribirPush } from '../../hooks/usePushSubscription'
 
 const VOCES = ['soprano', 'contralto', 'tenor', 'bajo', 'director']
 
@@ -10,7 +11,7 @@ const TAMANOS = [
 ]
 
 export default function Perfil() {
-  const { perfil, actualizarPerfil, actualizarContrasena } = useAuth()
+  const { perfil, usuario, actualizarPerfil, actualizarContrasena } = useAuth()
 
   const [form, setForm] = useState({
     nombre: '', telefono: '', voz: '',
@@ -221,6 +222,9 @@ export default function Perfil() {
         )}
       </div>
 
+      {/* Notificaciones */}
+      <SeccionNotificaciones usuario={usuario} />
+
       {/* Tamaño de fuente */}
       <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '22px', border: '1px solid #E8E6DF' }}>
         <h3 style={estilos.seccionTitulo}>Accesibilidad</h3>
@@ -249,6 +253,87 @@ export default function Perfil() {
         </div>
       </div>
 
+    </div>
+  )
+}
+
+function SeccionNotificaciones({ usuario }) {
+  const [estado, setEstado] = useState('verificando') // verificando | no_soportado | denegado | suscripto | disponible
+  const [activando, setActivando] = useState(false)
+  const [errorActivar, setErrorActivar] = useState('')
+
+  async function verificarEstado() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setEstado('no_soportado')
+      return
+    }
+    if (Notification.permission === 'denied') {
+      setEstado('denegado')
+      return
+    }
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const sub = await registration.pushManager.getSubscription()
+      setEstado(sub ? 'suscripto' : 'disponible')
+    } catch {
+      setEstado('disponible')
+    }
+  }
+
+  useEffect(() => { verificarEstado() }, [])
+
+  async function handleActivar() {
+    setActivando(true)
+    setErrorActivar('')
+    const resultado = await suscribirPush(usuario)
+    setActivando(false)
+    if (resultado.ok) {
+      await verificarEstado()
+    } else if (resultado.motivo === 'permiso_denegado') {
+      setEstado('denegado')
+    } else {
+      setErrorActivar('No se pudo activar. Probá de nuevo en un momento.')
+    }
+  }
+
+  return (
+    <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '22px', border: '1px solid #E8E6DF', marginBottom: '14px' }}>
+      <h3 style={estilos.seccionTitulo}>Notificaciones</h3>
+
+      {estado === 'verificando' && (
+        <p style={{ fontSize: '13px', color: '#888780' }}>Verificando...</p>
+      )}
+
+      {estado === 'no_soportado' && (
+        <p style={{ fontSize: '13px', color: '#888780' }}>
+          Tu navegador no admite notificaciones push.
+        </p>
+      )}
+
+      {estado === 'suscripto' && (
+        <div style={estilos.alerta('exito')}>✓ Las notificaciones están activadas en este dispositivo.</div>
+      )}
+
+      {estado === 'denegado' && (
+        <div style={estilos.alerta('error')}>
+          Bloqueaste las notificaciones para esta app en algún momento. Para activarlas ahora hay que habilitarlo a mano
+          desde la configuración del navegador o del celular (Ajustes → Notificaciones, buscando el nombre de la app;
+          o tocando el ícono de información junto a la dirección web y permitiéndolas ahí).
+        </div>
+      )}
+
+      {estado === 'disponible' && (
+        <div>
+          <p style={{ fontSize: '13px', color: '#5F5E5A', marginBottom: '12px' }}>
+            Activá las notificaciones para enterarte de avisos, ensayos y recordatorios sin tener que abrir la app.
+          </p>
+          {errorActivar && <div style={estilos.alerta('error')}>{errorActivar}</div>}
+          <button onClick={handleActivar} disabled={activando}
+            style={{ height: '38px', padding: '0 16px', borderRadius: '8px', border: 'none', background: activando ? '#9FE1CB' : '#0F6E56', color: '#FFFFFF', fontSize: '13px', cursor: activando ? 'not-allowed' : 'pointer', fontWeight: '500' }}>
+            {activando ? 'Activando...' : 'Activar notificaciones'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

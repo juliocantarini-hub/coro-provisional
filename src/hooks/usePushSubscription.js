@@ -11,44 +11,59 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
 }
 
+// Intenta suscribir al usuario a las notificaciones push. La usan tanto el
+// intento automático al iniciar sesión como el botón "Activar notificaciones"
+// de Mi perfil (para quien nunca llegó a decidir, o a quien falló el intento
+// automático). Si el usuario ya bloqueó el permiso antes, el navegador
+// resuelve requestPermission() como 'denied' sin mostrar nada — eso no se
+// puede reabrir por código, solo a mano desde la configuración del navegador.
+export async function suscribirPush(user) {
+  if (!user) return { ok: false, motivo: 'sin_usuario' }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return { ok: false, motivo: 'no_soportado' }
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') {
+      return { ok: false, motivo: 'permiso_denegado' }
+    }
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    })
+
+    const { endpoint, keys } = subscription.toJSON()
+
+    const coro = await getCoroActual()
+
+    const datos = {
+      perfil_id: user.id,
+      endpoint,
+      p256dh: keys.p256dh,
+      auth: keys.auth
+    }
+    if (coro) datos.coro_id = coro.id
+
+    await supabase.from('push_suscripciones').upsert(
+      datos,
+      { onConflict: 'perfil_id,endpoint' }
+    )
+
+    return { ok: true }
+  } catch (err) {
+    console.error('Error al suscribir push:', err)
+    return { ok: false, motivo: 'error', error: err }
+  }
+}
+
+// Intento automático y silencioso al iniciar sesión (comportamiento existente,
+// sin cambios). No muestra nada si falla o si el permiso ya estaba bloqueado.
 export function usePushSubscription(user) {
   useEffect(() => {
     if (!user) return
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-
-    async function suscribir() {
-      try {
-        const registration = await navigator.serviceWorker.ready
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') return
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-        })
-
-        const { endpoint, keys } = subscription.toJSON()
-
-        const coro = await getCoroActual()
-
-        const datos = {
-          perfil_id: user.id,
-          endpoint,
-          p256dh: keys.p256dh,
-          auth: keys.auth
-        }
-        if (coro) datos.coro_id = coro.id
-
-        await supabase.from('push_suscripciones').upsert(
-          datos,
-          { onConflict: 'perfil_id,endpoint' }
-        )
-
-      } catch (err) {
-        console.error('Error al suscribir push:', err)
-      }
-    }
-
-    suscribir()
+    suscribirPush(user)
   }, [user])
 }
