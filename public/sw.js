@@ -12,7 +12,7 @@ self.addEventListener('push', function (event) {
   const options = {
     body: data.body || '',
     icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    badge: '/badge-96.png',
     data: { url: data.url || '/' }
   }
   event.waitUntil(self.registration.showNotification(title, options))
