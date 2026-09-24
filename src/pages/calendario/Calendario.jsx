@@ -33,6 +33,7 @@ export default function Calendario() {
   const [mes, setMes]               = useState(hoy.getMonth())
   const [anio, setAnio]             = useState(hoy.getFullYear())
   const [cantantes, setCantantes]   = useState([])
+  const [cumpleSeleccionado, setCumpleSeleccionado] = useState(null)
 
   const { eventos, cargando, error, recargar } = useEventos({
     tipo: tipoFiltro || undefined,
@@ -227,7 +228,8 @@ export default function Calendario() {
                     {/* Cumpleaños */}
                     {cumpleDia.map(c => (
                       <div key={c.id}
-                        style={{ fontSize: '10px', background: '#FFE4B8', color: '#8A3B00', border: '1px solid #F5B95B', borderRadius: '3px', padding: '2px 4px', marginBottom: '2px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: '700' }}
+                        onClick={(e) => { e.stopPropagation(); setCumpleSeleccionado(c) }}
+                        style={{ fontSize: '10px', background: '#FFE4B8', color: '#8A3B00', border: '1px solid #F5B95B', borderRadius: '3px', padding: '2px 4px', marginBottom: '2px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: '700', cursor: 'pointer' }}
                         title={`🎂 Cumpleaños de ${c.nombre}`}>
                         🎂 {c.nombre}
                       </div>
@@ -313,6 +315,45 @@ export default function Calendario() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Tarjetita con el nombre completo del cumpleañero */}
+      {cumpleSeleccionado && (
+        <div
+          onClick={() => setCumpleSeleccionado(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(26,26,24,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: '20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF', borderRadius: '14px', padding: '22px 24px',
+              maxWidth: '300px', width: '100%', textAlign: 'center',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+            }}
+          >
+            <div style={{ fontSize: '30px', marginBottom: '6px' }}>🎂</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', color: '#1A1A18', marginBottom: '2px' }}>
+              {cumpleSeleccionado.nombre}
+            </div>
+            <div style={{ fontSize: '13px', color: '#888780', marginBottom: '16px' }}>
+              Cumpleaños
+            </div>
+            <button
+              onClick={() => setCumpleSeleccionado(null)}
+              style={{
+                padding: '8px 22px', borderRadius: '8px', border: 'none',
+                background: '#0F6E56', color: '#FFFFFF', fontSize: '13px',
+                fontWeight: '500', cursor: 'pointer',
+              }}
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
     </div>
