@@ -29,6 +29,7 @@ function getZoom() {
 export default function AppLayout({ children }) {
   const esMovil = useEsMovil()
   const location = useLocation()
+  const navigate = useNavigate()
   const [abierto, setAbierto] = useState(false)
   const [seccionAdmin, setSeccionAdmin] = useState(
     location.pathname.startsWith('/admin')
@@ -36,6 +37,23 @@ export default function AppLayout({ children }) {
   const [zoom, setZoom] = useState(getZoom)
   const [user, setUser] = useState(null)
   const { perfil } = useAuth()
+
+  // Al entrar (login), admins/directores arrancan del lado Admin en vez de Cantante.
+  // Se aplica una sola vez por sesión del navegador (no cada vez que vuelven a Inicio).
+  useEffect(() => {
+    if (!perfil) return
+    let yaAplicado = false
+    try {
+      yaAplicado = !!sessionStorage.getItem('corum_vista_inicial_aplicada')
+      if (!yaAplicado) sessionStorage.setItem('corum_vista_inicial_aplicada', '1')
+    } catch {}
+    if (yaAplicado) return
+    const esAdminODirector = perfil.rol === 'admin' || perfil.rol === 'director'
+    if (esAdminODirector && location.pathname === '/') {
+      setSeccionAdmin(true)
+      navigate('/admin', { replace: true })
+    }
+  }, [perfil])
 
   useEffect(() => {
     const fn = () => setZoom(getZoom())

@@ -179,6 +179,7 @@ function useAuthLogic() {
     await supabase.auth.signOut()
     setPerfil(null)
     setUsuario(null)
+    try { sessionStorage.removeItem('corum_vista_inicial_aplicada') } catch {}
   }
 
   const esAdmin    = perfil?.rol === 'admin'
