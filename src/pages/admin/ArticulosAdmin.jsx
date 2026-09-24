@@ -5,6 +5,19 @@ import {
   crearArticulo, actualizarArticulo, publicarArticulo,
   eliminarArticulo, useArticulosAdmin, CATEGORIAS, CATEGORIA_COLOR
 } from '../../hooks/useBlog'
+import { getCoroActual } from '../../lib/coro'
+
+async function enviarNotificacionArticulo(titulo) {
+  try {
+    const coro = await getCoroActual()
+    if (!coro) return
+    await supabase.functions.invoke('enviar-notificaciones', {
+      body: { coro_id: coro.id, titulo: `Nuevo texto: ${titulo}`, cuerpo: 'Ya está disponible para leer', url: '/blog' }
+    })
+  } catch (err) {
+    console.error('Error al enviar notificación:', err)
+  }
+}
 
 function useEsMovil() {
   return window.innerWidth <= 768
@@ -31,6 +44,9 @@ export function ArticulosAdmin() {
   async function togglePublicar(art) {
     setProcesando(art.id)
     await publicarArticulo(art.id, !art.publicado)
+    if (!art.publicado) {
+      await enviarNotificacionArticulo(art.titulo)
+    }
     await recargar()
     setProcesando(null)
   }
@@ -240,7 +256,10 @@ export function ArticuloForm() {
     if (publicar) datos.publicado = true
     const { ok, data, error } = esEdicion ? await actualizarArticulo(id, datos) : await crearArticulo(datos)
     if (!ok) { setErrorGlobal(error); setGuardando(false); return }
-    if (publicar && !esEdicion && data?.id) await publicarArticulo(data.id, true)
+    if (publicar && !esEdicion && data?.id) {
+      await publicarArticulo(data.id, true)
+      await enviarNotificacionArticulo(datos.titulo)
+    }
     setGuardando(false)
     navigate('/admin/blog')
   }
