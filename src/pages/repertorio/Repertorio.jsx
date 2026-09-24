@@ -215,9 +215,9 @@ export default function Repertorio() {
                   <span>{obra.compositor || 'Compositor desconocido'}</span>
                   <span style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <MatIcon tiene={!!obra.drive_partitura_id} title="Partitura PDF" />
-                    <MatIcon tiene={!!obra.drive_audio_general} title="Audio general" />
+                    <MatIcon tiene={obra.audios?.some(a => a.voz === 'general')} title="Audio general" />
                     {perfil?.voz && (
-                      <MatIcon tiene={!!obra[`drive_audio_${perfil.voz}`]} title={`Audio ${perfil.voz}`} />
+                      <MatIcon tiene={obra.audios?.some(a => a.voz === perfil.voz)} title={`Audio ${perfil.voz}`} />
                     )}
                   </span>
                 </div>
