@@ -19,6 +19,13 @@ const FILTROS = [
   { valor: 'general',  label: 'General' },
 ]
 
+function aclarar(hex, factor = 0.75) {
+  const n = parseInt(hex.slice(1), 16)
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  const mix = c => Math.round(c + (255 - c) * factor)
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`
+}
+
 function compartirWhatsApp(aviso, e) {
   e.stopPropagation()
   const texto = `📢 *${aviso.titulo}*${aviso.cuerpo ? '\n\n' + aviso.cuerpo : ''}`
@@ -169,7 +176,7 @@ function AvisoCard({ aviso, estaAbierto, onAbrir, navigate }) {
       </div>
 
       {estaAbierto && (
-        <div style={{ padding: '0 16px 14px', borderTop: '1px solid #F1EFE8' }}>
+        <div style={{ padding: '0 16px 14px', background: aclarar(tc.bg), borderTop: '1px solid #F1EFE8' }}>
           {aviso.cuerpo && (
             <p style={{ fontSize: '13px', color: '#5F5E5A', margin: '12px 0 10px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>
               {aviso.cuerpo}
