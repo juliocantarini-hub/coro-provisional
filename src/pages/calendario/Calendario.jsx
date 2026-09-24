@@ -226,9 +226,9 @@ export default function Calendario() {
                     {/* Cumpleaños */}
                     {cumpleDia.map(c => (
                       <div key={c.id}
-                        style={{ fontSize: '9px', background: '#FFF3E0', color: '#E65100', borderRadius: '3px', padding: '2px 4px', marginBottom: '2px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: '500' }}
+                        style={{ fontSize: '10px', background: '#FFE4B8', color: '#8A3B00', border: '1px solid #F5B95B', borderRadius: '3px', padding: '2px 4px', marginBottom: '2px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontWeight: '700' }}
                         title={`🎂 Cumpleaños de ${c.nombre}`}>
-                        🎂 {c.nombre.split(' ')[0]}
+                        🎂 {c.nombre}
                       </div>
                     ))}
                   </div>
