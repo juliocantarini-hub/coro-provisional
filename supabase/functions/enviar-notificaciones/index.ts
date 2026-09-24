@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { coro_id, titulo, cuerpo } = await req.json()
+    const { coro_id, titulo, cuerpo, url } = await req.json()
 
     if (!titulo) {
       return new Response(JSON.stringify({ error: 'Faltan parámetros' }), { status: 400 })
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
 
     if (error) throw error
 
-    const payload = JSON.stringify({ title: titulo, body: cuerpo || '' })
+    const payload = JSON.stringify({ title: titulo, body: cuerpo || '', url: url || '/' })
 
     const resultados = await Promise.allSettled(
       suscripciones.map(s =>

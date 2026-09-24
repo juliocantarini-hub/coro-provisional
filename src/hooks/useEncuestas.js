@@ -290,7 +290,7 @@ async function enviarNotificacionEncuesta(coroId, pregunta) {
   try {
     if (!coroId) return
     await supabase.functions.invoke('enviar-notificaciones', {
-      body: { coro_id: coroId, titulo: `Nueva encuesta: ${pregunta}`, cuerpo: '' }
+      body: { coro_id: coroId, titulo: `Nueva encuesta: ${pregunta}`, cuerpo: '', url: '/avisos' }
     })
   } catch (err) {
     console.error('Error al enviar notificación:', err)
