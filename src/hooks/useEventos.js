@@ -216,6 +216,10 @@ export function esFuturo(iso) {
 
 export function diasRestantes(iso) {
   if (!iso) return null
-  const diff = new Date(iso) - new Date()
-  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  const fecha = new Date(iso)
+  const hoy = new Date()
+  const fechaDia = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate())
+  const hoyDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+  const diff = fechaDia - hoyDia
+  return Math.round(diff / (1000 * 60 * 60 * 24))
 }
