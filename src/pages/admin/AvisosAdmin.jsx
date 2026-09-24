@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
-import { crearAviso, actualizarAviso, publicarAviso, eliminarAviso, useAvisosAdmin, tiempoRelativo, TIPO_AVISO } from '../../hooks/useAvisos'
+import { crearAviso, actualizarAviso, publicarAviso, eliminarAviso, eliminarAvisosAntiguos, useAvisosAdmin, tiempoRelativo, TIPO_AVISO } from '../../hooks/useAvisos'
 import { useEncuesta, useCrearEncuesta } from '../../hooks/useEncuestas'
 import EncuestaWidget from '../../components/EncuestaWidget'
 
@@ -34,7 +34,12 @@ export function AvisosAdmin() {
   const [confirmEliminar, setConfirmEliminar] = useState(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [editando, setEditando] = useState(null)
+  const [confirmLimpieza, setConfirmLimpieza] = useState(false)
+  const [limpiando, setLimpiando] = useState(false)
   const esMovil = useEsMovil()
+
+  const fechaCorte = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const avisosAntiguos = avisos.filter(a => new Date(a.creado_en) < fechaCorte)
 
   async function togglePublicar(aviso) {
     setProcesando(aviso.id)
@@ -52,6 +57,15 @@ export function AvisosAdmin() {
     setConfirmEliminar(null)
     await recargar()
     setProcesando(null)
+  }
+
+  async function handleLimpiarAntiguos() {
+    setLimpiando(true)
+    const coro = await getCoroActual()
+    await eliminarAvisosAntiguos(coro.id, fechaCorte.toISOString())
+    setConfirmLimpieza(false)
+    await recargar()
+    setLimpiando(false)
   }
 
   if (mostrarForm || editando) {
@@ -73,11 +87,20 @@ export function AvisosAdmin() {
             {cargando ? 'Cargando...' : `${avisos.length} aviso${avisos.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <button onClick={() => setMostrarForm(true)}
-          style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          Nuevo aviso
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {avisosAntiguos.length > 0 && (
+            <button onClick={() => setConfirmLimpieza(true)}
+              style={{ background: 'none', color: '#A32D2D', border: '1px solid #F0C5B4', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+              Borrar antiguos ({avisosAntiguos.length})
+            </button>
+          )}
+          <button onClick={() => setMostrarForm(true)}
+            style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Nuevo aviso
+          </button>
+        </div>
       </div>
 
       {error && <div style={{ background: '#FCEBEB', border: '1px solid #E24B4A', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#501313', marginBottom: '16px' }}>{error}</div>}
@@ -200,6 +223,24 @@ export function AvisosAdmin() {
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setConfirmEliminar(null)} style={{ flex: 1, height: '40px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
               <button onClick={() => handleEliminar(confirmEliminar.id)} style={{ flex: 1, height: '40px', borderRadius: '8px', border: 'none', background: '#A32D2D', color: '#FFFFFF', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmLimpieza && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '28px 24px', maxWidth: '380px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
+            <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', margin: '0 0 10px' }}>Borrar avisos antiguos</h3>
+            <p style={{ fontSize: '14px', color: '#5F5E5A', lineHeight: '1.6', margin: '0 0 24px' }}>
+              Se van a eliminar <strong>{avisosAntiguos.length} aviso{avisosAntiguos.length !== 1 ? 's' : ''}</strong> de más de 30 días,
+              dejando solo el último mes. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setConfirmLimpieza(false)} disabled={limpiando} style={{ flex: 1, height: '40px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
+              <button onClick={handleLimpiarAntiguos} disabled={limpiando} style={{ flex: 1, height: '40px', borderRadius: '8px', border: 'none', background: '#A32D2D', color: '#FFFFFF', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                {limpiando ? 'Borrando...' : 'Borrar'}
+              </button>
             </div>
           </div>
         </div>
