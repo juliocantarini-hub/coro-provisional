@@ -59,7 +59,7 @@ export default function EstadisticaAdmin() {
   const [coroId, setCoroId]       = useState(null)
   const [desde, setDesde]         = useState(null)
   const [busqueda, setBusqueda]   = useState('')
-  const [orden, setOrden]         = useState('ingresos')
+  const [orden, setOrden]         = useState('reciente')
   const [soloCantantes, setSoloCantantes] = useState(false)
   const [abierto, setAbierto]     = useState(null)
   const movil = esMovil()
