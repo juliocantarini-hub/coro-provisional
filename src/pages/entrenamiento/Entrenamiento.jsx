@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../../hooks/useAuth'
 import { useEjerciciosEntrenamiento, useEjerciciosHoy } from '../../hooks/useEntrenamiento'
 import EjercicioPlayer from '../../components/EjercicioPlayer'
 import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
@@ -12,6 +13,7 @@ const CATEGORIAS = {
 const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'vocalizacion']
 
 export default function Entrenamiento() {
+  const { perfil } = useAuth()
   const { porCategoria, cargando, error, recargar } = useEjerciciosEntrenamiento()
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
   const [categoriaActiva, setCategoriaActiva] = useState('')
@@ -58,7 +60,7 @@ export default function Entrenamiento() {
         </div>
       </div>
 
-      <PianoInteractivo abierto={pianoAbierto} />
+      <PianoInteractivo abierto={pianoAbierto} voz={perfil?.voz} />
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setCategoriaActiva('')} style={{
