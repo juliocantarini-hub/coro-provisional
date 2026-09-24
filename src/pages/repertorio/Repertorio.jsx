@@ -210,6 +210,9 @@ export default function Repertorio() {
                   {obra.progreso === 'estudiada' && (
                     <span style={{ fontSize: '10px', color: '#639922', fontWeight: '600' }}>✓ Estudiada</span>
                   )}
+                  {obra.progreso === 'en_progreso' && (
+                    <span style={{ fontSize: '10px', color: '#D85A30', fontWeight: '600' }}>◐ En progreso</span>
+                  )}
                 </div>
                 <div style={{ fontSize: '12px', color: '#888780', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <span>{obra.compositor || 'Compositor desconocido'}</span>

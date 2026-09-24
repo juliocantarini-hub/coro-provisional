@@ -46,6 +46,7 @@ export function useObras(filtros = {}) {
         .eq('publicada', true)
         .order('orden', { ascending: true }).order('titulo')
 
+      if (usuario) query = query.eq('progreso_estudio.perfil_id', usuario.id)
       if (filtros.estado)   query = query.eq('estado', filtros.estado)
       if (filtros.busqueda) {
         query = query.or(
@@ -71,7 +72,7 @@ export function useObras(filtros = {}) {
     } finally {
       setCargando(false)
     }
-  }, [filtros.estado, filtros.busqueda])
+  }, [filtros.estado, filtros.busqueda, usuario])
 
   useEffect(() => { cargar() }, [cargar])
 
@@ -80,6 +81,7 @@ export function useObras(filtros = {}) {
 
 // ─── Hook para una obra individual ───────────────────────────────────────────
 export function useObra(id) {
+  const { usuario } = useAuth()
   const [obra, setObra]         = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError]       = useState(null)
@@ -88,7 +90,7 @@ export function useObra(id) {
     if (!id) return
     async function cargar() {
       setCargando(true)
-      const { data, error: err } = await supabase
+      let query = supabase
         .from('obras')
         .select(`
           *,
@@ -97,7 +99,10 @@ export function useObra(id) {
         `)
         .eq('id', id)
         .eq('publicada', true)
-        .single()
+
+      if (usuario) query = query.eq('progreso_estudio.perfil_id', usuario.id)
+
+      const { data, error: err } = await query.single()
 
       if (err) { setError('Obra no encontrada.'); setCargando(false); return }
 
@@ -112,7 +117,7 @@ export function useObra(id) {
       setCargando(false)
     }
     cargar()
-  }, [id])
+  }, [id, usuario])
 
   return { obra, cargando, error }
 }
