@@ -23,7 +23,22 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { coro_id, titulo, cuerpo, url } = await req.json()
+    const body = await req.json()
+
+    // Los Database Webhooks de Supabase mandan {type, table, schema, record, old_record}
+    // en vez de {coro_id, titulo, cuerpo, url}. Se detecta y se normaliza acá.
+    const esWebhookEjercicio = body.table === 'ejercicios_entrenamiento' && !!body.record
+
+    if (esWebhookEjercicio && body.record.activo === false) {
+      return new Response(JSON.stringify({ ok: true, omitido: true }), {
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      })
+    }
+
+    const coro_id = esWebhookEjercicio ? null : body.coro_id
+    const titulo  = esWebhookEjercicio ? `Nuevo ejercicio: ${body.record.nombre}` : body.titulo
+    const cuerpo  = esWebhookEjercicio ? 'Ya está disponible en Entrenamiento' : (body.cuerpo || '')
+    const url     = esWebhookEjercicio ? '/entrenamiento' : (body.url || '/')
 
     if (!titulo) {
       return new Response(JSON.stringify({ error: 'Faltan parámetros' }), { status: 400 })
