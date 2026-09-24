@@ -37,6 +37,23 @@ export async function suscribirPush(user) {
 
     const { endpoint, keys } = subscription.toJSON()
 
+    // Si este mismo navegador tenía un endpoint distinto guardado de una
+    // suscripción anterior (el navegador lo rota de tanto en tanto), borramos
+    // esa fila vieja para no dejarla viva recibiendo notificaciones en paralelo
+    // con la nueva (causaba que a algunos les llegara la misma notificación
+    // duplicada).
+    try {
+      const endpointAnterior = localStorage.getItem('corum_push_endpoint')
+      if (endpointAnterior && endpointAnterior !== endpoint) {
+        await supabase.from('push_suscripciones')
+          .delete()
+          .eq('perfil_id', user.id)
+          .eq('endpoint', endpointAnterior)
+      }
+    } catch (err) {
+      console.error('Error al limpiar suscripción push anterior:', err)
+    }
+
     const coro = await getCoroActual()
 
     const datos = {
@@ -51,6 +68,8 @@ export async function suscribirPush(user) {
       datos,
       { onConflict: 'perfil_id,endpoint' }
     )
+
+    try { localStorage.setItem('corum_push_endpoint', endpoint) } catch {}
 
     return { ok: true }
   } catch (err) {
