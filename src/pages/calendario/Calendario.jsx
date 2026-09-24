@@ -197,10 +197,11 @@ export default function Calendario() {
                 const hoyQ = esHoy(celda.fecha)
                 return (
                   <div key={i} style={{
-                    minHeight: '72px', padding: '6px',
+                    minHeight: '72px', minWidth: 0, padding: '6px',
                     borderRight: (i + 1) % 7 !== 0 ? '1px solid #F1EFE8' : 'none',
                     borderBottom: i < 35 ? '1px solid #F1EFE8' : 'none',
                     background: !celda.mesActual ? '#F8F7F3' : '#FFFFFF',
+                    overflow: 'hidden',
                   }}>
                     <div style={{
                       width: '24px', height: '24px', borderRadius: '50%', display: 'flex',
