@@ -4,7 +4,7 @@ import { getCoroActual } from '../lib/coro'
 import { formatHora } from './useEventos'
 import {
   MENSAJES, TIPOS_DEL_DIA,
-  tipoPorAusencia, esCumple, eventoDeHoy,
+  tipoPorAusencia, esCumple, eventoDeHoy, diaEspecialHoy,
   armarTexto, indiceAlAzar, fechaLocal,
   MAX_MENSAJES_POR_SESION,
 } from '../lib/sorpresas'
@@ -127,9 +127,11 @@ function decidir(perfil, est, eventos) {
     return est.decidido
   }
 
-  // Orden de prioridad: cumple > concierto > ausencia > ensayo
+  // Orden de prioridad: cumple > día especial > concierto > ausencia > ensayo
   const candidatos = []
   if (esCumple(perfil)) candidatos.push('cumple')
+  const especial = diaEspecialHoy()
+  if (especial) candidatos.push(especial)
   if (eventoDeHoy(eventos, 'concierto')) candidatos.push('concierto')
   if (est.ausencia) candidatos.push(est.ausencia)
   if (eventoDeHoy(eventos, 'ensayo')) candidatos.push('ensayo')

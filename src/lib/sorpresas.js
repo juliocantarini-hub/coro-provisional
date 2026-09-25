@@ -77,10 +77,64 @@ export const MENSAJES = {
       'Ensayo hoy a las {hora}. Escuchá las obras.',
     ],
   },
+
+  // Días especiales / efemérides
+  diaMujer: {
+    emoji: '🌸',
+    textos: [
+      '¡Feliz Día de la Mujer, {nombre}! Un saludo enorme a todas las mujeres del coro.',
+    ],
+  },
+  diaDirectorCoral: {
+    emoji: '🎼',
+    textos: [
+      '¡Hoy es el día del Director de Coro!',
+    ],
+  },
+  diaMusica: {
+    emoji: '🎶',
+    textos: [
+      '¡Feliz Día de la Música, {nombre}! Hoy celebramos lo que más nos une.',
+    ],
+  },
+  navidad: {
+    emoji: '🎄',
+    textos: [
+      '¡Feliz Navidad, {nombre}! Que la pases hermoso junto a los tuyos.',
+    ],
+  },
+  anioNuevo: {
+    emoji: '🎆',
+    textos: [
+      '¡Feliz Año Nuevo, {nombre}! Que este año esté lleno de música.',
+    ],
+  },
+  diaPadre: {
+    emoji: '👔',
+    textos: [
+      '¡Feliz Día del Padre! Un saludo a todos los papás del coro.',
+    ],
+  },
+  diaMadre: {
+    emoji: '💐',
+    textos: [
+      '¡Feliz Día de la Madre! Un saludo a todas las mamás del coro.',
+    ],
+  },
+  diaCantoCoral: {
+    emoji: '🎤',
+    textos: [
+      '¡Feliz Día del Canto Coral, {nombre}! Hoy celebramos lo que somos: un coro.',
+    ],
+  },
 }
 
 // Situaciones que dependen del día (se muestran como máximo una vez por día)
-export const TIPOS_DEL_DIA = ['cumple', 'concierto', 'ensayo']
+export const TIPOS_DEL_DIA = [
+  'cumple', 'concierto', 'ensayo',
+  'diaMujer', 'diaDirectorCoral', 'diaMusica', 'navidad', 'anioNuevo',
+  'diaPadre', 'diaMadre', 'diaCantoCoral',
+]
 
 // Cuántos días sin entrar activan cada mensaje de ausencia
 export const DIAS_AUSENCIA_CORTA = 7
@@ -104,6 +158,31 @@ export function esCumple(perfil, ahora = new Date()) {
   if (!f) return false
   const [, mes, dia] = String(f).slice(0, 10).split('-').map(Number)
   return mes === ahora.getMonth() + 1 && dia === ahora.getDate()
+}
+
+// ¿Es el domingo número n (1, 2, 3...) del mes indicado?
+function esNEsimoDomingoDeMes(fecha, mes, n) {
+  if (fecha.getMonth() + 1 !== mes || fecha.getDay() !== 0) return false
+  return Math.ceil(fecha.getDate() / 7) === n
+}
+
+// Días especiales / efemérides: devuelve la clave de MENSAJES que corresponde
+// a hoy, o null si hoy no es ninguno de ellos.
+export function diaEspecialHoy(ahora = new Date()) {
+  const mes = ahora.getMonth() + 1
+  const dia = ahora.getDate()
+
+  if (mes === 3 && dia === 8)   return 'diaMujer'
+  if (mes === 10 && dia === 6)  return 'diaDirectorCoral'
+  if (mes === 11 && dia === 22) return 'diaMusica'
+  if (mes === 12 && dia === 25) return 'navidad'
+  if (mes === 1 && dia === 1)   return 'anioNuevo'
+
+  if (esNEsimoDomingoDeMes(ahora, 6, 3))  return 'diaPadre'       // 3er domingo de junio
+  if (esNEsimoDomingoDeMes(ahora, 10, 3)) return 'diaMadre'       // 3er domingo de octubre
+  if (esNEsimoDomingoDeMes(ahora, 12, 2)) return 'diaCantoCoral'  // 2do domingo de diciembre
+
+  return null
 }
 
 function mismoDia(a, b) {
