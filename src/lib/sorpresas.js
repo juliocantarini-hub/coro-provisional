@@ -82,7 +82,7 @@ export const MENSAJES = {
   diaMujer: {
     emoji: '🌸',
     textos: [
-      '¡Feliz Día de la Mujer, {nombre}! Un saludo enorme a todas las mujeres del coro.',
+      'Recordamos y celebramos a las mujeres del coro. ¡Feliz día!',
     ],
   },
   diaDirectorCoral: {
