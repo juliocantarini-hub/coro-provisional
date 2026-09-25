@@ -36,7 +36,7 @@ function esNEsimoDomingo(dia, esDomingo, n) {
 // push y el banner de la app coincidan.
 function diaEspecialHoy({ mes, dia, esDomingo }) {
   if (mes === 3 && dia === 8) {
-    return { titulo: '🌸 ¡Feliz Día de la Mujer!', cuerpo: 'Un saludo enorme a todas las mujeres del coro.' }
+    return { titulo: '🌸 Recordamos y celebramos a las mujeres del coro. ¡Feliz día!', cuerpo: '' }
   }
   if (mes === 10 && dia === 6) {
     return { titulo: '🎼 ¡Hoy es el día del Director de Coro!', cuerpo: '' }
