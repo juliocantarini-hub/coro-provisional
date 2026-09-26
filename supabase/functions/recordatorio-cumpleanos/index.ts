@@ -12,10 +12,6 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
-function primerNombre(nombre) {
-  return (nombre || '').split(' ')[0]
-}
-
 // Fecha de hoy en huso horario Argentina (el servidor de Supabase corre en UTC)
 function hoyEnArgentina() {
   const fmt = new Intl.DateTimeFormat('en-CA', {
@@ -77,7 +73,6 @@ Deno.serve(async (req) => {
     let fallidas = 0
 
     for (const persona of cumpleaneros) {
-      const nombreCorto = primerNombre(persona.nombre)
 
       // Al resto del coro (si el proyecto es multi-tenant filtra por coro_id; si no, va a todo el proyecto)
       let queryResto = supabase.from('push_suscripciones').select('*').neq('perfil_id', persona.id)
@@ -85,7 +80,7 @@ Deno.serve(async (req) => {
       const { data: susResto } = await queryResto
       const r1 = await enviarATodos(
         susResto || [],
-        `🎂 ¡Hoy es el cumpleaños de ${nombreCorto}!`,
+        `🎂 ¡Hoy es el cumpleaños de ${persona.nombre}!`,
         'Mandale un saludo 🎉'
       )
 
@@ -96,7 +91,7 @@ Deno.serve(async (req) => {
         .eq('perfil_id', persona.id)
       const r2 = await enviarATodos(
         susPersona || [],
-        `🎂 ¡Feliz cumpleaños, ${nombreCorto}!`,
+        `🎂 ¡Feliz cumpleaños, ${persona.nombre}!`,
         'Todo el coro te desea un gran día 🎉'
       )
 
