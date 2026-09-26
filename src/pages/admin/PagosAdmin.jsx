@@ -5,8 +5,8 @@ import { supabase } from '../../lib/supabase'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const ESTADO_LABEL = { pagado: 'Pagó', pendiente: 'Pendiente', exento: 'Exento' }
-const ESTADO_COLOR = { pagado: '#0F6E56', pendiente: '#D85A30', exento: '#888780' }
-const ESTADO_BG    = { pagado: '#E1F5EE', pendiente: '#FAECE7', exento: '#F1EFE8' }
+const ESTADO_COLOR = { pagado: '#0F6E56', pendiente: '#D85A30', exento: '#3B5BA5' }
+const ESTADO_BG    = { pagado: '#E1F5EE', pendiente: '#FAECE7', exento: '#E6EEF9' }
 
 function formatMonto(monto) {
   return '$' + Number(monto).toLocaleString('es-AR', { maximumFractionDigits: 0 })
@@ -223,7 +223,7 @@ function DetalleColecta({ colecta, onVolver, onEditado, onEliminado }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '20px' }}>
         <ResCard val={pagados}   label="Pagaron"    color="#0F6E56" bg="#E1F5EE" />
         <ResCard val={pendientes} label="Pendientes" color="#D85A30" bg="#FAECE7" />
-        <ResCard val={exentos}   label="Exentos"    color="#888780" bg="#F1EFE8" />
+        <ResCard val={exentos}   label="Exentos"    color="#3B5BA5" bg="#E6EEF9" />
       </div>
 
       {cargando ? (
