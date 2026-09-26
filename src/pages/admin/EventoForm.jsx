@@ -124,14 +124,19 @@ export default function EventoForm() {
     }
     if (publicar) datos.publicado = true
 
+    const yaEstabaPublicado = publicado
+
     const { ok, data, error } = esEdicion
       ? await actualizarEvento(id, datos, obrasSeleccionadas)
       : await crearEvento(datos, obrasSeleccionadas)
 
     if (!ok) { setErrorGlobal(error || 'No se pudo guardar.'); setGuardando(false); return }
 
-    if (publicar && !esEdicion && data?.id) {
-      await publicarEvento(data.id, true)
+    // Se avisa por push la primera vez que el evento queda publicado, ya sea
+    // publicándolo al crearlo o editando después un borrador (antes esto
+    // último no mandaba la notificación).
+    if (publicar && !yaEstabaPublicado && data?.id) {
+      if (!esEdicion) await publicarEvento(data.id, true)
       await enviarNotificacionEvento(datos.titulo)
     }
 
