@@ -131,7 +131,7 @@ function DetalleVotos({ encuestaId }) {
         </button>
       ) : (
         <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {detalle.map(op => (
+          {detalle.opciones.map(op => (
             <div key={op.id} style={{ fontSize: '12px' }}>
               <div style={{ fontWeight: '500', color: '#1A1A18', marginBottom: '2px' }}>{op.texto}</div>
               <div style={{ color: op.votantes.length ? '#5F5E5A' : '#B4B2A9' }}>
@@ -139,6 +139,14 @@ function DetalleVotos({ encuestaId }) {
               </div>
             </div>
           ))}
+          <div style={{ fontSize: '12px', paddingTop: '6px', marginTop: '2px', borderTop: '1px solid #F1EFE8' }}>
+            <div style={{ fontWeight: '500', color: '#1A1A18', marginBottom: '2px' }}>
+              Todavía no votaron ({detalle.noVotaron.length})
+            </div>
+            <div style={{ color: detalle.noVotaron.length ? '#5F5E5A' : '#B4B2A9' }}>
+              {detalle.noVotaron.length ? detalle.noVotaron.join(', ') : 'Votaron todos.'}
+            </div>
+          </div>
         </div>
       )}
     </div>

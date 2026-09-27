@@ -94,7 +94,7 @@ function useEncuestaBase(fetchEncuesta, deps) {
   // Join manual (no embed automático) porque perfiles tiene PK compuesta (id, coro_id)
   // — el mismo id (ej. cuenta de soporte) puede repetirse en distintos coros.
   async function detalleVotos() {
-    if (!encuesta) return []
+    if (!encuesta) return { opciones: [], noVotaron: [] }
 
     const { data: votosData } = await supabase
       .from('encuesta_votos')
@@ -102,28 +102,33 @@ function useEncuestaBase(fetchEncuesta, deps) {
       .eq('encuesta_id', encuesta.id)
 
     const votosConPerfil = votosData || []
-    const perfilIds = [...new Set(votosConPerfil.map(v => v.perfil_id))]
+    const perfilIdsQueVotaron = new Set(votosConPerfil.map(v => v.perfil_id))
 
-    let nombresPorId = {}
-    if (perfilIds.length) {
-      const { data: perfilesData } = await supabase
-        .from('perfiles')
-        .select('id, nombre')
-        .eq('coro_id', encuesta.coro_id)
-        .in('id', perfilIds)
+    const { data: perfilesCoro } = await supabase
+      .from('perfiles')
+      .select('id, nombre')
+      .eq('coro_id', encuesta.coro_id)
+      .in('rol', ['cantante', 'admin', 'director'])
+      .eq('estado', 'activo')
 
-      nombresPorId = (perfilesData || []).reduce((acc, p) => {
-        acc[p.id] = p.nombre
-        return acc
-      }, {})
-    }
+    const nombresPorId = (perfilesCoro || []).reduce((acc, p) => {
+      acc[p.id] = p.nombre
+      return acc
+    }, {})
 
-    return opciones.map(op => ({
+    const opcionesConVotantes = opciones.map(op => ({
       ...op,
       votantes: votosConPerfil
         .filter(v => v.opcion_id === op.id)
         .map(v => nombresPorId[v.perfil_id] || 'Sin nombre')
     }))
+
+    const noVotaron = (perfilesCoro || [])
+      .filter(p => !perfilIdsQueVotaron.has(p.id))
+      .map(p => p.nombre)
+      .sort((a, b) => a.localeCompare(b, 'es'))
+
+    return { opciones: opcionesConVotantes, noVotaron }
   }
 
   return { encuesta, opciones, votos, miPerfilId, cargando, votar, resultados, miVoto, detalleVotos, recargar: cargar }
