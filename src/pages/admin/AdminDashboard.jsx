@@ -21,13 +21,28 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function cargar() {
       const coro = await getCoroActual()
-      const [usuarios, obras, eventos, avisos, asistencias] = await Promise.all([
+      const [usuarios, obras, eventos, avisos] = await Promise.all([
         supabase.from('perfiles').select('id, rol, estado', { count: 'exact' }).eq('coro_id', coro.id),
         supabase.from('obras').select('id, publicada', { count: 'exact' }).eq('coro_id', coro.id),
-        supabase.from('eventos').select('id, publicado, fecha_inicio').eq('coro_id', coro.id).gte('fecha_inicio', new Date().toISOString()),
+        supabase.from('eventos').select('id, publicado, fecha_inicio, asistencias!left(perfil_id, estado)').eq('coro_id', coro.id).gte('fecha_inicio', new Date().toISOString()),
         supabase.from('avisos').select('id, publicado', { count: 'exact' }).eq('coro_id', coro.id),
-        supabase.from('asistencias').select('estado').eq('estado', 'pendiente'),
       ])
+      // "Pendiente" = todavía no confirmó ni avisó que no va (no alcanza con mirar
+      // asistencias.estado === 'pendiente': esa fila solo existe si alguien tocó
+      // "Aún no sé" a propósito; la mayoría de quienes no respondieron no tienen
+      // fila en absoluto, así que hay que compararlos contra el total de activos.
+      const cantantesActivos = (usuarios.data || []).filter(u => u.estado === 'activo' && ['cantante', 'admin', 'director'].includes(u.rol)).length
+      const asistPendientes = (eventos.data || [])
+        .filter(e => e.publicado)
+        .reduce((total, e) => {
+          const decidieron = new Set(
+            (e.asistencias || [])
+              .filter(a => a.estado === 'confirmado' || a.estado === 'no_asiste')
+              .map(a => a.perfil_id)
+          ).size
+          return total + Math.max(0, cantantesActivos - decidieron)
+        }, 0)
+
       setStats({
         totalUsuarios:    usuarios.count || 0,
         usuariosActivos:  (usuarios.data || []).filter(u => u.estado === 'activo').length,
@@ -35,7 +50,7 @@ export default function AdminDashboard() {
         obrasPublicadas:  (obras.data || []).filter(o => o.publicada).length,
         eventosFuturos:   eventos.data?.length || 0,
         avisosPublicados: (avisos.data || []).filter(a => a.publicado).length,
-        asistPendientes:  asistencias.data?.length || 0,
+        asistPendientes,
       })
       setCargando(false)
     }
