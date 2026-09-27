@@ -10,9 +10,8 @@ import { getCoroActual } from '../../lib/coro'
 async function enviarNotificacionArticulo(titulo) {
   try {
     const coro = await getCoroActual()
-    if (!coro) return
     await supabase.functions.invoke('enviar-notificaciones', {
-      body: { coro_id: coro.id, titulo: `Nuevo texto: ${titulo}`, cuerpo: 'Ya está disponible para leer', url: '/blog' }
+      body: { coro_id: coro?.id, titulo: `Nuevo texto: ${titulo}`, cuerpo: 'Ya está disponible para leer', url: '/blog' }
     })
   } catch (err) {
     console.error('Error al enviar notificación:', err)

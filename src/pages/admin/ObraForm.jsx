@@ -8,9 +8,8 @@ import { driveUrlPDF, driveUrlAudio } from '../../components/drive/DriveComponen
 async function enviarNotificacionObra(titulo) {
   try {
     const coro = await getCoroActual()
-    if (!coro) return
     await supabase.functions.invoke('enviar-notificaciones', {
-      body: { coro_id: coro.id, titulo: `Nueva obra: ${titulo}`, cuerpo: 'Ya está disponible en el repertorio', url: '/repertorio' }
+      body: { coro_id: coro?.id, titulo: `Nueva obra: ${titulo}`, cuerpo: 'Ya está disponible en el repertorio', url: '/repertorio' }
     })
   } catch (err) {
     console.error('Error al enviar notificación:', err)
