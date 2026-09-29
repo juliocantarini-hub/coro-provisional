@@ -53,10 +53,13 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         // El zoom se pone DESPUÉS de load() — load() llama internamente a
         // reset(), que reinicia el zoom a 1. Ponerlo antes (como estaba) hacía
         // que el valor quedara pisado y nunca se viera el cambio.
-        // Partitura más compacta: por defecto OSMD dibuja a tamaño de partitura
-        // impresa, que en pantallas chicas (y dentro del panel acotado) queda
-        // grande. 0.5 la achica bastante más manteniendo la lectura.
-        osmd.zoom = 0.5
+        // Zoom más chico en pantallas angostas: con el mismo zoom, OSMD calcula
+        // cuántos compases entran por línea en base al ancho del contenedor, así
+        // que en mobile (contenedor angosto) un zoom igual de chico que en
+        // desktop termina amontonando muchos compases en una línea, quedando
+        // desproporcionado. Con un zoom mayor en mobile entran menos compases
+        // por línea y se ve más prolijo.
+        osmd.zoom = window.innerWidth <= 768 ? 0.75 : 0.5
         osmd.render()
         osmd.cursor.show()
         osmdRef.current = osmd
@@ -173,10 +176,34 @@ function moverCursor(osmd, mod, tickInicio, divisions) {
     const iteradorDirecto = new MusicPartManagerIterator(osmd.sheet, fraccion)
     osmd.cursor.iterator = iteradorDirecto
     osmd.cursor.update()
-    if (osmd.cursor.cursorElement?.scrollIntoView) {
-      osmd.cursor.cursorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
+    scrollCursorIntoView(osmd.cursor.cursorElement)
   } catch (e) {
     // Si falla el posicionamiento directo, dejamos el cursor donde estaba.
+  }
+}
+
+// El scrollIntoView() nativo del navegador scrollea TODOS los contenedores con
+// scroll por los que pasa, incluida la página entera — en mobile eso hacía que
+// el título "Entrenamiento" de arriba de todo quedara tapado por la barra de
+// estado del teléfono cada vez que el cursor avanzaba. Acá scrolleamos a mano,
+// solo el contenedor con scroll propio más cercano (el panel de práctica), sin
+// tocar el scroll de la página.
+function scrollCursorIntoView(cursorEl) {
+  if (!cursorEl) return
+  let contenedor = cursorEl.parentElement
+  while (contenedor && contenedor !== document.body) {
+    const estilo = window.getComputedStyle(contenedor)
+    if (estilo.overflowY === 'auto' || estilo.overflowY === 'scroll') break
+    contenedor = contenedor.parentElement
+  }
+  if (!contenedor || contenedor === document.body) return
+
+  const cursorRect = cursorEl.getBoundingClientRect()
+  const contRect = contenedor.getBoundingClientRect()
+  const margen = 40
+  if (cursorRect.top < contRect.top + margen) {
+    contenedor.scrollTop -= (contRect.top + margen - cursorRect.top)
+  } else if (cursorRect.bottom > contRect.bottom - margen) {
+    contenedor.scrollTop += (cursorRect.bottom - (contRect.bottom - margen))
   }
 }

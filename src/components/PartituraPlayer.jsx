@@ -66,12 +66,15 @@ export default function PartituraPlayer({ partitura }) {
   const [tiempoActual, setTiempoActual] = useState(0)
   const [error, setError] = useState('')
   const intervalRef = useRef(null)
-  // Punto de referencia (Date.now()) desde el que se calcula tiempoActual — en un ref
-  // (no solo una variable local) porque pausar/reanudar necesitan poder recalcularlo
-  // sin volver a programar las notas desde cero.
-  const inicioRealRef = useRef(0)
+  // Segundos reales ya transcurridos ANTES del tramo actual del Transport — el
+  // tiempo mostrado/usado es esto más Tone.Transport.seconds. Tone.Transport.seconds
+  // es el mismo reloj que dispara el audio (a diferencia de Date.now()), así que
+  // usarlo evita que la barra de progreso/cursor se desincronice del sonido.
+  const offsetTiempoRef = useRef(0)
+  // IDs de eventos programados en Tone.Transport, por voz — permite sumar o cortar
+  // una voz en vivo (mientras suena) sin tocar las demás.
+  const eventosPorVozRef = useRef({})
 
-  const [verPartitura, setVerPartitura] = useState(false)
   // Por defecto se muestra en la partitura únicamente el pentagrama de la voz propia,
   // para que el cantante no tenga que leer entre las demás voces.
   const [soloMiVoz, setSoloMiVoz] = useState(true)
@@ -81,6 +84,15 @@ export default function PartituraPlayer({ partitura }) {
   const [lectura, setLectura] = useState(null) // { freq, cents, nombre, objetivo }
   const [errorMic, setErrorMic] = useState('')
   const micRefs = useRef({ contexto: null, analyser: null, stream: null, intervalo: null, historial: [] })
+  // El intervalo del micrófono se crea una sola vez (al activarlo) y no se vuelve a
+  // crear en cada render, así que su callback no puede leer reproduciendo/tiempoActual/
+  // velocidad/miVoz directamente (quedarían "congelados" en el valor que tenían al
+  // activar el mic). Este ref se mantiene al día en cada render para que el callback
+  // siempre lea el valor actual.
+  const vivosRef = useRef({ reproduciendo, tiempoActual, velocidad, miVoz })
+  useEffect(() => {
+    vivosRef.current = { reproduciendo, tiempoActual, velocidad, miVoz }
+  })
 
   const partituraParseada = useMemo(() => {
     try {
@@ -133,6 +145,8 @@ export default function PartituraPlayer({ partitura }) {
     const { sampler } = getPianoSampler()
     if (sampler) sampler.releaseAll()
     limpiarIntervalo()
+    eventosPorVozRef.current = {}
+    offsetTiempoRef.current = 0
     setReproduciendo(false)
     setPausado(false)
     setTiempoActual(0)
@@ -141,6 +155,8 @@ export default function PartituraPlayer({ partitura }) {
 
   // Pausa el transporte sin cancelar las notas ya programadas: al reanudar sigue
   // sonando desde el mismo punto, sin tener que volver a armar toda la partitura.
+  // Tone.Transport.seconds queda "congelado" mientras está pausado, así que ni
+  // siquiera hace falta recalcular ningún punto de referencia al reanudar.
   function pausar() {
     Tone.Transport.pause()
     limpiarIntervalo()
@@ -148,11 +164,10 @@ export default function PartituraPlayer({ partitura }) {
   }
 
   function reanudar() {
-    inicioRealRef.current = Date.now() - tiempoActual * 1000
     limpiarIntervalo()
     intervalRef.current = setInterval(() => {
-      setTiempoActual((Date.now() - inicioRealRef.current) / 1000)
-    }, 200)
+      setTiempoActual(offsetTiempoRef.current + Tone.Transport.seconds)
+    }, 100)
     Tone.Transport.start()
     setPausado(false)
   }
@@ -163,27 +178,76 @@ export default function PartituraPlayer({ partitura }) {
     else pausar()
   }
 
+  // Programa en vivo las notas restantes de una voz (a partir de la posición actual)
+  // sin tocar lo que ya está sonando de las demás — se usa para que una voz que se
+  // activa mientras suena la partitura se sume de inmediato, en vez de recién
+  // escucharse la próxima vez que se le da Reproducir.
+  function unirVozEnVivo(vozId) {
+    const voz = vocesOrdenadas.find(v => v.id === vozId)
+    if (!voz) return
+    const { sampler } = getPianoSampler()
+    if (!sampler) return
+    const posicionMusical = tiempoActual * velocidad
+    const ids = eventosPorVozRef.current[vozId] || []
+    for (const evento of voz.notas) {
+      if (!evento.nota) continue
+      if (evento.tiempo < posicionMusical) continue // ya pasó, no la tocamos retroactivamente
+      const inicio = (evento.tiempo - posicionMusical) / velocidad
+      const duracion = evento.duracion / velocidad
+      const id = Tone.Transport.scheduleOnce((time) => {
+        sampler.triggerAttackRelease(evento.nota, duracion, time)
+      }, inicio)
+      ids.push(id)
+    }
+    eventosPorVozRef.current[vozId] = ids
+  }
+
+  // Cancela las notas que todavía faltaba tocar de una voz. La nota que esté
+  // sonando en este instante (si hay una) termina de sonar naturalmente — no la
+  // cortamos de golpe, igual que al pausar.
+  function silenciarVozEnVivo(vozId) {
+    const ids = eventosPorVozRef.current[vozId] || []
+    ids.forEach(id => Tone.Transport.clear(id))
+    eventosPorVozRef.current[vozId] = []
+  }
+
   function alternarVoz(vozId) {
-    setActivas(prev => ({ ...prev, [vozId]: !prev[vozId] }))
+    const nuevoActivo = !activas[vozId]
+    setActivas(prev => ({ ...prev, [vozId]: nuevoActivo }))
+    if (reproduciendo) {
+      if (nuevoActivo) unirVozEnVivo(vozId)
+      else silenciarVozEnVivo(vozId)
+    }
   }
 
   function soloEstaVoz(vozId) {
     const nuevo = {}
-    vocesOrdenadas.forEach(v => { nuevo[v.id] = v.id === vozId })
+    vocesOrdenadas.forEach(v => {
+      const activa = v.id === vozId
+      nuevo[v.id] = activa
+      if (reproduciendo) {
+        if (activa && !activas[v.id]) unirVozEnVivo(v.id)
+        else if (!activa && activas[v.id]) silenciarVozEnVivo(v.id)
+      }
+    })
     setActivas(nuevo)
     setMiVoz(vozId)
   }
 
   function todasActivas() {
     const nuevo = {}
-    vocesOrdenadas.forEach(v => { nuevo[v.id] = true })
+    vocesOrdenadas.forEach(v => {
+      nuevo[v.id] = true
+      if (reproduciendo && !activas[v.id]) unirVozEnVivo(v.id)
+    })
     setActivas(nuevo)
   }
 
-  async function reproducir() {
-    if (!partituraParseada) return
-    tomarControlReproduccion(detener)
-
+  // Arranca (o reinicia) la reproducción desde una posición musical dada (en
+  // segundos "de partitura", sin escalar por tempo), a una velocidad dada. reproducir()
+  // y cambiarVelocidad() son casos particulares de esto: uno arranca desde el
+  // principio, el otro desde donde va la reproducción pero a otro tempo.
+  async function reproducirDesde(posicionMusical, velocidadUsar) {
     const { sampler, listo } = getPianoSampler()
     await listo
 
@@ -191,31 +255,56 @@ export default function PartituraPlayer({ partitura }) {
     Tone.Transport.stop()
     Tone.Transport.position = 0
 
+    eventosPorVozRef.current = {}
     let duracionMax = 0
     for (const voz of vocesOrdenadas) {
       if (!activas[voz.id]) continue
+      const ids = []
       for (const evento of voz.notas) {
         if (!evento.nota) continue // silencio: no dispara sonido
-        const inicio = evento.tiempo / velocidad
-        const duracion = evento.duracion / velocidad
-        Tone.Transport.scheduleOnce((time) => {
+        if (evento.tiempo < posicionMusical) continue
+        const inicio = (evento.tiempo - posicionMusical) / velocidadUsar
+        const duracion = evento.duracion / velocidadUsar
+        const id = Tone.Transport.scheduleOnce((time) => {
           sampler.triggerAttackRelease(evento.nota, duracion, time)
         }, inicio)
+        ids.push(id)
         duracionMax = Math.max(duracionMax, inicio + duracion)
       }
+      eventosPorVozRef.current[voz.id] = ids
     }
 
     Tone.Transport.scheduleOnce(() => detener(), duracionMax + 0.3)
 
-    inicioRealRef.current = Date.now()
+    offsetTiempoRef.current = velocidadUsar > 0 ? posicionMusical / velocidadUsar : 0
+    setTiempoActual(offsetTiempoRef.current)
     limpiarIntervalo()
     intervalRef.current = setInterval(() => {
-      setTiempoActual((Date.now() - inicioRealRef.current) / 1000)
-    }, 200)
+      setTiempoActual(offsetTiempoRef.current + Tone.Transport.seconds)
+    }, 100)
 
     Tone.Transport.start()
     setReproduciendo(true)
     setPausado(false)
+  }
+
+  function reproducir() {
+    if (!partituraParseada) return
+    tomarControlReproduccion(detener)
+    reproducirDesde(0, velocidad)
+  }
+
+  // Cambiar el tempo mientras suena antes no hacía nada audible: las notas ya
+  // estaban programadas a la velocidad vieja. Ahora se reprograma lo que falta,
+  // a la nueva velocidad, desde la posición actual (sin volver al principio).
+  function cambiarVelocidad(nueva) {
+    if (nueva === velocidad) return
+    const vieja = velocidad
+    setVelocidad(nueva)
+    if (reproduciendo) {
+      const posicionMusical = tiempoActual * vieja
+      reproducirDesde(posicionMusical, nueva)
+    }
   }
 
   // ─── Afinación con micrófono ────────────────────────────────────────────
@@ -257,9 +346,10 @@ export default function PartituraPlayer({ partitura }) {
 
         const cercana = frecuenciaANotaCercana(freq)
         let objetivo = null
-        if (miVoz && reproduciendo) {
-          const voz = vocesOrdenadas.find(v => v.id === miVoz)
-          const notaObjetivo = voz && notaEnInstante(voz.notas, tiempoActual * velocidad)
+        const { reproduciendo: reproduciendoAhora, tiempoActual: tiempoAhora, velocidad: velocidadAhora, miVoz: miVozAhora } = vivosRef.current
+        if (miVozAhora && reproduciendoAhora) {
+          const voz = vocesOrdenadas.find(v => v.id === miVozAhora)
+          const notaObjetivo = voz && notaEnInstante(voz.notas, tiempoAhora * velocidadAhora)
           if (notaObjetivo) {
             const midiObjetivo = notaAMidi(notaObjetivo.nota)
             if (midiObjetivo != null) {
@@ -313,50 +403,47 @@ export default function PartituraPlayer({ partitura }) {
     estadoAfinacion = abs <= 15 ? 'afinado' : centsMostrados > 0 ? 'agudo' : 'grave'
   }
 
-  // Con la partitura visible, el bloque entero pasa a "modo práctica": altura
-  // acotada donde solo la partitura scrollea, y el panel de control (voces,
-  // reproducción, tempo y afinador) queda siempre a la vista abajo, todo junto
-  // como un único bloque — así no hace falta bajar la página para ver el
-  // afinador mientras se lee la partitura. Sin la partitura visible, el bloque
-  // vuelve a su alto natural (compacto), como antes.
+  // El bloque entero está siempre en "modo práctica": altura acotada donde solo
+  // la partitura scrollea, y el panel de control (voces, reproducción, tempo y
+  // afinador) queda siempre a la vista abajo, todo junto como un único bloque —
+  // así no hace falta bajar la página para ver el afinador mientras se lee la
+  // partitura.
   return (
     <div style={{
       background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
-      ...(verPartitura ? { height: 'min(72vh, 640px)' } : {}),
+      height: 'min(72vh, 640px)',
     }}>
-      {verPartitura && (
-        <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px' }}>
-          {vocesOrdenadas.length > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-              <button onClick={() => setSoloMiVoz(v => !v)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
-                  borderRadius: '8px', border: '1px solid #D3D1C7', cursor: 'pointer',
-                  background: soloMiVoz ? '#E1F5EE' : '#FFFFFF',
-                  color: '#04342C', fontSize: '12px', fontWeight: '500',
-                }}>
-                {soloMiVoz ? '🎼 Mostrando solo tu voz' : '🎼 Mostrando todas las voces'}
-              </button>
-            </div>
-          )}
-          <PartituraVisual
-            musicxml={partitura.musicxml}
-            tiempos={partituraParseada.tiempos}
-            divisions={partituraParseada.divisions}
-            vozNombre={vocesOrdenadas.find(v => v.id === miVoz)?.nombre}
-            soloMiVoz={soloMiVoz}
-            tiempoActual={tiempoActual}
-            velocidad={velocidad}
-            reproduciendo={reproduciendo}
-          />
-        </div>
-      )}
+      <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px' }}>
+        {vocesOrdenadas.length > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <button onClick={() => setSoloMiVoz(v => !v)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+                borderRadius: '8px', border: '1px solid #D3D1C7', cursor: 'pointer',
+                background: soloMiVoz ? '#E1F5EE' : '#FFFFFF',
+                color: '#04342C', fontSize: '12px', fontWeight: '500',
+              }}>
+              {soloMiVoz ? '🎼 Mostrando solo tu voz' : '🎼 Mostrando todas las voces'}
+            </button>
+          </div>
+        )}
+        <PartituraVisual
+          musicxml={partitura.musicxml}
+          tiempos={partituraParseada.tiempos}
+          divisions={partituraParseada.divisions}
+          vozNombre={vocesOrdenadas.find(v => v.id === miVoz)?.nombre}
+          soloMiVoz={soloMiVoz}
+          tiempoActual={tiempoActual}
+          velocidad={velocidad}
+          reproduciendo={reproduciendo}
+        />
+      </div>
 
       {/* Panel de control integrado: voces, reproducción, tempo y afinador,
           siempre visible como un único bloque pegado abajo. */}
-      <div style={{ flex: '0 0 auto', ...(verPartitura ? { boxShadow: '0 -4px 10px rgba(26,26,24,0.05)' } : {}) }}>
-        <div style={{ padding: '14px 18px 10px', ...(verPartitura ? { borderTop: '1px solid #E8E6DF' } : {}) }}>
+      <div style={{ flex: '0 0 auto', boxShadow: '0 -4px 10px rgba(26,26,24,0.05)' }}>
+        <div style={{ padding: '14px 18px 10px', borderTop: '1px solid #E8E6DF' }}>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {vocesOrdenadas.map(voz => {
               const vc = VOCES_COLOR[voz.vozCoral] || { bg: '#F1EFE8', color: '#5F5E5A' }
@@ -451,7 +538,7 @@ export default function PartituraPlayer({ partitura }) {
               desplegable aparte. */}
           <div style={{ display: 'flex', gap: '2px', background: '#EAE7DD', borderRadius: '16px', padding: '3px' }}>
             {VELOCIDADES.map(v => (
-              <button key={v} onClick={() => setVelocidad(v)}
+              <button key={v} onClick={() => cambiarVelocidad(v)}
                 style={{
                   padding: '5px 9px', borderRadius: '13px', border: 'none', cursor: 'pointer',
                   fontSize: '11px', whiteSpace: 'nowrap',
@@ -464,18 +551,6 @@ export default function PartituraPlayer({ partitura }) {
               </button>
             ))}
           </div>
-
-          <button onClick={() => setVerPartitura(v => !v)}
-            style={{
-              marginLeft: 'auto',
-              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-              borderRadius: '8px', border: `1px solid ${verPartitura ? '#0F6E56' : '#D3D1C7'}`,
-              background: verPartitura ? '#E1F5EE' : '#FFFFFF',
-              color: verPartitura ? '#04342C' : '#5F5E5A',
-              fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-            }}>
-            {verPartitura ? '🎼 Ocultar partitura' : '🎼 Ver partitura'}
-          </button>
         </div>
 
         <div style={{ height: '1px', background: '#E8E6DF', margin: '0 18px' }} />
