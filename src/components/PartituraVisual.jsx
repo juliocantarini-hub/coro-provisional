@@ -37,10 +37,21 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         containerRef.current.innerHTML = ''
         const osmd = new OpenSheetMusicDisplay(containerRef.current, {
           autoResize: false,
-          drawTitle: false,
           backend: 'svg',
           drawPartNames: true,
+          // El título/compositor de la obra ya se muestra arriba, en la tarjeta de
+          // la práctica — repetirlo adentro de la partitura (viene del MusicXML
+          // como "credits") solo agrega ruido y, en mobile, aparece cortado.
+          drawTitle: false,
+          drawSubtitle: false,
+          drawComposer: false,
+          drawLyricist: false,
+          drawCredits: false,
         })
+        // Partitura más compacta: por defecto OSMD dibuja a tamaño de partitura
+        // impresa, que en pantallas chicas (y dentro del panel acotado) queda
+        // grande. 0.7 la achica sin que deje de leerse bien.
+        osmd.zoom = 0.7
         await osmd.load(musicxml)
         if (cancelado) return
         osmd.render()
