@@ -12,6 +12,57 @@ const IDIOMA_LABEL = {
   portugues: 'Portugués', otro: 'otro idioma',
 }
 
+function imprimirTexto(articulo, pronunciacion) {
+  const lineasHtml = pronunciacion.split('\n').map(linea => {
+    if (!linea.trim()) return '<div class="espacio"></div>'
+    const esOriginal = linea.startsWith('O: ')
+    const esFonetica = linea.startsWith('F: ')
+    const esTraduccion = linea.startsWith('T: ')
+    const texto = linea.replace(/^[OFT]: /, '')
+    if (!esOriginal && !esFonetica && !esTraduccion) return ''
+    const clase = esOriginal ? 'original' : esFonetica ? 'fonetica' : 'traduccion'
+    return `<div class="${clase}">${texto}</div>`
+  }).join('')
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>${articulo.titulo}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Georgia, serif; color: #1A1A18; padding: 32px; }
+        .encabezado { margin-bottom: 24px; border-bottom: 2px solid #0F6E56; padding-bottom: 14px; }
+        h1 { font-size: 22px; font-weight: normal; margin-bottom: 4px; }
+        .meta { font-size: 12px; color: #888780; font-family: system-ui, sans-serif; }
+        .resumen { font-size: 13px; color: #5F5E5A; font-style: italic; margin: 16px 0; padding: 10px 14px; background: #F8F7F3; border-left: 3px solid #1D9E75; }
+        .contenido { font-size: 14px; line-height: 2; margin-top: 20px; }
+        .original { color: #1A1A18; font-size: 15px; font-family: Georgia, serif; margin-bottom: 2px; }
+        .fonetica { color: #0F6E56; font-size: 13px; font-family: system-ui, sans-serif; margin-bottom: 2px; }
+        .traduccion { color: #6B6A66; font-size: 12px; font-family: system-ui, sans-serif; font-style: italic; }
+        .espacio { height: 10px; }
+        @media print { body { padding: 16px; } }
+      </style>
+    </head>
+    <body>
+      <div class="encabezado">
+        <h1>${articulo.titulo}</h1>
+        <div class="meta">${articulo.idioma ? (IDIOMA_LABEL[articulo.idioma] || articulo.idioma) : ''}${articulo.perfiles?.nombre ? ' · ' + articulo.perfiles.nombre : ''}</div>
+      </div>
+      ${articulo.resumen ? `<div class="resumen">${articulo.resumen}</div>` : ''}
+      <div class="contenido">${lineasHtml}</div>
+    </body>
+    </html>
+  `
+
+  const ventana = window.open('', '_blank')
+  ventana.document.write(html)
+  ventana.document.close()
+  ventana.focus()
+  setTimeout(() => ventana.print(), 500)
+}
+
 export function Blog() {
   const navigate = useNavigate()
   const [busqueda, setBusqueda] = useState('')
@@ -331,8 +382,14 @@ export function ArticuloDetalle() {
 
       {pronunciacion && (
         <div style={{ background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
-            🎤 Guía de pronunciación
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              🎤 Guía de pronunciación
+            </div>
+            <button onClick={() => imprimirTexto(articulo, pronunciacion)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#5F5E5A', background: '#FFFFFF', border: '1px solid #E8E6DF', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>
+              🖨 Imprimir / PDF
+            </button>
           </div>
           <div style={{ fontSize: '14px', color: '#1A1A18', lineHeight: '2' }}>
             {pronunciacion.split('\n').map((linea, i) => {
