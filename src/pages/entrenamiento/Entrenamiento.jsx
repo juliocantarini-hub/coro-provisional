@@ -127,25 +127,31 @@ export default function Entrenamiento() {
 
       {/* Menú unificado: una sola fila con el mismo alto y tipografía para las
           4 pestañas (antes "Practica tu voz" quedaba suelta en una fila aparte,
-          con otro estilo — ahora es una pestaña más del mismo grupo). */}
+          con otro estilo — ahora es una pestaña más del mismo grupo).
+          minWidth:'fit-content' obligaba a cada pestaña a no achicarse nunca
+          por debajo de su texto — con 4 pestañas eso no entraba en una
+          pantalla angosta y aparecía un scroll horizontal feo, con la última
+          pestaña cortada justo en el borde. Con minWidth:0 cada pestaña se
+          achica y trunca su texto si hace falta, así las 4 entran siempre sin
+          necesidad de scrollear. */}
       <div style={{
         display: 'flex', gap: '4px', background: '#EAE7DD', borderRadius: '22px',
-        padding: '4px', marginBottom: '16px', overflowX: 'auto',
+        padding: '4px', marginBottom: '16px',
       }}>
         {TABS.map(tab => {
           const activa = categoriaActiva === tab.id
           return (
             <button key={tab.id} onClick={() => setCategoriaActiva(tab.id)} style={{
-              flex: '1 1 0', minWidth: 'fit-content', padding: '8px 12px', borderRadius: '18px',
-              border: 'none', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap',
+              flex: '1 1 0', minWidth: 0, padding: '8px 6px', borderRadius: '18px',
+              border: 'none', cursor: 'pointer', fontSize: '12px',
               fontWeight: activa ? '700' : '500',
               background: activa ? '#FFFFFF' : 'transparent',
               color: activa ? '#04342C' : '#5F5E5A',
               boxShadow: activa ? '0 1px 3px rgba(26,26,24,0.12)' : 'none',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
             }}>
-              {tab.icono && <span>{tab.icono}</span>}
-              {tab.label}
+              {tab.icono && <span style={{ flexShrink: 0 }}>{tab.icono}</span>}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tab.label}</span>
             </button>
           )
         })}

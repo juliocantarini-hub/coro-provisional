@@ -4,25 +4,11 @@ import { useAuth } from '../hooks/useAuth'
 import { parsearMusicXML } from '../lib/musicxml'
 import { getPianoSampler } from '../lib/pianoSampler'
 import { tomarControlReproduccion, liberarControlReproduccion } from '../lib/reproductorActivo'
-import {
-  notaAMidi, midiAFrecuencia, centsEntre, detectarFrecuencia, frecuenciaANotaCercana,
-} from '../lib/afinacion'
 import PartituraVisual from './PartituraVisual'
 
 const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5]
 
 const ORDEN_VOZ = { soprano: 0, contralto: 1, tenor: 2, bajo: 3 }
-
-const LUCES_AFINACION = [
-  { key: 'grave',   color: '#D85A30', label: 'grave' },
-  { key: 'afinado', color: '#1D9E75', label: 'afinado' },
-  { key: 'agudo',   color: '#D8A21D', label: 'agudo' },
-]
-
-// Cuántas lecturas de frecuencia guardamos para suavizar (mediana) y evitar que un
-// solo salto de octava (típico de la autocorrelación con voz cantada) haga
-// parpadear el afinador entre colores sin motivo.
-const VENTANA_SUAVIZADO = 5
 
 // El registro vocal del perfil puede tener más matices que las 4 voces corales
 // de la partitura (mezzosoprano, barítono) — los mapeamos a la voz SATB más cercana.
@@ -42,13 +28,20 @@ function formatoTiempo(seg) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-// Busca, dentro de las notas de una voz, la que está sonando en el instante dado
-// (tiempo en segundos, a velocidad normal — sin escalar por el multiplicador de tempo).
-function notaEnInstante(notas, tiempo) {
-  for (const n of notas) {
-    if (n.nota && tiempo >= n.tiempo && tiempo < n.tiempo + n.duracion) return n
+// Cuánto tarda el audio en volverse audible después de que el Transport dice
+// que "ya sonó" (buffer de salida del dispositivo — altavoz, Bluetooth, etc.):
+// Tone.Transport.seconds avanza en el reloj interno de audio, pero hay una
+// latencia real hasta que eso se escucha. Sin descontarla, el cursor/barra de
+// progreso corren ligeramente ADELANTADOS de lo que se oye. outputLatency es
+// el valor más preciso cuando el navegador lo expone; si no, se usa
+// baseLatency como aproximación, y si tampoco existe, no se descuenta nada.
+function latenciaSalidaSeg() {
+  try {
+    const ctx = Tone.getContext().rawContext
+    return ctx.outputLatency || ctx.baseLatency || 0
+  } catch (e) {
+    return 0
   }
-  return null
 }
 
 export default function PartituraPlayer({ partitura, pantallaCompleta }) {
@@ -65,20 +58,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   // usarlo evita que la barra de progreso/cursor se desincronice del sonido.
   const offsetTiempoRef = useRef(0)
 
-  const [micActivo, setMicActivo] = useState(false)
   const [miVoz, setMiVoz] = useState(null)
-  const [lectura, setLectura] = useState(null) // { freq, cents, nombre, objetivo }
-  const [errorMic, setErrorMic] = useState('')
-  const micRefs = useRef({ contexto: null, analyser: null, stream: null, intervalo: null, historial: [] })
-  // El intervalo del micrófono se crea una sola vez (al activarlo) y no se vuelve a
-  // crear en cada render, así que su callback no puede leer reproduciendo/tiempoActual/
-  // velocidad/miVoz directamente (quedarían "congelados" en el valor que tenían al
-  // activar el mic). Este ref se mantiene al día en cada render para que el callback
-  // siempre lea el valor actual.
-  const vivosRef = useRef({ reproduciendo, tiempoActual, velocidad, miVoz })
-  useEffect(() => {
-    vivosRef.current = { reproduciendo, tiempoActual, velocidad, miVoz }
-  })
 
   const partituraParseada = useMemo(() => {
     try {
@@ -115,7 +95,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   }, [partituraParseada])
 
   useEffect(() => {
-    return () => { detener(); detenerMicrofono() }
+    return () => { detener() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -149,7 +129,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   function reanudar() {
     limpiarIntervalo()
     intervalRef.current = setInterval(() => {
-      setTiempoActual(offsetTiempoRef.current + Tone.Transport.seconds)
+      setTiempoActual(Math.max(0, offsetTiempoRef.current + Tone.Transport.seconds - latenciaSalidaSeg()))
     }, 100)
     Tone.Transport.start()
     setPausado(false)
@@ -194,7 +174,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     setTiempoActual(offsetTiempoRef.current)
     limpiarIntervalo()
     intervalRef.current = setInterval(() => {
-      setTiempoActual(offsetTiempoRef.current + Tone.Transport.seconds)
+      setTiempoActual(Math.max(0, offsetTiempoRef.current + Tone.Transport.seconds - latenciaSalidaSeg()))
     }, 100)
 
     Tone.Transport.start()
@@ -240,94 +220,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     }
   }
 
-  // ─── Afinación con micrófono ────────────────────────────────────────────
-  async function activarMicrofono() {
-    setErrorMic('')
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setErrorMic('Tu navegador no permite usar el micrófono acá.')
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const Ctx = window.AudioContext || window.webkitAudioContext
-      const contexto = new Ctx()
-      const fuente = contexto.createMediaStreamSource(stream)
-      const analyser = contexto.createAnalyser()
-      analyser.fftSize = 2048
-      fuente.connect(analyser)
-
-      micRefs.current = { contexto, analyser, stream, intervalo: null, historial: [] }
-
-      const buffer = new Float32Array(analyser.fftSize)
-      micRefs.current.intervalo = setInterval(() => {
-        analyser.getFloatTimeDomainData(buffer)
-        const freqCruda = detectarFrecuencia(buffer, contexto.sampleRate)
-        if (!freqCruda) {
-          micRefs.current.historial = []
-          setLectura(null)
-          return
-        }
-
-        // Si hay una nota objetivo en este instante (se está reproduciendo la
-        // partitura), la buscamos ANTES de suavizar: la autocorrelación con voz
-        // cantada suele "engancharse" en un armónico (típicamente el doble o la
-        // mitad de la frecuencia real), lo que antes hacía que el medidor casi
-        // nunca marcara "afinado" aunque el cantante estuviera bien. Como ya
-        // sabemos qué nota debería sonar, corregimos la lectura cruda a la
-        // octava más cercana a esa nota antes de compararla — así un error de
-        // octava en la detección no se confunde con estar realmente desafinado.
-        let objetivoFreq = null
-        const { reproduciendo: reproduciendoAhora, tiempoActual: tiempoAhora, velocidad: velocidadAhora, miVoz: miVozAhora } = vivosRef.current
-        let notaObjetivoNombre = null
-        if (miVozAhora && reproduciendoAhora) {
-          const voz = vocesOrdenadas.find(v => v.id === miVozAhora)
-          const notaObjetivo = voz && notaEnInstante(voz.notas, tiempoAhora * velocidadAhora)
-          if (notaObjetivo) {
-            const midiObjetivo = notaAMidi(notaObjetivo.nota)
-            if (midiObjetivo != null) {
-              objetivoFreq = midiAFrecuencia(midiObjetivo)
-              notaObjetivoNombre = notaObjetivo.nota
-            }
-          }
-        }
-
-        const freqCorregida = objetivoFreq
-          ? freqCruda * Math.pow(2, Math.round(Math.log2(objetivoFreq / freqCruda)))
-          : freqCruda
-
-        // Suavizado por mediana: una sola lectura ruidosa (ya corregida de
-        // octava) queda descartada por las lecturas vecinas en vez de hacer
-        // "saltar" el afinador.
-        const historial = micRefs.current.historial
-        historial.push(freqCorregida)
-        if (historial.length > VENTANA_SUAVIZADO) historial.shift()
-        const ordenado = [...historial].sort((a, b) => a - b)
-        const freq = ordenado[Math.floor(ordenado.length / 2)]
-
-        const cercana = frecuenciaANotaCercana(freq)
-        const objetivo = objetivoFreq
-          ? { nombre: notaObjetivoNombre, cents: centsEntre(freq, objetivoFreq) }
-          : null
-
-        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
-      }, 80)
-
-      setMicActivo(true)
-    } catch (e) {
-      setErrorMic('No pudimos acceder al micrófono. Revisá los permisos del navegador.')
-    }
-  }
-
-  function detenerMicrofono() {
-    const { contexto, stream, intervalo } = micRefs.current
-    if (intervalo) clearInterval(intervalo)
-    if (stream) stream.getTracks().forEach(t => t.stop())
-    if (contexto && contexto.state !== 'closed') contexto.close()
-    micRefs.current = { contexto: null, analyser: null, stream: null, intervalo: null, historial: [] }
-    setMicActivo(false)
-    setLectura(null)
-  }
-
   if (error) {
     return (
       <div style={{ fontSize: '13px', color: '#A32D2D', padding: '10px 0' }}>{error}</div>
@@ -340,23 +232,11 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   const duracionEscalada = duracionTotal / velocidad
   const progresoPct = duracionEscalada > 0 ? Math.min(100, Math.max(0, (tiempoActual / duracionEscalada) * 100)) : 0
 
-  // Umbral: qué tan cerca (en cents) hay que estar para considerarlo "afinado",
-  // y de qué lado (agudo/grave) cae si no lo está. 15 cents es un margen más
-  // realista para voz cantada que los 12 anteriores (con vibrato natural, un
-  // umbral más chico casi nunca llegaba a encender el verde).
-  const centsMostrados = lectura?.objetivo ? lectura.objetivo.cents : lectura?.centsCercano
-  let estadoAfinacion = null
-  if (lectura && centsMostrados != null) {
-    const abs = Math.abs(centsMostrados)
-    estadoAfinacion = abs <= 15 ? 'afinado' : centsMostrados > 0 ? 'agudo' : 'grave'
-  }
-
   // El bloque entero está siempre en "modo práctica": altura acotada donde solo
-  // la partitura scrollea, y el panel de control (reproducción, tempo y
-  // afinador) queda siempre a la vista abajo, todo junto como un único bloque —
-  // así no hace falta bajar la página para ver el afinador mientras se lee la
-  // partitura. En pantalla completa (abierto desde Entrenamiento) ocupa toda la
-  // altura disponible del contenedor en vez de una altura fija acotada.
+  // la partitura scrollea, y el panel de control (reproducción y tempo) queda
+  // siempre a la vista abajo, todo junto como un único bloque. En pantalla
+  // completa (abierto desde Entrenamiento) ocupa toda la altura disponible
+  // del contenedor en vez de una altura fija acotada.
   return (
     <div style={{
       background: '#F8F7F3', border: pantallaCompleta ? 'none' : '1px solid #E8E6DF',
@@ -376,10 +256,11 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         />
       </div>
 
-      {/* Panel de control integrado: reproducción, tempo y afinador de la voz
-          propia, siempre visible como un único bloque pegado abajo. Mostrar u
-          oír las demás voces quedó afuera: para eso ya está Repertorio, que
-          tiene la partitura y el audio completos con todas las voces. */}
+      {/* Panel de control integrado: reproducción y tempo de la voz propia,
+          siempre visible como un único bloque pegado abajo. Mostrar u oír las
+          demás voces quedó afuera: para eso ya está Repertorio, que tiene la
+          partitura y el audio completos con todas las voces. (El afinador se
+          sacó por ahora — hasta ajustarlo mejor, volverá más adelante.) */}
       <div style={{ flex: '0 0 auto', boxShadow: '0 -4px 10px rgba(26,26,24,0.05)' }}>
         <div style={{ padding: '14px 18px 4px', borderTop: '1px solid #E8E6DF' }}>
           {/* Área de toque más alta que la barra visual (3px es muy fino para
@@ -463,67 +344,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
               </button>
             ))}
           </div>
-        </div>
-
-        <div style={{ height: '1px', background: '#E8E6DF', margin: '0 18px' }} />
-
-        {/* Afinación */}
-        <div style={{ padding: '12px 18px 14px' }}>
-          <button onClick={micActivo ? detenerMicrofono : activarMicrofono}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-              borderRadius: '20px', border: `1px solid ${micActivo ? '#D85A30' : '#D3D1C7'}`,
-              background: micActivo ? '#FAECE7' : '#FFFFFF',
-              color: micActivo ? '#712B13' : '#5F5E5A',
-              fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-            }}>
-            {micActivo ? '🎤 Apagar micrófono' : '🎤 Practicar afinación'}
-          </button>
-
-          {errorMic && <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '8px' }}>{errorMic}</div>}
-
-          {micActivo && (
-            <div style={{ marginTop: '12px' }}>
-              {vocesOrdenadas.length > 1 && (
-                <div style={{ fontSize: '11px', color: '#B4B2A9', marginBottom: '8px' }}>
-                  Cantando como: <strong style={{ color: '#5F5E5A' }}>{vocesOrdenadas.find(v => v.id === miVoz)?.nombre}</strong>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '10px', padding: '10px 16px' }}>
-                <div style={{ minWidth: '54px' }}>
-                  <div style={{ fontSize: '22px', fontWeight: '600', color: lectura ? '#1A1A18' : '#D3D1C7', fontFamily: 'Georgia, serif', lineHeight: 1 }}>
-                    {lectura ? (lectura.objetivo?.nombre || lectura.nombreCercano) : '—'}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '14px', flexGrow: 1, justifyContent: 'center' }}>
-                  {LUCES_AFINACION.map(luz => {
-                    const encendida = estadoAfinacion === luz.key
-                    return (
-                      <div key={luz.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                        <div style={{
-                          width: '24px', height: '24px', borderRadius: '50%',
-                          background: encendida ? luz.color : '#EDEBE3',
-                          border: `2px solid ${encendida ? luz.color : '#D3D1C7'}`,
-                          boxShadow: encendida ? `0 0 10px ${luz.color}66` : 'none',
-                          transition: 'background 0.15s ease, box-shadow 0.15s ease',
-                        }} />
-                        <span style={{ fontSize: '9px', color: encendida ? '#5F5E5A' : '#B4B2A9', fontWeight: encendida ? '600' : '400' }}>
-                          {luz.label}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              <div style={{ fontSize: '11px', color: '#888780', marginTop: '6px' }}>
-                {lectura?.objetivo
-                  ? 'nota que estás cantando ahora en la partitura'
-                  : reproduciendo ? 'silencio en este instante' : 'nota más cercana a lo que cantás'}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
