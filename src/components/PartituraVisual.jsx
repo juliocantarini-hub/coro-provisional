@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 // alineado con lo que se escucha, pulso a pulso (no solo compás a compás), sin
 // importar si la partitura tiene repeticiones escritas.
 
-export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombre, tiempoActual, velocidad, reproduciendo }) {
+export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombre, soloMiVoz, tiempoActual, velocidad, reproduciendo }) {
   const containerRef = useRef(null)
   const osmdRef = useRef(null)
   const osmdModRef = useRef(null)
@@ -48,7 +48,7 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         osmdRef.current = osmd
         osmdModRef.current = mod
         pulsoActualRef.current = -1
-        colorearVoz(osmd, vozNombre)
+        aplicarVozYVisibilidad(osmd, vozNombre, soloMiVoz)
         setEstado('lista')
       } catch (e) {
         if (!cancelado) setEstado('error')
@@ -63,13 +63,14 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicxml])
 
-  // Recolorear cuando cambia la voz que se quiere destacar.
+  // Recolorear y/o mostrar solo la voz propia cuando cambia la voz destacada
+  // o el modo de visibilidad.
   useEffect(() => {
     if (estado === 'lista' && osmdRef.current) {
-      colorearVoz(osmdRef.current, vozNombre)
+      aplicarVozYVisibilidad(osmdRef.current, vozNombre, soloMiVoz)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vozNombre, estado])
+  }, [vozNombre, soloMiVoz, estado])
 
   // Mover el cursor al pulso (tiempo del compás) que corresponde al instante
   // actual de reproducción — no solo al principio del compás.
@@ -101,12 +102,14 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
       {estado === 'cargando' && (
         <div style={{ fontSize: '12px', color: '#888780', padding: '8px 0' }}>Cargando partitura...</div>
       )}
+      {/* Sin alto ni scroll propios: el único contenedor que scrollea es el
+          panel de práctica (PartituraPlayer) que envuelve este componente.
+          Tener dos contenedores con scroll independiente hacía que el
+          seguimiento automático del cursor (scrollIntoView) fuera errático. */}
       <div
         ref={containerRef}
         style={{
           display: estado === 'lista' ? 'block' : 'none',
-          maxHeight: '420px',
-          overflowY: 'auto',
           background: '#FFFFFF',
           border: '1px solid #E8E6DF',
           borderRadius: '10px',
@@ -117,9 +120,17 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
   )
 }
 
-function colorearVoz(osmd, vozNombre) {
+// Colorea las notas de la voz propia y, si soloMiVoz está activo, oculta el
+// resto de los pentagramas (en vez de solo pintarlos distinto) para que el
+// cantante lea únicamente su línea.
+function aplicarVozYVisibilidad(osmd, vozNombre, soloMiVoz) {
   try {
     const instrumento = vozNombre && osmd.sheet.Instruments.find(i => i.Name === vozNombre)
+
+    osmd.sheet.Instruments.forEach(inst => {
+      inst.Visible = soloMiVoz && instrumento ? inst.Id === instrumento.Id : true
+    })
+
     const cursor = osmd.cursor
     cursor.reset()
     const iterator = cursor.Iterator
@@ -133,10 +144,11 @@ function colorearVoz(osmd, vozNombre) {
       iterator.moveToNext()
     }
     cursor.reset()
+    osmd.updateGraphic()
     osmd.render()
     osmd.cursor.show()
   } catch (e) {
-    // Si algo falla al colorear, seguimos mostrando la partitura sin resaltar la voz.
+    // Si algo falla al colorear/ocultar, seguimos mostrando la partitura completa sin resaltar la voz.
   }
 }
 

@@ -61,13 +61,20 @@ function notaEnInstante(notas, tiempo) {
 export default function PartituraPlayer({ partitura }) {
   const { perfil } = useAuth()
   const [reproduciendo, setReproduciendo] = useState(false)
+  const [pausado, setPausado] = useState(false)
   const [velocidad, setVelocidad] = useState(1)
   const [tiempoActual, setTiempoActual] = useState(0)
   const [error, setError] = useState('')
   const intervalRef = useRef(null)
+  // Punto de referencia (Date.now()) desde el que se calcula tiempoActual — en un ref
+  // (no solo una variable local) porque pausar/reanudar necesitan poder recalcularlo
+  // sin volver a programar las notas desde cero.
+  const inicioRealRef = useRef(0)
 
   const [verPartitura, setVerPartitura] = useState(false)
-  const [mostrarTempo, setMostrarTempo] = useState(false)
+  // Por defecto se muestra en la partitura únicamente el pentagrama de la voz propia,
+  // para que el cantante no tenga que leer entre las demás voces.
+  const [soloMiVoz, setSoloMiVoz] = useState(true)
 
   const [micActivo, setMicActivo] = useState(false)
   const [miVoz, setMiVoz] = useState(null)
@@ -127,8 +134,33 @@ export default function PartituraPlayer({ partitura }) {
     if (sampler) sampler.releaseAll()
     limpiarIntervalo()
     setReproduciendo(false)
+    setPausado(false)
     setTiempoActual(0)
     liberarControlReproduccion(detener)
+  }
+
+  // Pausa el transporte sin cancelar las notas ya programadas: al reanudar sigue
+  // sonando desde el mismo punto, sin tener que volver a armar toda la partitura.
+  function pausar() {
+    Tone.Transport.pause()
+    limpiarIntervalo()
+    setPausado(true)
+  }
+
+  function reanudar() {
+    inicioRealRef.current = Date.now() - tiempoActual * 1000
+    limpiarIntervalo()
+    intervalRef.current = setInterval(() => {
+      setTiempoActual((Date.now() - inicioRealRef.current) / 1000)
+    }, 200)
+    Tone.Transport.start()
+    setPausado(false)
+  }
+
+  function alternarPlayPausa() {
+    if (!reproduciendo) reproducir()
+    else if (pausado) reanudar()
+    else pausar()
   }
 
   function alternarVoz(vozId) {
@@ -175,14 +207,15 @@ export default function PartituraPlayer({ partitura }) {
 
     Tone.Transport.scheduleOnce(() => detener(), duracionMax + 0.3)
 
-    const inicioReal = Date.now()
+    inicioRealRef.current = Date.now()
     limpiarIntervalo()
     intervalRef.current = setInterval(() => {
-      setTiempoActual((Date.now() - inicioReal) / 1000)
+      setTiempoActual((Date.now() - inicioRealRef.current) / 1000)
     }, 200)
 
     Tone.Transport.start()
     setReproduciendo(true)
+    setPausado(false)
   }
 
   // ─── Afinación con micrófono ────────────────────────────────────────────
@@ -294,11 +327,25 @@ export default function PartituraPlayer({ partitura }) {
     }}>
       {verPartitura && (
         <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px' }}>
+          {vocesOrdenadas.length > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <button onClick={() => setSoloMiVoz(v => !v)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+                  borderRadius: '8px', border: '1px solid #D3D1C7', cursor: 'pointer',
+                  background: soloMiVoz ? '#E1F5EE' : '#FFFFFF',
+                  color: '#04342C', fontSize: '12px', fontWeight: '500',
+                }}>
+                {soloMiVoz ? '🎼 Mostrando solo tu voz' : '🎼 Mostrando todas las voces'}
+              </button>
+            </div>
+          )}
           <PartituraVisual
             musicxml={partitura.musicxml}
             tiempos={partituraParseada.tiempos}
             divisions={partituraParseada.divisions}
             vozNombre={vocesOrdenadas.find(v => v.id === miVoz)?.nombre}
+            soloMiVoz={soloMiVoz}
             tiempoActual={tiempoActual}
             velocidad={velocidad}
             reproduciendo={reproduciendo}
@@ -367,61 +414,62 @@ export default function PartituraPlayer({ partitura }) {
           </div>
         </div>
 
-        <div style={{ padding: '4px 18px 10px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <button onClick={reproduciendo ? detener : reproducir}
+        <div style={{ padding: '4px 18px 10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button onClick={alternarPlayPausa}
             disabled={!Object.values(activas).some(Boolean)}
-            title={reproduciendo ? 'Detener' : 'Reproducir'}
+            title={!reproduciendo ? 'Reproducir' : pausado ? 'Reanudar' : 'Pausar'}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               width: '46px', height: '46px', borderRadius: '50%', border: 'none', cursor: 'pointer',
-              background: reproduciendo ? '#FCEBEB' : '#0F6E56',
-              color: reproduciendo ? '#A32D2D' : '#FFFFFF',
-              boxShadow: reproduciendo ? 'none' : '0 3px 8px rgba(15,110,86,0.35)',
+              background: '#0F6E56', color: '#FFFFFF',
+              boxShadow: '0 3px 8px rgba(15,110,86,0.35)',
               opacity: Object.values(activas).some(Boolean) ? 1 : 0.5,
             }}>
-            {reproduciendo ? (
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2" /></svg>
+            {reproduciendo && !pausado ? (
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+                <rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" />
+              </svg>
             ) : (
               <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.5v13l11-6.5-11-6.5z" /></svg>
             )}
           </button>
 
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setMostrarTempo(v => !v)}
+          {reproduciendo && (
+            <button onClick={detener} title="Detener"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 10px',
-                borderRadius: '14px', border: '1px solid #D3D1C7', background: '#FFFFFF', cursor: 'pointer',
-                fontSize: '12px', fontWeight: '600', color: '#5F5E5A',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                width: '32px', height: '32px', borderRadius: '50%', border: '1px solid #D3D1C7', cursor: 'pointer',
+                background: '#FFFFFF', color: '#5F5E5A',
               }}>
-              {velocidad === 1 ? '1x' : `${velocidad}x`} ▾
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2" /></svg>
             </button>
-            {mostrarTempo && (
-              <div style={{
-                position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 5, minWidth: '96px',
-                background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '10px',
-                boxShadow: '0 4px 14px rgba(26,26,24,0.12)', padding: '6px',
-                display: 'flex', flexDirection: 'column', gap: '2px',
-              }}>
-                {VELOCIDADES.map(v => (
-                  <button key={v} onClick={() => { setVelocidad(v); setMostrarTempo(false) }}
-                    style={{
-                      padding: '6px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', textAlign: 'left',
-                      fontSize: '12px', fontWeight: '500',
-                      background: velocidad === v ? '#F1EFE8' : 'transparent',
-                      color: velocidad === v ? '#1A1A18' : '#5F5E5A',
-                    }}>
-                    {v === 1 ? 'Normal (1x)' : `${v}x`}
-                  </button>
-                ))}
-              </div>
-            )}
+          )}
+
+          {/* Selector de tempo con el mismo estilo de "grupo segmentado" que ya
+              usa la app (ver las pestañas de Entrenamiento): fondo neutro y el
+              valor activo resaltado en blanco con sombra, en vez de un menú
+              desplegable aparte. */}
+          <div style={{ display: 'flex', gap: '2px', background: '#EAE7DD', borderRadius: '16px', padding: '3px' }}>
+            {VELOCIDADES.map(v => (
+              <button key={v} onClick={() => setVelocidad(v)}
+                style={{
+                  padding: '5px 9px', borderRadius: '13px', border: 'none', cursor: 'pointer',
+                  fontSize: '11px', whiteSpace: 'nowrap',
+                  fontWeight: velocidad === v ? '700' : '500',
+                  background: velocidad === v ? '#FFFFFF' : 'transparent',
+                  color: velocidad === v ? '#04342C' : '#5F5E5A',
+                  boxShadow: velocidad === v ? '0 1px 3px rgba(26,26,24,0.12)' : 'none',
+                }}>
+                {v === 1 ? 'Normal' : `${v}x`}
+              </button>
+            ))}
           </div>
 
           <button onClick={() => setVerPartitura(v => !v)}
             style={{
               marginLeft: 'auto',
               display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-              borderRadius: '20px', border: `1px solid ${verPartitura ? '#0F6E56' : '#D3D1C7'}`,
+              borderRadius: '8px', border: `1px solid ${verPartitura ? '#0F6E56' : '#D3D1C7'}`,
               background: verPartitura ? '#E1F5EE' : '#FFFFFF',
               color: verPartitura ? '#04342C' : '#5F5E5A',
               fontSize: '13px', fontWeight: '500', cursor: 'pointer',
