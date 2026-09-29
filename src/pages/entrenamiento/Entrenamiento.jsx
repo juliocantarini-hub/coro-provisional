@@ -59,20 +59,13 @@ export default function Entrenamiento() {
   const [categoriaActiva, setCategoriaActiva] = useState('respiracion')
   const [pianoAbierto, setPianoAbierto] = useState(false)
 
+  const TABS = [
+    ...ORDEN_CATEGORIAS.map(cat => ({ id: cat, label: CATEGORIAS[cat]?.label || cat, icono: null })),
+    { id: PRACTICA, label: 'Practica tu voz', icono: '🎤' },
+  ]
+
   return (
     <div>
-      <style>{`
-        @media (max-width: 768px) {
-          .boton-piano-mobile {
-            position: fixed !important;
-            top: 12px !important;
-            right: 12px !important;
-            left: auto !important;
-            z-index: 55 !important;
-          }
-        }
-      `}</style>
-
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
@@ -91,35 +84,36 @@ export default function Entrenamiento() {
               </span>
             </div>
           )}
-          <div className="boton-piano-mobile">
-            <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
-          </div>
+          <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
         </div>
       </div>
 
       <PianoInteractivo abierto={pianoAbierto} voz={perfil?.voz} />
 
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {ORDEN_CATEGORIAS.map(cat => (
-          <button key={cat} onClick={() => setCategoriaActiva(cat)} style={{
-            padding: '4px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-            border: `1px solid ${categoriaActiva === cat ? '#1D9E75' : '#D3D1C7'}`,
-            background: categoriaActiva === cat ? '#E1F5EE' : 'none',
-            color: categoriaActiva === cat ? '#04342C' : '#5F5E5A',
-            fontWeight: categoriaActiva === cat ? '500' : '400',
-          }}>
-            {CATEGORIAS[cat]?.label || cat}
-          </button>
-        ))}
-        <button onClick={() => setCategoriaActiva(PRACTICA)} style={{
-          padding: '4px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-          fontWeight: '700', letterSpacing: '0.3px',
-          border: `1px solid ${categoriaActiva === PRACTICA ? '#712B13' : '#D3D1C7'}`,
-          background: categoriaActiva === PRACTICA ? '#FAECE7' : 'none',
-          color: categoriaActiva === PRACTICA ? '#712B13' : '#5F5E5A',
-        }}>
-          PRACTICA TU VOZ
-        </button>
+      {/* Menú unificado: una sola fila con el mismo alto y tipografía para las
+          4 pestañas (antes "Practica tu voz" quedaba suelta en una fila aparte,
+          con otro estilo — ahora es una pestaña más del mismo grupo). */}
+      <div style={{
+        display: 'flex', gap: '4px', background: '#EAE7DD', borderRadius: '22px',
+        padding: '4px', marginBottom: '16px', overflowX: 'auto',
+      }}>
+        {TABS.map(tab => {
+          const activa = categoriaActiva === tab.id
+          return (
+            <button key={tab.id} onClick={() => setCategoriaActiva(tab.id)} style={{
+              flex: '1 1 0', minWidth: 'fit-content', padding: '8px 12px', borderRadius: '18px',
+              border: 'none', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap',
+              fontWeight: activa ? '700' : '500',
+              background: activa ? '#FFFFFF' : 'transparent',
+              color: activa ? '#04342C' : '#5F5E5A',
+              boxShadow: activa ? '0 1px 3px rgba(26,26,24,0.12)' : 'none',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+            }}>
+              {tab.icono && <span>{tab.icono}</span>}
+              {tab.label}
+            </button>
+          )
+        })}
       </div>
 
       {error && categoriaActiva !== PRACTICA && (
