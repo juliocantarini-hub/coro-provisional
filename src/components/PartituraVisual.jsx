@@ -50,8 +50,8 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         })
         // Partitura más compacta: por defecto OSMD dibuja a tamaño de partitura
         // impresa, que en pantallas chicas (y dentro del panel acotado) queda
-        // grande. 0.7 la achica sin que deje de leerse bien.
-        osmd.zoom = 0.7
+        // grande. 0.5 la achica bastante más mantiendo la lectura.
+        osmd.zoom = 0.5
         await osmd.load(musicxml)
         if (cancelado) return
         osmd.render()
