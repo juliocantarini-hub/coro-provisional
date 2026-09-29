@@ -24,6 +24,7 @@ const NAV_ADMIN = [
   { ruta: '/admin/eventos',      label: 'Eventos',    icono: 'calendario' },
   { ruta: '/admin/asistencia',   label: 'Asistencia', icono: 'calendario' },
   { ruta: '/admin/estudio',      label: 'Estudio',    icono: 'estudio' },
+  { ruta: '/admin/partituras',   label: 'Partituras', icono: 'musica' },
   { ruta: '/admin/estadistica',  label: 'Estadística', icono: 'estadistica' },
   { ruta: '/admin/avisos',       label: 'Avisos',     icono: 'campana' },
   { ruta: '/admin/encuestas',    label: 'Encuestas',  icono: 'encuestas' },

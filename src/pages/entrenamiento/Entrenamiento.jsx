@@ -3,6 +3,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { useEjerciciosEntrenamiento, useEjerciciosHoy } from '../../hooks/useEntrenamiento'
 import EjercicioPlayer from '../../components/EjercicioPlayer'
 import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
+import { usePartituras, usePartitura } from '../../hooks/usePartituras'
+import PartituraPlayer from '../../components/PartituraPlayer'
 
 const CATEGORIAS = {
   respiracion:  { label: 'Respiración',  color: '#0F6E56', bg: '#E1F5EE' },
@@ -12,9 +14,45 @@ const CATEGORIAS = {
 
 const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'vocalizacion']
 
+function formatoTiempoPartitura(seg) {
+  if (!seg || !isFinite(seg)) return ''
+  const m = Math.floor(seg / 60)
+  const s = Math.round(seg % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function PartituraCard({ resumen }) {
+  const [abierta, setAbierta] = useState(false)
+  const { partitura, cargando } = usePartitura(abierta ? resumen.id : null)
+
+  return (
+    <div style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden' }}>
+      <div onClick={() => setAbierta(v => !v)} style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+        <div>
+          <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{resumen.titulo}</div>
+          <div style={{ fontSize: '12px', color: '#888780' }}>
+            {resumen.compositor ? `${resumen.compositor} · ` : ''}{formatoTiempoPartitura(resumen.duracion_seg)}
+          </div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#B4B2A9"
+          style={{ transform: abierta ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
+          <path d="M7 10l5 5 5-5z"/>
+        </svg>
+      </div>
+      {abierta && (
+        <div style={{ padding: '0 16px 16px' }}>
+          {cargando && <div style={{ fontSize: '13px', color: '#888780' }}>Cargando...</div>}
+          {partitura && <PartituraPlayer partitura={partitura} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Entrenamiento() {
   const { perfil } = useAuth()
   const { porCategoria, cargando, error, recargar } = useEjerciciosEntrenamiento()
+  const { partituras, cargando: cargandoPartituras } = usePartituras()
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
   const [categoriaActiva, setCategoriaActiva] = useState('')
   const [pianoAbierto, setPianoAbierto] = useState(false)
@@ -121,6 +159,24 @@ export default function Entrenamiento() {
           </div>
         </div>
       ))}
+
+      {!cargandoPartituras && partituras.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <span style={{
+              fontSize: '10px', fontWeight: '700', color: '#712B13', background: '#FAECE7',
+              padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px',
+            }}>
+              Práctica por voz
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {partituras.map(p => (
+              <PartituraCard key={p.id} resumen={p} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
