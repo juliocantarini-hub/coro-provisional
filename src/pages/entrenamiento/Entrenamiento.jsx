@@ -23,31 +23,66 @@ function formatoTiempoPartitura(seg) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+// Tocar la obra abre la práctica en pantalla completa (en vez de expandirla
+// adentro de la tarjeta, dentro del scroll de la página): así el panel de
+// control queda siempre entero a la vista, sin tener que bajar la página, y
+// la partitura tiene el máximo espacio posible para leerse.
 function PartituraCard({ resumen }) {
   const [abierta, setAbierta] = useState(false)
   const { partitura, cargando } = usePartitura(abierta ? resumen.id : null)
 
   return (
-    <div style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden' }}>
-      <div onClick={() => setAbierta(v => !v)} style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+    <>
+      <div onClick={() => setAbierta(true)}
+        style={{
+          background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px',
+          padding: '14px 16px', cursor: 'pointer',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
+        }}>
         <div>
           <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{resumen.titulo}</div>
           <div style={{ fontSize: '12px', color: '#888780' }}>
             {resumen.compositor ? `${resumen.compositor} · ` : ''}{formatoTiempoPartitura(resumen.duracion_seg)}
           </div>
         </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="#B4B2A9"
-          style={{ transform: abierta ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
-          <path d="M7 10l5 5 5-5z"/>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#B4B2A9" style={{ flexShrink: 0 }}>
+          <path d="M8 5v14l11-7z"/>
         </svg>
       </div>
+
       {abierta && (
-        <div style={{ padding: '0 16px 16px' }}>
-          {cargando && <div style={{ fontSize: '13px', color: '#888780' }}>Cargando...</div>}
-          {partitura && <PartituraPlayer partitura={partitura} />}
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200, background: '#F1EFE8',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0,
+            // env(safe-area-inset-top) para que el botón de cerrar no quede tapado
+            // por la barra de estado del teléfono cuando esto tapa toda la pantalla.
+            padding: 'calc(12px + env(safe-area-inset-top, 0px)) 16px 12px',
+            borderBottom: '1px solid #E8E6DF', background: '#FFFFFF',
+          }}>
+            <button onClick={() => setAbierta(false)} title="Cerrar"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                width: '32px', height: '32px', borderRadius: '50%', border: '1px solid #D3D1C7',
+                background: '#FFFFFF', cursor: 'pointer',
+              }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5F5E5A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1A1A18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {resumen.titulo}
+            </div>
+          </div>
+          <div style={{ flex: '1 1 auto', minHeight: 0, padding: '12px', display: 'flex', flexDirection: 'column' }}>
+            {cargando && <div style={{ fontSize: '13px', color: '#888780' }}>Cargando...</div>}
+            {partitura && <PartituraPlayer partitura={partitura} pantallaCompleta />}
+          </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 

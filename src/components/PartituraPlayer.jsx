@@ -51,7 +51,7 @@ function notaEnInstante(notas, tiempo) {
   return null
 }
 
-export default function PartituraPlayer({ partitura }) {
+export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   const { perfil } = useAuth()
   const [reproduciendo, setReproduciendo] = useState(false)
   const [pausado, setPausado] = useState(false)
@@ -208,6 +208,25 @@ export default function PartituraPlayer({ partitura }) {
     reproducirDesde(0, velocidad)
   }
 
+  // Ir directo a un punto de la partitura (click/tap en la barra de progreso).
+  // Si ya estaba sonando, sigue sonando desde el nuevo punto; si estaba pausada
+  // o detenida, deja todo listo en la nueva posición sin arrancar el audio solo,
+  // para que Reproducir/Reanudar retome justo desde ahí.
+  async function buscarPosicion(fraccion) {
+    if (!partituraParseada) return
+    const duracion = partitura.duracion_seg || partituraParseada.duracionTotal
+    const f = Math.min(1, Math.max(0, fraccion))
+    const posicionMusical = f * duracion
+    if (!reproduciendo) tomarControlReproduccion(detener)
+    const estabaSonando = reproduciendo && !pausado
+    await reproducirDesde(posicionMusical, velocidad)
+    if (!estabaSonando) {
+      Tone.Transport.pause()
+      limpiarIntervalo()
+      setPausado(true)
+    }
+  }
+
   // Cambiar el tempo mientras suena antes no hacía nada audible: las notas ya
   // estaban programadas a la velocidad vieja. Ahora se reprograma lo que falta,
   // a la nueva velocidad, desde la posición actual (sin volver al principio).
@@ -249,31 +268,46 @@ export default function PartituraPlayer({ partitura }) {
           return
         }
 
-        // Suavizado por mediana: una sola lectura ruidosa u octava mal detectada
-        // (algo normal en autocorrelación con voz cantada) queda descartada por
-        // las lecturas vecinas en vez de hacer "saltar" el afinador.
-        const historial = micRefs.current.historial
-        historial.push(freqCruda)
-        if (historial.length > VENTANA_SUAVIZADO) historial.shift()
-        const ordenado = [...historial].sort((a, b) => a - b)
-        const freq = ordenado[Math.floor(ordenado.length / 2)]
-
-        const cercana = frecuenciaANotaCercana(freq)
-        let objetivo = null
+        // Si hay una nota objetivo en este instante (se está reproduciendo la
+        // partitura), la buscamos ANTES de suavizar: la autocorrelación con voz
+        // cantada suele "engancharse" en un armónico (típicamente el doble o la
+        // mitad de la frecuencia real), lo que antes hacía que el medidor casi
+        // nunca marcara "afinado" aunque el cantante estuviera bien. Como ya
+        // sabemos qué nota debería sonar, corregimos la lectura cruda a la
+        // octava más cercana a esa nota antes de compararla — así un error de
+        // octava en la detección no se confunde con estar realmente desafinado.
+        let objetivoFreq = null
         const { reproduciendo: reproduciendoAhora, tiempoActual: tiempoAhora, velocidad: velocidadAhora, miVoz: miVozAhora } = vivosRef.current
+        let notaObjetivoNombre = null
         if (miVozAhora && reproduciendoAhora) {
           const voz = vocesOrdenadas.find(v => v.id === miVozAhora)
           const notaObjetivo = voz && notaEnInstante(voz.notas, tiempoAhora * velocidadAhora)
           if (notaObjetivo) {
             const midiObjetivo = notaAMidi(notaObjetivo.nota)
             if (midiObjetivo != null) {
-              objetivo = {
-                nombre: notaObjetivo.nota,
-                cents: centsEntre(freq, midiAFrecuencia(midiObjetivo)),
-              }
+              objetivoFreq = midiAFrecuencia(midiObjetivo)
+              notaObjetivoNombre = notaObjetivo.nota
             }
           }
         }
+
+        const freqCorregida = objetivoFreq
+          ? freqCruda * Math.pow(2, Math.round(Math.log2(objetivoFreq / freqCruda)))
+          : freqCruda
+
+        // Suavizado por mediana: una sola lectura ruidosa (ya corregida de
+        // octava) queda descartada por las lecturas vecinas en vez de hacer
+        // "saltar" el afinador.
+        const historial = micRefs.current.historial
+        historial.push(freqCorregida)
+        if (historial.length > VENTANA_SUAVIZADO) historial.shift()
+        const ordenado = [...historial].sort((a, b) => a - b)
+        const freq = ordenado[Math.floor(ordenado.length / 2)]
+
+        const cercana = frecuenciaANotaCercana(freq)
+        const objetivo = objetivoFreq
+          ? { nombre: notaObjetivoNombre, cents: centsEntre(freq, objetivoFreq) }
+          : null
 
         setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
       }, 80)
@@ -321,12 +355,14 @@ export default function PartituraPlayer({ partitura }) {
   // la partitura scrollea, y el panel de control (reproducción, tempo y
   // afinador) queda siempre a la vista abajo, todo junto como un único bloque —
   // así no hace falta bajar la página para ver el afinador mientras se lee la
-  // partitura.
+  // partitura. En pantalla completa (abierto desde Entrenamiento) ocupa toda la
+  // altura disponible del contenedor en vez de una altura fija acotada.
   return (
     <div style={{
-      background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden',
+      background: '#F8F7F3', border: pantallaCompleta ? 'none' : '1px solid #E8E6DF',
+      borderRadius: pantallaCompleta ? 0 : '12px', overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
-      height: 'min(72vh, 640px)',
+      height: pantallaCompleta ? '100%' : 'min(72vh, 640px)',
     }}>
       <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px' }}>
         <PartituraVisual
@@ -346,16 +382,26 @@ export default function PartituraPlayer({ partitura }) {
           tiene la partitura y el audio completos con todas las voces. */}
       <div style={{ flex: '0 0 auto', boxShadow: '0 -4px 10px rgba(26,26,24,0.05)' }}>
         <div style={{ padding: '14px 18px 4px', borderTop: '1px solid #E8E6DF' }}>
-          <div style={{ position: 'relative', height: '3px', borderRadius: '2px', background: '#E8E6DF' }}>
-            <div style={{
-              position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: '2px',
-              width: `${progresoPct}%`, background: '#1D9E75',
-            }} />
-            <div style={{
-              position: 'absolute', top: '50%', left: `${progresoPct}%`, transform: 'translate(-50%, -50%)',
-              width: '12px', height: '12px', borderRadius: '50%',
-              background: '#0F6E56', border: '2.5px solid #FFFFFF', boxShadow: '0 1px 3px rgba(26,26,24,0.3)',
-            }} />
+          {/* Área de toque más alta que la barra visual (3px es muy fino para
+              tocar con el dedo) — permite ir directo a un punto de la partitura
+              tocando/clickeando en la barra, no solo mirarla. */}
+          <div
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              buscarPosicion((e.clientX - rect.left) / rect.width)
+            }}
+            style={{ position: 'relative', height: '20px', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <div style={{ position: 'relative', width: '100%', height: '3px', borderRadius: '2px', background: '#E8E6DF' }}>
+              <div style={{
+                position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: '2px',
+                width: `${progresoPct}%`, background: '#1D9E75',
+              }} />
+              <div style={{
+                position: 'absolute', top: '50%', left: `${progresoPct}%`, transform: 'translate(-50%, -50%)',
+                width: '12px', height: '12px', borderRadius: '50%',
+                background: '#0F6E56', border: '2.5px solid #FFFFFF', boxShadow: '0 1px 3px rgba(26,26,24,0.3)',
+              }} />
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
             <span style={{ fontSize: '11px', color: '#888780', fontVariantNumeric: 'tabular-nums' }}>

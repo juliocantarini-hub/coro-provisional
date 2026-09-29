@@ -58,8 +58,10 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         // que en mobile (contenedor angosto) un zoom igual de chico que en
         // desktop termina amontonando muchos compases en una línea, quedando
         // desproporcionado. Con un zoom mayor en mobile entran menos compases
-        // por línea y se ve más prolijo.
-        osmd.zoom = window.innerWidth <= 768 ? 0.75 : 0.5
+        // por línea y se ve más prolijo — pero 0.75 quedó más grande de lo que
+        // Julio quería, así que se bajó a 0.6 (sigue por encima del 0.5 de
+        // desktop para no volver a amontonar compases).
+        osmd.zoom = window.innerWidth <= 768 ? 0.6 : 0.5
         osmd.render()
         osmd.cursor.show()
         osmdRef.current = osmd
