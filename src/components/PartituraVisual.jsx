@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 // alineado con lo que se escucha, pulso a pulso (no solo compás a compás), sin
 // importar si la partitura tiene repeticiones escritas.
 
-export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombre, soloMiVoz, tiempoActual, velocidad, reproduciendo }) {
+export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombre, tiempoActual, velocidad, reproduciendo }) {
   const containerRef = useRef(null)
   const osmdRef = useRef(null)
   const osmdModRef = useRef(null)
@@ -65,7 +65,7 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         osmdRef.current = osmd
         osmdModRef.current = mod
         pulsoActualRef.current = -1
-        aplicarVozYVisibilidad(osmd, vozNombre, soloMiVoz)
+        aplicarVozYVisibilidad(osmd, vozNombre)
         setEstado('lista')
       } catch (e) {
         if (!cancelado) setEstado('error')
@@ -80,14 +80,13 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicxml])
 
-  // Recolorear y/o mostrar solo la voz propia cuando cambia la voz destacada
-  // o el modo de visibilidad.
+  // Recolorear y mostrar solo la voz propia cuando cambia la voz destacada.
   useEffect(() => {
     if (estado === 'lista' && osmdRef.current) {
-      aplicarVozYVisibilidad(osmdRef.current, vozNombre, soloMiVoz)
+      aplicarVozYVisibilidad(osmdRef.current, vozNombre)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vozNombre, soloMiVoz, estado])
+  }, [vozNombre, estado])
 
   // Mover el cursor al pulso (tiempo del compás) que corresponde al instante
   // actual de reproducción — no solo al principio del compás.
@@ -137,15 +136,16 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
   )
 }
 
-// Colorea las notas de la voz propia y, si soloMiVoz está activo, oculta el
-// resto de los pentagramas (en vez de solo pintarlos distinto) para que el
-// cantante lea únicamente su línea.
-function aplicarVozYVisibilidad(osmd, vozNombre, soloMiVoz) {
+// Colorea las notas de la voz propia y oculta el resto de los pentagramas
+// (en vez de solo pintarlos distinto) para que el cantante lea únicamente
+// su línea — la partitura completa con todas las voces ya está disponible
+// en Repertorio, así que acá no hace falta mostrarla de nuevo.
+function aplicarVozYVisibilidad(osmd, vozNombre) {
   try {
     const instrumento = vozNombre && osmd.sheet.Instruments.find(i => i.Name === vozNombre)
 
     osmd.sheet.Instruments.forEach(inst => {
-      inst.Visible = soloMiVoz && instrumento ? inst.Id === instrumento.Id : true
+      inst.Visible = instrumento ? inst.Id === instrumento.Id : true
     })
 
     const cursor = osmd.cursor
