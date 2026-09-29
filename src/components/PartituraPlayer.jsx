@@ -7,7 +7,6 @@ import {
   notaAMidi, midiAFrecuencia, centsEntre, detectarFrecuencia, frecuenciaANotaCercana,
 } from '../lib/afinacion'
 import PartituraVisual from './PartituraVisual'
-import SeguimientoLetra from './SeguimientoLetra'
 
 const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5]
 
@@ -296,7 +295,7 @@ export default function PartituraPlayer({ partitura }) {
 
       {vocesOrdenadas.length > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
-          <span style={{ fontSize: '12px', color: '#888780' }}>¿Qué voz querés seguir?</span>
+          <span style={{ fontSize: '12px', color: '#888780' }}>¿Qué voz querés destacar?</span>
           {vocesOrdenadas.map(voz => (
             <button key={voz.id} onClick={() => setMiVoz(voz.id)}
               style={{
@@ -309,12 +308,6 @@ export default function PartituraPlayer({ partitura }) {
           ))}
         </div>
       )}
-
-      <SeguimientoLetra
-        notas={vocesOrdenadas.find(v => v.id === miVoz)?.notas}
-        tiempoActual={tiempoActual}
-        velocidad={velocidad}
-      />
 
       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #E8E6DF' }}>
         <button onClick={() => setVerPartitura(v => !v)}

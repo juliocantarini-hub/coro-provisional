@@ -88,9 +88,6 @@ function extraerEventosCrudos(parteEl) {
         const nota = pitchEl ? pitchANota(pitchEl) : null
         const lyricEl = hijo.getElementsByTagName('lyric')[0]
         const letra = lyricEl ? textoDe(lyricEl, 'text') : null
-        // begin/middle: esta sílaba sigue pegada a la próxima (misma palabra, sin espacio).
-        // end/single (o sin dato): cierra la palabra, va seguida de un espacio.
-        const silabica = lyricEl ? textoDe(lyricEl, 'syllabic') : null
 
         const tieEls = Array.from(hijo.getElementsByTagName('tie'))
         const ligaAbre = tieEls.some(t => t.getAttribute('type') === 'start')
@@ -105,7 +102,7 @@ function extraerEventosCrudos(parteEl) {
           notaAbiertaPorVoz[vozId].ticks += dur
           if (!ligaAbre) notaAbiertaPorVoz[vozId] = null
         } else {
-          const evento = { tickInicio, ticks: dur, nota, letra, silabica }
+          const evento = { tickInicio, ticks: dur, nota, letra }
           eventosPorVoz[vozId].push(evento)
           notaAbiertaPorVoz[vozId] = ligaAbre ? evento : null
         }
@@ -192,7 +189,6 @@ export function parsearMusicXML(xmlTexto) {
           duracion: tickASegundos(e.tickInicio + e.ticks) - tickASegundos(e.tickInicio),
           nota: e.nota,
           letra: e.letra,
-          silabica: e.silabica,
         }))
 
       const sufijo = vozIds.length > 1 ? ` ${vozId}` : ''
