@@ -277,38 +277,68 @@ export default function PartituraPlayer({ partitura }) {
     estadoAfinacion = abs <= 15 ? 'afinado' : centsMostrados > 0 ? 'agudo' : 'grave'
   }
 
+  // Con la partitura visible, el bloque entero pasa a "modo práctica": altura
+  // acotada donde solo la partitura scrollea, y el panel de control (voces,
+  // reproducción, tempo y afinador) queda siempre a la vista abajo, todo junto
+  // como un único bloque — así no hace falta bajar la página para ver el
+  // afinador mientras se lee la partitura. Sin la partitura visible, el bloque
+  // vuelve a su alto natural (compacto), como antes.
   return (
-    <div style={{ background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden' }}>
-      <div style={{ padding: '18px 18px 0' }}>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
-          {vocesOrdenadas.map(voz => {
-            const vc = VOCES_COLOR[voz.vozCoral] || { bg: '#F1EFE8', color: '#5F5E5A' }
-            const activa = activas[voz.id]
-            return (
-              <button key={voz.id} onClick={() => alternarVoz(voz.id)}
-                onDoubleClick={() => soloEstaVoz(voz.id)}
-                title="Click: activar/silenciar. Doble click: escuchar solo esta voz."
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  padding: '7px 14px', borderRadius: '20px', cursor: 'pointer',
-                  border: `1px solid ${activa ? vc.color : '#D3D1C7'}`,
-                  background: activa ? vc.bg : '#FFFFFF',
-                  color: activa ? vc.color : '#B4B2A9',
-                  fontSize: '13px', fontWeight: '500',
-                }}>
-                {activa ? '🔊' : '🔇'} {voz.nombre}
+    <div style={{
+      background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', overflow: 'hidden',
+      display: 'flex', flexDirection: 'column',
+      ...(verPartitura ? { height: 'min(72vh, 640px)' } : {}),
+    }}>
+      {verPartitura && (
+        <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px' }}>
+          <PartituraVisual
+            musicxml={partitura.musicxml}
+            tiempos={partituraParseada.tiempos}
+            divisions={partituraParseada.divisions}
+            vozNombre={vocesOrdenadas.find(v => v.id === miVoz)?.nombre}
+            tiempoActual={tiempoActual}
+            velocidad={velocidad}
+            reproduciendo={reproduciendo}
+          />
+        </div>
+      )}
+
+      {/* Panel de control integrado: voces, reproducción, tempo y afinador,
+          siempre visible como un único bloque pegado abajo. */}
+      <div style={{ flex: '0 0 auto', ...(verPartitura ? { boxShadow: '0 -4px 10px rgba(26,26,24,0.05)' } : {}) }}>
+        <div style={{ padding: '14px 18px 10px', ...(verPartitura ? { borderTop: '1px solid #E8E6DF' } : {}) }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {vocesOrdenadas.map(voz => {
+              const vc = VOCES_COLOR[voz.vozCoral] || { bg: '#F1EFE8', color: '#5F5E5A' }
+              const activa = activas[voz.id]
+              return (
+                <button key={voz.id} onClick={() => alternarVoz(voz.id)}
+                  onDoubleClick={() => soloEstaVoz(voz.id)}
+                  title="Click: activar/silenciar. Doble click: escuchar solo esta voz."
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '7px 14px', borderRadius: '20px', cursor: 'pointer',
+                    border: `1px solid ${activa ? vc.color : '#D3D1C7'}`,
+                    background: activa ? vc.bg : '#FFFFFF',
+                    color: activa ? vc.color : '#B4B2A9',
+                    fontSize: '13px', fontWeight: '500',
+                  }}>
+                  {activa ? '🔊' : '🔇'} {voz.nombre}
+                </button>
+              )
+            })}
+            {vocesOrdenadas.length > 1 && (
+              <button onClick={todasActivas}
+                style={{ fontSize: '12px', color: '#5F5E5A', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                Escuchar todas
               </button>
-            )
-          })}
-          {vocesOrdenadas.length > 1 && (
-            <button onClick={todasActivas}
-              style={{ fontSize: '12px', color: '#5F5E5A', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-              Escuchar todas
-            </button>
-          )}
+            )}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ height: '1px', background: '#E8E6DF', margin: '0 18px' }} />
+
+        <div style={{ padding: '10px 18px 6px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <button onClick={reproduciendo ? detener : reproducir}
             disabled={!Object.values(activas).some(Boolean)}
             style={{
@@ -324,8 +354,10 @@ export default function PartituraPlayer({ partitura }) {
           <span style={{ fontSize: '12px', color: '#888780', fontVariantNumeric: 'tabular-nums' }}>
             {formatoTiempo(tiempoActual)} / {formatoTiempo(duracionTotal / velocidad)}
           </span>
+        </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', flexWrap: 'wrap' }}>
+        <div style={{ padding: '0 18px 10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '12px', color: '#888780' }}>Tempo:</span>
             {VELOCIDADES.map(v => (
               <button key={v} onClick={() => setVelocidad(v)}
@@ -338,11 +370,10 @@ export default function PartituraPlayer({ partitura }) {
               </button>
             ))}
           </div>
-        </div>
 
-        <div style={{ marginTop: '16px', paddingTop: '16px', paddingBottom: '18px', borderTop: '1px solid #E8E6DF' }}>
           <button onClick={() => setVerPartitura(v => !v)}
             style={{
+              marginLeft: 'auto',
               display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
               borderRadius: '20px', border: `1px solid ${verPartitura ? '#0F6E56' : '#D3D1C7'}`,
               background: verPartitura ? '#E1F5EE' : '#FFFFFF',
@@ -351,86 +382,68 @@ export default function PartituraPlayer({ partitura }) {
             }}>
             {verPartitura ? '🎼 Ocultar partitura' : '🎼 Ver partitura'}
           </button>
-
-          {verPartitura && (
-            <PartituraVisual
-              musicxml={partitura.musicxml}
-              tiempos={partituraParseada.tiempos}
-              divisions={partituraParseada.divisions}
-              vozNombre={vocesOrdenadas.find(v => v.id === miVoz)?.nombre}
-              tiempoActual={tiempoActual}
-              velocidad={velocidad}
-              reproduciendo={reproduciendo}
-            />
-          )}
         </div>
-      </div>
 
-      {/* Afinación: panel integrado que queda pegado abajo — al scrollear una
-          partitura larga (o con la vista de partitura abierta), el micrófono y
-          las luces del afinador siguen siempre a la vista en vez de quedar
-          tapados más abajo. */}
-      <div style={{
-        position: 'sticky', bottom: 0, zIndex: 3,
-        background: '#F8F7F3', borderTop: '1px solid #E8E6DF',
-        boxShadow: '0 -4px 10px rgba(26,26,24,0.05)',
-        padding: '14px 18px',
-      }}>
-        <button onClick={micActivo ? detenerMicrofono : activarMicrofono}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-            borderRadius: '20px', border: `1px solid ${micActivo ? '#D85A30' : '#D3D1C7'}`,
-            background: micActivo ? '#FAECE7' : '#FFFFFF',
-            color: micActivo ? '#712B13' : '#5F5E5A',
-            fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-          }}>
-          {micActivo ? '🎤 Apagar micrófono' : '🎤 Practicar afinación'}
-        </button>
+        <div style={{ height: '1px', background: '#E8E6DF', margin: '0 18px' }} />
 
-        {errorMic && <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '8px' }}>{errorMic}</div>}
+        {/* Afinación */}
+        <div style={{ padding: '12px 18px 14px' }}>
+          <button onClick={micActivo ? detenerMicrofono : activarMicrofono}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+              borderRadius: '20px', border: `1px solid ${micActivo ? '#D85A30' : '#D3D1C7'}`,
+              background: micActivo ? '#FAECE7' : '#FFFFFF',
+              color: micActivo ? '#712B13' : '#5F5E5A',
+              fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+            }}>
+            {micActivo ? '🎤 Apagar micrófono' : '🎤 Practicar afinación'}
+          </button>
 
-        {micActivo && (
-          <div style={{ marginTop: '12px' }}>
-            {vocesOrdenadas.length > 1 && (
-              <div style={{ fontSize: '11px', color: '#B4B2A9', marginBottom: '8px' }}>
-                Cantando como: <strong style={{ color: '#5F5E5A' }}>{vocesOrdenadas.find(v => v.id === miVoz)?.nombre}</strong> (doble click en una voz de arriba para cambiarla)
-              </div>
-            )}
+          {errorMic && <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '8px' }}>{errorMic}</div>}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '10px', padding: '10px 16px' }}>
-              <div style={{ minWidth: '54px' }}>
-                <div style={{ fontSize: '22px', fontWeight: '600', color: lectura ? '#1A1A18' : '#D3D1C7', fontFamily: 'Georgia, serif', lineHeight: 1 }}>
-                  {lectura ? (lectura.objetivo?.nombre || lectura.nombreCercano) : '—'}
+          {micActivo && (
+            <div style={{ marginTop: '12px' }}>
+              {vocesOrdenadas.length > 1 && (
+                <div style={{ fontSize: '11px', color: '#B4B2A9', marginBottom: '8px' }}>
+                  Cantando como: <strong style={{ color: '#5F5E5A' }}>{vocesOrdenadas.find(v => v.id === miVoz)?.nombre}</strong> (doble click en una voz de arriba para cambiarla)
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '10px', padding: '10px 16px' }}>
+                <div style={{ minWidth: '54px' }}>
+                  <div style={{ fontSize: '22px', fontWeight: '600', color: lectura ? '#1A1A18' : '#D3D1C7', fontFamily: 'Georgia, serif', lineHeight: 1 }}>
+                    {lectura ? (lectura.objetivo?.nombre || lectura.nombreCercano) : '—'}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', flexGrow: 1, justifyContent: 'center' }}>
+                  {LUCES_AFINACION.map(luz => {
+                    const encendida = estadoAfinacion === luz.key
+                    return (
+                      <div key={luz.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <div style={{
+                          width: '24px', height: '24px', borderRadius: '50%',
+                          background: encendida ? luz.color : '#EDEBE3',
+                          border: `2px solid ${encendida ? luz.color : '#D3D1C7'}`,
+                          boxShadow: encendida ? `0 0 10px ${luz.color}66` : 'none',
+                          transition: 'background 0.15s ease, box-shadow 0.15s ease',
+                        }} />
+                        <span style={{ fontSize: '9px', color: encendida ? '#5F5E5A' : '#B4B2A9', fontWeight: encendida ? '600' : '400' }}>
+                          {luz.label}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
-
-              <div style={{ display: 'flex', gap: '14px', flexGrow: 1, justifyContent: 'center' }}>
-                {LUCES_AFINACION.map(luz => {
-                  const encendida = estadoAfinacion === luz.key
-                  return (
-                    <div key={luz.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                      <div style={{
-                        width: '24px', height: '24px', borderRadius: '50%',
-                        background: encendida ? luz.color : '#EDEBE3',
-                        border: `2px solid ${encendida ? luz.color : '#D3D1C7'}`,
-                        boxShadow: encendida ? `0 0 10px ${luz.color}66` : 'none',
-                        transition: 'background 0.15s ease, box-shadow 0.15s ease',
-                      }} />
-                      <span style={{ fontSize: '9px', color: encendida ? '#5F5E5A' : '#B4B2A9', fontWeight: encendida ? '600' : '400' }}>
-                        {luz.label}
-                      </span>
-                    </div>
-                  )
-                })}
+              <div style={{ fontSize: '11px', color: '#888780', marginTop: '6px' }}>
+                {lectura?.objetivo
+                  ? 'nota que estás cantando ahora en la partitura'
+                  : reproduciendo ? 'silencio en este instante' : 'nota más cercana a lo que cantás'}
               </div>
             </div>
-            <div style={{ fontSize: '11px', color: '#888780', marginTop: '6px' }}>
-              {lectura?.objetivo
-                ? 'nota que estás cantando ahora en la partitura'
-                : reproduciendo ? 'silencio en este instante' : 'nota más cercana a lo que cantás'}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
