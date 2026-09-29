@@ -67,6 +67,7 @@ export default function PartituraPlayer({ partitura }) {
   const intervalRef = useRef(null)
 
   const [verPartitura, setVerPartitura] = useState(false)
+  const [mostrarTempo, setMostrarTempo] = useState(false)
 
   const [micActivo, setMicActivo] = useState(false)
   const [miVoz, setMiVoz] = useState(null)
@@ -265,6 +266,8 @@ export default function PartituraPlayer({ partitura }) {
   if (!partituraParseada) return null
 
   const duracionTotal = partitura.duracion_seg || partituraParseada.duracionTotal
+  const duracionEscalada = duracionTotal / velocidad
+  const progresoPct = duracionEscalada > 0 ? Math.min(100, Math.max(0, (tiempoActual / duracionEscalada) * 100)) : 0
 
   // Umbral: qué tan cerca (en cents) hay que estar para considerarlo "afinado",
   // y de qué lado (agudo/grave) cae si no lo está. 15 cents es un margen más
@@ -317,20 +320,24 @@ export default function PartituraPlayer({ partitura }) {
                   title="Click: activar/silenciar. Doble click: escuchar solo esta voz."
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '7px 14px', borderRadius: '20px', cursor: 'pointer',
-                    border: `1px solid ${activa ? vc.color : '#D3D1C7'}`,
-                    background: activa ? vc.bg : '#FFFFFF',
-                    color: activa ? vc.color : '#B4B2A9',
-                    fontSize: '13px', fontWeight: '500',
+                    padding: '6px 12px', borderRadius: '16px', cursor: 'pointer',
+                    border: `1px solid ${activa ? vc.color + '55' : '#E8E6DF'}`,
+                    background: activa ? vc.bg : '#FAFAF7',
+                    color: activa ? vc.color : '#8A887F',
+                    fontSize: '12px', fontWeight: '500',
                   }}>
-                  {activa ? '🔊' : '🔇'} {voz.nombre}
+                  <span style={{
+                    width: '7px', height: '7px', borderRadius: '50%', display: 'inline-block',
+                    background: activa ? vc.color : '#C7C5BB',
+                  }} />
+                  {voz.nombre}
                 </button>
               )
             })}
             {vocesOrdenadas.length > 1 && (
               <button onClick={todasActivas}
-                style={{ fontSize: '12px', color: '#5F5E5A', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                Escuchar todas
+                style={{ fontSize: '12px', color: '#8A887F', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Todas
               </button>
             )}
           </div>
@@ -338,37 +345,76 @@ export default function PartituraPlayer({ partitura }) {
 
         <div style={{ height: '1px', background: '#E8E6DF', margin: '0 18px' }} />
 
-        <div style={{ padding: '10px 18px 6px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <button onClick={reproduciendo ? detener : reproducir}
-            disabled={!Object.values(activas).some(Boolean)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 18px',
-              borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-              background: reproduciendo ? '#FCEBEB' : '#0F6E56',
-              color: reproduciendo ? '#A32D2D' : '#FFFFFF',
-              opacity: Object.values(activas).some(Boolean) ? 1 : 0.5,
-            }}>
-            {reproduciendo ? '⏹ Detener' : '▶ Reproducir'}
-          </button>
-
-          <span style={{ fontSize: '12px', color: '#888780', fontVariantNumeric: 'tabular-nums' }}>
-            {formatoTiempo(tiempoActual)} / {formatoTiempo(duracionTotal / velocidad)}
-          </span>
+        <div style={{ padding: '12px 18px 4px' }}>
+          <div style={{ position: 'relative', height: '3px', borderRadius: '2px', background: '#E8E6DF' }}>
+            <div style={{
+              position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: '2px',
+              width: `${progresoPct}%`, background: '#1D9E75',
+            }} />
+            <div style={{
+              position: 'absolute', top: '50%', left: `${progresoPct}%`, transform: 'translate(-50%, -50%)',
+              width: '12px', height: '12px', borderRadius: '50%',
+              background: '#0F6E56', border: '2.5px solid #FFFFFF', boxShadow: '0 1px 3px rgba(26,26,24,0.3)',
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
+            <span style={{ fontSize: '11px', color: '#888780', fontVariantNumeric: 'tabular-nums' }}>
+              {formatoTiempo(tiempoActual)}
+            </span>
+            <span style={{ fontSize: '11px', color: '#888780', fontVariantNumeric: 'tabular-nums' }}>
+              -{formatoTiempo(Math.max(0, duracionEscalada - tiempoActual))}
+            </span>
+          </div>
         </div>
 
-        <div style={{ padding: '0 18px 10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: '#888780' }}>Tempo:</span>
-            {VELOCIDADES.map(v => (
-              <button key={v} onClick={() => setVelocidad(v)}
-                style={{
-                  padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-                  background: velocidad === v ? '#378ADD' : '#F1EFE8',
-                  color: velocidad === v ? '#FFFFFF' : '#5F5E5A',
-                }}>
-                {v === 1 ? 'Normal' : `${v}x`}
-              </button>
-            ))}
+        <div style={{ padding: '4px 18px 10px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button onClick={reproduciendo ? detener : reproducir}
+            disabled={!Object.values(activas).some(Boolean)}
+            title={reproduciendo ? 'Detener' : 'Reproducir'}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              width: '46px', height: '46px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: reproduciendo ? '#FCEBEB' : '#0F6E56',
+              color: reproduciendo ? '#A32D2D' : '#FFFFFF',
+              boxShadow: reproduciendo ? 'none' : '0 3px 8px rgba(15,110,86,0.35)',
+              opacity: Object.values(activas).some(Boolean) ? 1 : 0.5,
+            }}>
+            {reproduciendo ? (
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2" /></svg>
+            ) : (
+              <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.5v13l11-6.5-11-6.5z" /></svg>
+            )}
+          </button>
+
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setMostrarTempo(v => !v)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 10px',
+                borderRadius: '14px', border: '1px solid #D3D1C7', background: '#FFFFFF', cursor: 'pointer',
+                fontSize: '12px', fontWeight: '600', color: '#5F5E5A',
+              }}>
+              {velocidad === 1 ? '1x' : `${velocidad}x`} ▾
+            </button>
+            {mostrarTempo && (
+              <div style={{
+                position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 5, minWidth: '96px',
+                background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '10px',
+                boxShadow: '0 4px 14px rgba(26,26,24,0.12)', padding: '6px',
+                display: 'flex', flexDirection: 'column', gap: '2px',
+              }}>
+                {VELOCIDADES.map(v => (
+                  <button key={v} onClick={() => { setVelocidad(v); setMostrarTempo(false) }}
+                    style={{
+                      padding: '6px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                      fontSize: '12px', fontWeight: '500',
+                      background: velocidad === v ? '#F1EFE8' : 'transparent',
+                      color: velocidad === v ? '#1A1A18' : '#5F5E5A',
+                    }}>
+                    {v === 1 ? 'Normal (1x)' : `${v}x`}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <button onClick={() => setVerPartitura(v => !v)}
