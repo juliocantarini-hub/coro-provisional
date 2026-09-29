@@ -51,9 +51,12 @@ function extraerEventosCrudos(parteEl) {
   const eventosPorVoz = {}       // vozId -> [eventos]
   const notaAbiertaPorVoz = {}   // vozId -> evento (para fusionar ligaduras)
   const cambiosTempo = []        // { tick, bpm }
+  const medidasTick = []         // { numero, tickInicio } - una por compás, en orden del documento
 
   for (const medida of medidas) {
     const medidaInicioTick = tickAbsoluto
+    const numeroMedida = medida.getAttribute('number')
+    medidasTick.push({ numero: numeroMedida, tickInicio: medidaInicioTick })
     let cursor = 0
     let cursorMax = 0
 
@@ -114,7 +117,7 @@ function extraerEventosCrudos(parteEl) {
     tickAbsoluto = medidaInicioTick + cursorMax
   }
 
-  return { eventosPorVoz, divisions, cambiosTempo, ticksTotales: tickAbsoluto }
+  return { eventosPorVoz, divisions, cambiosTempo, ticksTotales: tickAbsoluto, medidasTick }
 }
 
 // Convierte ticks a segundos respetando los cambios de tempo del propio archivo.
@@ -198,8 +201,19 @@ export function parsearMusicXML(xmlTexto) {
     }
   }
 
+  // Tiempo de inicio de cada compás, en segundos — para sincronizar un cursor visual
+  // con la reproducción. Asumimos que todas las partes de una obra coral SATB tienen
+  // la misma cantidad de compases en el mismo orden (caso normal); tomamos la primera.
+  const medidas = (crudosPorParte[0]?.medidasTick || []).map(m => ({
+    numero: m.numero,
+    tiempo: tickASegundos(m.tickInicio),
+    tickInicio: m.tickInicio,
+  }))
+
   return {
     voces,
     duracionTotal: tickASegundos(ticksTotalesMax),
+    medidas,
+    divisions: divisionsGlobal,
   }
 }

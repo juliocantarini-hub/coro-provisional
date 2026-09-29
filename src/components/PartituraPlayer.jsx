@@ -6,6 +6,7 @@ import { tomarControlReproduccion, liberarControlReproduccion } from '../lib/rep
 import {
   notaAMidi, midiAFrecuencia, centsEntre, detectarFrecuencia, frecuenciaANotaCercana,
 } from '../lib/afinacion'
+import PartituraVisual from './PartituraVisual'
 
 const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5]
 
@@ -40,6 +41,8 @@ export default function PartituraPlayer({ partitura }) {
   const [tiempoActual, setTiempoActual] = useState(0)
   const [error, setError] = useState('')
   const intervalRef = useRef(null)
+
+  const [verPartitura, setVerPartitura] = useState(false)
 
   const [micActivo, setMicActivo] = useState(false)
   const [miVoz, setMiVoz] = useState(null)
@@ -288,6 +291,31 @@ export default function PartituraPlayer({ partitura }) {
             </button>
           ))}
         </div>
+      </div>
+
+      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #E8E6DF' }}>
+        <button onClick={() => setVerPartitura(v => !v)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+            borderRadius: '20px', border: `1px solid ${verPartitura ? '#0F6E56' : '#D3D1C7'}`,
+            background: verPartitura ? '#E1F5EE' : '#FFFFFF',
+            color: verPartitura ? '#04342C' : '#5F5E5A',
+            fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+          }}>
+          {verPartitura ? '🎼 Ocultar partitura' : '🎼 Ver partitura'}
+        </button>
+
+        {verPartitura && (
+          <PartituraVisual
+            musicxml={partitura.musicxml}
+            medidas={partituraParseada.medidas}
+            divisions={partituraParseada.divisions}
+            vozNombre={vocesOrdenadas.find(v => v.id === miVoz)?.nombre}
+            tiempoActual={tiempoActual}
+            velocidad={velocidad}
+            reproduciendo={reproduciendo}
+          />
+        )}
       </div>
 
       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #E8E6DF' }}>
