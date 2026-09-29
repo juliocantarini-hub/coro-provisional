@@ -7,6 +7,7 @@ import {
   notaAMidi, midiAFrecuencia, centsEntre, detectarFrecuencia, frecuenciaANotaCercana,
 } from '../lib/afinacion'
 import PartituraVisual from './PartituraVisual'
+import SeguimientoLetra from './SeguimientoLetra'
 
 const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5]
 
@@ -293,6 +294,28 @@ export default function PartituraPlayer({ partitura }) {
         </div>
       </div>
 
+      {vocesOrdenadas.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
+          <span style={{ fontSize: '12px', color: '#888780' }}>¿Qué voz querés seguir?</span>
+          {vocesOrdenadas.map(voz => (
+            <button key={voz.id} onClick={() => setMiVoz(voz.id)}
+              style={{
+                padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
+                background: miVoz === voz.id ? '#0F6E56' : '#F1EFE8',
+                color: miVoz === voz.id ? '#FFFFFF' : '#5F5E5A',
+              }}>
+              {voz.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <SeguimientoLetra
+        notas={vocesOrdenadas.find(v => v.id === miVoz)?.notas}
+        tiempoActual={tiempoActual}
+        velocidad={velocidad}
+      />
+
       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #E8E6DF' }}>
         <button onClick={() => setVerPartitura(v => !v)}
           style={{
@@ -335,18 +358,8 @@ export default function PartituraPlayer({ partitura }) {
         {micActivo && (
           <div style={{ marginTop: '14px' }}>
             {vocesOrdenadas.length > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                <span style={{ fontSize: '12px', color: '#888780' }}>¿Qué voz estás cantando?</span>
-                {vocesOrdenadas.map(voz => (
-                  <button key={voz.id} onClick={() => setMiVoz(voz.id)}
-                    style={{
-                      padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-                      background: miVoz === voz.id ? '#0F6E56' : '#F1EFE8',
-                      color: miVoz === voz.id ? '#FFFFFF' : '#5F5E5A',
-                    }}>
-                    {voz.nombre}
-                  </button>
-                ))}
+              <div style={{ fontSize: '11px', color: '#B4B2A9', marginBottom: '10px' }}>
+                Cantando como: <strong style={{ color: '#5F5E5A' }}>{vocesOrdenadas.find(v => v.id === miVoz)?.nombre}</strong> (cambiá la voz arriba, junto a la letra)
               </div>
             )}
 
