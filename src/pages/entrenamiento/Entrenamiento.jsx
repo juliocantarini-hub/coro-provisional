@@ -14,6 +14,8 @@ const CATEGORIAS = {
 
 const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'vocalizacion']
 
+const PRACTICA = 'practica'
+
 function formatoTiempoPartitura(seg) {
   if (!seg || !isFinite(seg)) return ''
   const m = Math.floor(seg / 60)
@@ -54,11 +56,8 @@ export default function Entrenamiento() {
   const { porCategoria, cargando, error, recargar } = useEjerciciosEntrenamiento()
   const { partituras, cargando: cargandoPartituras } = usePartituras()
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
-  const [categoriaActiva, setCategoriaActiva] = useState('')
+  const [categoriaActiva, setCategoriaActiva] = useState('respiracion')
   const [pianoAbierto, setPianoAbierto] = useState(false)
-
-  const categoriasConDatos = ORDEN_CATEGORIAS.filter(cat => porCategoria[cat]?.length > 0)
-  const categoriasAMostrar = categoriaActiva ? [categoriaActiva] : categoriasConDatos
 
   return (
     <div>
@@ -80,7 +79,7 @@ export default function Entrenamiento() {
             Entrenamiento
           </h2>
           <p style={{ fontSize: '13px', color: '#888780', margin: 0 }}>
-            Ejercicios de técnica vocal para practicar a tu ritmo
+            Ejercicios de técnica vocal y práctica de tu voz en las obras.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -101,16 +100,7 @@ export default function Entrenamiento() {
       <PianoInteractivo abierto={pianoAbierto} voz={perfil?.voz} />
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => setCategoriaActiva('')} style={{
-          padding: '4px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-          border: `1px solid ${categoriaActiva === '' ? '#1D9E75' : '#D3D1C7'}`,
-          background: categoriaActiva === '' ? '#E1F5EE' : 'none',
-          color: categoriaActiva === '' ? '#04342C' : '#5F5E5A',
-          fontWeight: categoriaActiva === '' ? '500' : '400',
-        }}>
-          Todas
-        </button>
-        {categoriasConDatos.map(cat => (
+        {ORDEN_CATEGORIAS.map(cat => (
           <button key={cat} onClick={() => setCategoriaActiva(cat)} style={{
             padding: '4px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
             border: `1px solid ${categoriaActiva === cat ? '#1D9E75' : '#D3D1C7'}`,
@@ -121,16 +111,25 @@ export default function Entrenamiento() {
             {CATEGORIAS[cat]?.label || cat}
           </button>
         ))}
+        <button onClick={() => setCategoriaActiva(PRACTICA)} style={{
+          padding: '4px 12px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
+          fontWeight: '700', letterSpacing: '0.3px',
+          border: `1px solid ${categoriaActiva === PRACTICA ? '#712B13' : '#D3D1C7'}`,
+          background: categoriaActiva === PRACTICA ? '#FAECE7' : 'none',
+          color: categoriaActiva === PRACTICA ? '#712B13' : '#5F5E5A',
+        }}>
+          PRACTICA TU VOZ
+        </button>
       </div>
 
-      {error && (
+      {error && categoriaActiva !== PRACTICA && (
         <div style={{ background: '#FCEBEB', border: '1px solid #E24B4A', borderRadius: '8px', padding: '12px 14px', fontSize: '13px', color: '#501313', marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
           {error}
           <button onClick={recargar} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontWeight: '500', fontSize: '12px' }}>Reintentar</button>
         </div>
       )}
 
-      {cargando && (
+      {categoriaActiva !== PRACTICA && cargando && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {[1, 2, 3].map(i => (
             <div key={i} style={{ height: '90px', background: '#F1EFE8', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite' }} />
@@ -139,43 +138,39 @@ export default function Entrenamiento() {
         </div>
       )}
 
-      {!cargando && !error && categoriasAMostrar.map(cat => (
-        <div key={cat} style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <span style={{
-              fontSize: '10px', fontWeight: '700',
-              color: CATEGORIAS[cat]?.color || '#5F5E5A',
-              background: CATEGORIAS[cat]?.bg || '#F1EFE8',
-              padding: '2px 8px', borderRadius: '10px',
-              textTransform: 'uppercase', letterSpacing: '0.3px',
-            }}>
-              {CATEGORIAS[cat]?.label || cat}
-            </span>
+      {categoriaActiva !== PRACTICA && !cargando && !error && (
+        (porCategoria[categoriaActiva] || []).length === 0 ? (
+          <div style={{ fontSize: '13px', color: '#888780', padding: '30px 0', textAlign: 'center' }}>
+            Todavía no hay ejercicios cargados en esta categoría.
           </div>
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {(porCategoria[cat] || []).map(ej => (
+            {porCategoria[categoriaActiva].map(ej => (
               <EjercicioPlayer key={ej.id} ejercicio={ej} />
             ))}
           </div>
-        </div>
-      ))}
+        )
+      )}
 
-      {!cargandoPartituras && partituras.length > 0 && (
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <span style={{
-              fontSize: '10px', fontWeight: '700', color: '#712B13', background: '#FAECE7',
-              padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px',
-            }}>
-              Práctica por voz
-            </span>
+      {categoriaActiva === PRACTICA && (
+        cargandoPartituras ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[1, 2].map(i => (
+              <div key={i} style={{ height: '90px', background: '#F1EFE8', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            ))}
+            <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
           </div>
+        ) : partituras.length === 0 ? (
+          <div style={{ fontSize: '13px', color: '#888780', padding: '30px 0', textAlign: 'center' }}>
+            Todavía no hay obras cargadas para practicar por voz.
+          </div>
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {partituras.map(p => (
               <PartituraCard key={p.id} resumen={p} />
             ))}
           </div>
-        </div>
+        )
       )}
     </div>
   )

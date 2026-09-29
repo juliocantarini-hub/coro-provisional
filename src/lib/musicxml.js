@@ -47,11 +47,13 @@ function pitchANota(pitchEl) {
 function extraerEventosCrudos(parteEl) {
   const medidas = Array.from(parteEl.getElementsByTagName('measure'))
   let divisions = 1
+  let beatType = 4               // "denominador" del compás (4 = negra, 8 = corchea, etc.)
   let tickAbsoluto = 0
   const eventosPorVoz = {}       // vozId -> [eventos]
   const notaAbiertaPorVoz = {}   // vozId -> evento (para fusionar ligaduras)
   const cambiosTempo = []        // { tick, bpm }
   const medidasTick = []         // { numero, tickInicio } - una por compás, en orden del documento
+  const tiemposTick = []         // { tickInicio } - uno por cada tiempo (pulso) de cada compás
 
   for (const medida of medidas) {
     const medidaInicioTick = tickAbsoluto
@@ -67,6 +69,9 @@ function extraerEventosCrudos(parteEl) {
       if (tag === 'attributes') {
         const div = textoDe(hijo, 'divisions')
         if (div) divisions = parseFloat(div)
+        const timeEl = hijo.getElementsByTagName('time')[0]
+        const bt = timeEl && textoDe(timeEl, 'beat-type')
+        if (bt) beatType = parseFloat(bt) || beatType
       } else if (tag === 'direction') {
         const sonido = hijo.getElementsByTagName('sound')[0]
         const tempo = sonido && sonido.getAttribute('tempo')
@@ -114,10 +119,20 @@ function extraerEventosCrudos(parteEl) {
       }
     }
 
+    // Un "tiempo" (pulso) por cada negra del compás (o corchea, etc., según el
+    // compás vigente) — así la barra de seguimiento avanza pulso a pulso y no
+    // solo al principio de cada compás. Se ajusta con round() para no romperse
+    // en compases de anacrusa (incompletos).
+    const ticksPorTiempo = (divisions * 4) / beatType || divisions
+    const cantidadTiempos = Math.max(1, Math.round(cursorMax / ticksPorTiempo))
+    for (let i = 0; i < cantidadTiempos; i++) {
+      tiemposTick.push({ tickInicio: medidaInicioTick + i * ticksPorTiempo })
+    }
+
     tickAbsoluto = medidaInicioTick + cursorMax
   }
 
-  return { eventosPorVoz, divisions, cambiosTempo, ticksTotales: tickAbsoluto, medidasTick }
+  return { eventosPorVoz, divisions, cambiosTempo, ticksTotales: tickAbsoluto, medidasTick, tiemposTick }
 }
 
 // Convierte ticks a segundos respetando los cambios de tempo del propio archivo.
@@ -201,19 +216,29 @@ export function parsearMusicXML(xmlTexto) {
     }
   }
 
-  // Tiempo de inicio de cada compás, en segundos — para sincronizar un cursor visual
-  // con la reproducción. Asumimos que todas las partes de una obra coral SATB tienen
-  // la misma cantidad de compases en el mismo orden (caso normal); tomamos la primera.
+  // Tiempo de inicio de cada compás, en segundos — se mantiene por si hace falta
+  // en el futuro (ej. mostrar número de compás). Asumimos que todas las partes de
+  // una obra coral SATB tienen la misma cantidad de compases en el mismo orden
+  // (caso normal); tomamos la primera.
   const medidas = (crudosPorParte[0]?.medidasTick || []).map(m => ({
     numero: m.numero,
     tiempo: tickASegundos(m.tickInicio),
     tickInicio: m.tickInicio,
   }))
 
+  // Tiempo de inicio de cada PULSO (tiempo del compás), en segundos — esto es lo
+  // que usa el cursor visual para avanzar pulso a pulso en vez de saltar compás
+  // a compás.
+  const tiempos = (crudosPorParte[0]?.tiemposTick || []).map(t => ({
+    tiempo: tickASegundos(t.tickInicio),
+    tickInicio: t.tickInicio,
+  }))
+
   return {
     voces,
     duracionTotal: tickASegundos(ticksTotalesMax),
     medidas,
+    tiempos,
     divisions: divisionsGlobal,
   }
 }

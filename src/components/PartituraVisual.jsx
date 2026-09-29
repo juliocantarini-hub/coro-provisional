@@ -9,16 +9,17 @@ import { useEffect, useRef, useState } from 'react'
 // Importante: el cursor NO usa el iterador musical propio de OSMD para avanzar (ese
 // iterador sigue la "forma" real de la pieza, incluidas repeticiones/da-capo, y
 // nuestro reproductor de audio no las reproduce). En cambio, cada vez que cambia el
-// compás actual (calculado con nuestro propio arreglo `medidas`, el mismo que usa el
-// audio), construimos un iterador nuevo posicionado directamente en ese compás y se lo
-// asignamos al cursor — así el cursor visual queda siempre alineado con lo que se
-// escucha, compás a compás, sin importar si la partitura tiene repeticiones escritas.
+// pulso (tiempo del compás) actual — calculado con nuestro propio arreglo `tiempos`,
+// el mismo que usa el audio —, construimos un iterador nuevo posicionado directamente
+// en ese pulso y se lo asignamos al cursor — así el cursor visual queda siempre
+// alineado con lo que se escucha, pulso a pulso (no solo compás a compás), sin
+// importar si la partitura tiene repeticiones escritas.
 
-export default function PartituraVisual({ musicxml, medidas, divisions, vozNombre, tiempoActual, velocidad, reproduciendo }) {
+export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombre, tiempoActual, velocidad, reproduciendo }) {
   const containerRef = useRef(null)
   const osmdRef = useRef(null)
   const osmdModRef = useRef(null)
-  const medidaActualRef = useRef(-1)
+  const pulsoActualRef = useRef(-1)
   const [estado, setEstado] = useState('cargando') // 'cargando' | 'lista' | 'error'
 
   // Carga y primer renderizado de la partitura.
@@ -46,7 +47,7 @@ export default function PartituraVisual({ musicxml, medidas, divisions, vozNombr
         osmd.cursor.show()
         osmdRef.current = osmd
         osmdModRef.current = mod
-        medidaActualRef.current = -1
+        pulsoActualRef.current = -1
         colorearVoz(osmd, vozNombre)
         setEstado('lista')
       } catch (e) {
@@ -70,22 +71,23 @@ export default function PartituraVisual({ musicxml, medidas, divisions, vozNombr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vozNombre, estado])
 
-  // Mover el cursor al compás que corresponde al instante actual de reproducción.
+  // Mover el cursor al pulso (tiempo del compás) que corresponde al instante
+  // actual de reproducción — no solo al principio del compás.
   useEffect(() => {
     const osmd = osmdRef.current
-    if (estado !== 'lista' || !osmd || !medidas.length) return
+    if (estado !== 'lista' || !osmd || !tiempos.length) return
 
     const posicionMusical = tiempoActual * velocidad
     let indice = 0
-    for (let i = 0; i < medidas.length; i++) {
-      if (medidas[i].tiempo <= posicionMusical) indice = i
+    for (let i = 0; i < tiempos.length; i++) {
+      if (tiempos[i].tiempo <= posicionMusical) indice = i
       else break
     }
 
-    if (indice === medidaActualRef.current) return
-    medidaActualRef.current = indice
+    if (indice === pulsoActualRef.current) return
+    pulsoActualRef.current = indice
 
-    moverCursor(osmd, osmdModRef.current, medidas[indice].tickInicio, divisions)
+    moverCursor(osmd, osmdModRef.current, tiempos[indice].tickInicio, divisions)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tiempoActual, velocidad, estado])
 

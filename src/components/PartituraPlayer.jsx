@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import * as Tone from 'tone'
+import { useAuth } from '../hooks/useAuth'
 import { parsearMusicXML } from '../lib/musicxml'
 import { getPianoSampler } from '../lib/pianoSampler'
 import { tomarControlReproduccion, liberarControlReproduccion } from '../lib/reproductorActivo'
@@ -19,6 +20,23 @@ const VOCES_COLOR = {
 
 const ORDEN_VOZ = { soprano: 0, contralto: 1, tenor: 2, bajo: 3 }
 
+const LUCES_AFINACION = [
+  { key: 'grave',   color: '#D85A30', label: 'grave' },
+  { key: 'afinado', color: '#1D9E75', label: 'afinado' },
+  { key: 'agudo',   color: '#D8A21D', label: 'agudo' },
+]
+
+// El registro vocal del perfil puede tener más matices que las 4 voces corales
+// de la partitura (mezzosoprano, barítono) — los mapeamos a la voz SATB más cercana.
+function vozAVozCoral(voz) {
+  if (!voz) return null
+  const v = voz.trim().toLowerCase()
+  if (v === 'mezzosoprano' || v === 'mezzo') return 'contralto'
+  if (v === 'baritono' || v === 'barítono') return 'bajo'
+  if (['soprano', 'contralto', 'tenor', 'bajo'].includes(v)) return v
+  return null
+}
+
 function formatoTiempo(seg) {
   if (!isFinite(seg) || seg < 0) seg = 0
   const m = Math.floor(seg / 60)
@@ -36,6 +54,7 @@ function notaEnInstante(notas, tiempo) {
 }
 
 export default function PartituraPlayer({ partitura }) {
+  const { perfil } = useAuth()
   const [reproduciendo, setReproduciendo] = useState(false)
   const [velocidad, setVelocidad] = useState(1)
   const [tiempoActual, setTiempoActual] = useState(0)
@@ -58,7 +77,7 @@ export default function PartituraPlayer({ partitura }) {
     }
   }, [partitura.musicxml])
 
-  // Voces detectadas, ordenadas SATB. Todas empiezan activas (mezcla completa).
+  // Voces detectadas, ordenadas SATB.
   const vocesOrdenadas = useMemo(() => {
     if (!partituraParseada) return []
     return [...partituraParseada.voces].sort((a, b) => {
@@ -69,13 +88,18 @@ export default function PartituraPlayer({ partitura }) {
   }, [partituraParseada])
 
   const [activas, setActivas] = useState({})
+  // Por defecto se escucha solo la voz registrada en el perfil del cantante
+  // (con la posibilidad de activar las demás desde los botones de arriba).
   useEffect(() => {
+    if (!vocesOrdenadas.length) return
+    const miVozCoral = vozAVozCoral(perfil?.voz)
+    const vozPropia = miVozCoral && vocesOrdenadas.find(v => v.vozCoral === miVozCoral)
     const iniciales = {}
-    vocesOrdenadas.forEach(v => { iniciales[v.id] = true })
+    vocesOrdenadas.forEach(v => { iniciales[v.id] = vozPropia ? v.id === vozPropia.id : true })
     setActivas(iniciales)
-    if (vocesOrdenadas.length && !miVoz) setMiVoz(vocesOrdenadas[0].id)
+    setMiVoz(vozPropia ? vozPropia.id : vocesOrdenadas[0].id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vocesOrdenadas])
+  }, [vocesOrdenadas, perfil?.voz])
 
   useEffect(() => {
     if (!partituraParseada) setError('No pudimos leer este archivo MusicXML.')
@@ -109,6 +133,7 @@ export default function PartituraPlayer({ partitura }) {
     const nuevo = {}
     vocesOrdenadas.forEach(v => { nuevo[v.id] = v.id === vozId })
     setActivas(nuevo)
+    setMiVoz(vozId)
   }
 
   function todasActivas() {
@@ -223,12 +248,13 @@ export default function PartituraPlayer({ partitura }) {
 
   const duracionTotal = partitura.duracion_seg || partituraParseada.duracionTotal
 
-  // Umbral visual: qué tan cerca (en cents) hay que estar para considerarlo "afinado".
+  // Umbral: qué tan cerca (en cents) hay que estar para considerarlo "afinado",
+  // y de qué lado (agudo/grave) cae si no lo está.
   const centsMostrados = lectura?.objetivo ? lectura.objetivo.cents : lectura?.centsCercano
-  let colorAfinacion = '#B4B2A9'
+  let estadoAfinacion = null
   if (lectura && centsMostrados != null) {
     const abs = Math.abs(centsMostrados)
-    colorAfinacion = abs <= 12 ? '#1D9E75' : abs <= 40 ? '#D8A21D' : '#D85A30'
+    estadoAfinacion = abs <= 12 ? 'afinado' : centsMostrados > 0 ? 'agudo' : 'grave'
   }
 
   return (
@@ -293,22 +319,6 @@ export default function PartituraPlayer({ partitura }) {
         </div>
       </div>
 
-      {vocesOrdenadas.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
-          <span style={{ fontSize: '12px', color: '#888780' }}>¿Qué voz querés destacar?</span>
-          {vocesOrdenadas.map(voz => (
-            <button key={voz.id} onClick={() => setMiVoz(voz.id)}
-              style={{
-                padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-                background: miVoz === voz.id ? '#0F6E56' : '#F1EFE8',
-                color: miVoz === voz.id ? '#FFFFFF' : '#5F5E5A',
-              }}>
-              {voz.nombre}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #E8E6DF' }}>
         <button onClick={() => setVerPartitura(v => !v)}
           style={{
@@ -324,7 +334,7 @@ export default function PartituraPlayer({ partitura }) {
         {verPartitura && (
           <PartituraVisual
             musicxml={partitura.musicxml}
-            medidas={partituraParseada.medidas}
+            tiempos={partituraParseada.tiempos}
             divisions={partituraParseada.divisions}
             vozNombre={vocesOrdenadas.find(v => v.id === miVoz)?.nombre}
             tiempoActual={tiempoActual}
@@ -352,7 +362,7 @@ export default function PartituraPlayer({ partitura }) {
           <div style={{ marginTop: '14px' }}>
             {vocesOrdenadas.length > 1 && (
               <div style={{ fontSize: '11px', color: '#B4B2A9', marginBottom: '10px' }}>
-                Cantando como: <strong style={{ color: '#5F5E5A' }}>{vocesOrdenadas.find(v => v.id === miVoz)?.nombre}</strong> (cambiá la voz arriba, junto a la letra)
+                Cantando como: <strong style={{ color: '#5F5E5A' }}>{vocesOrdenadas.find(v => v.id === miVoz)?.nombre}</strong> (doble click en una voz de arriba para cambiarla)
               </div>
             )}
 
@@ -366,17 +376,25 @@ export default function PartituraPlayer({ partitura }) {
                   : reproduciendo ? 'silencio en este instante' : 'nota más cercana a lo que cantás'}
               </div>
 
-              <div style={{ position: 'relative', height: '10px', background: '#F1EFE8', borderRadius: '6px', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: '#D3D1C7' }} />
-                {lectura && centsMostrados != null && (
-                  <div style={{
-                    position: 'absolute', top: 0, bottom: 0, width: '8px', borderRadius: '4px',
-                    background: colorAfinacion,
-                    left: `calc(${Math.max(0, Math.min(100, 50 + centsMostrados / 1))}% - 4px)`,
-                  }} />
-                )}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '22px', padding: '4px 0' }}>
+                {LUCES_AFINACION.map(luz => {
+                  const encendida = estadoAfinacion === luz.key
+                  return (
+                    <div key={luz.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+                      <div style={{
+                        width: '30px', height: '30px', borderRadius: '50%',
+                        background: encendida ? luz.color : '#EDEBE3',
+                        border: `2px solid ${encendida ? luz.color : '#D3D1C7'}`,
+                        boxShadow: encendida ? `0 0 12px ${luz.color}66` : 'none',
+                        transition: 'background 0.15s ease, box-shadow 0.15s ease',
+                      }} />
+                      <span style={{ fontSize: '10px', color: encendida ? '#5F5E5A' : '#B4B2A9', fontWeight: encendida ? '600' : '400' }}>
+                        {luz.label}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
-              <div style={{ fontSize: '11px', color: '#B4B2A9', marginTop: '4px' }}>grave · afinado · agudo</div>
             </div>
           </div>
         )}
