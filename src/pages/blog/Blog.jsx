@@ -12,6 +12,20 @@ const IDIOMA_LABEL = {
   portugues: 'Portugués', otro: 'otro idioma',
 }
 
+// Salvaguarda: si la IA devuelve el bloque completo repetido (a veces genera
+// la guía dos veces seguidas), esto lo detecta y se queda con una sola copia,
+// para que ni la guía en pantalla ni la impresión muestren el texto duplicado.
+function limpiarPronunciacionDuplicada(texto) {
+  const normalizado = texto.replace(/\r\n/g, '\n').trim()
+  const grupos = normalizado.split(/\n\s*\n/).filter(g => g.trim())
+  if (grupos.length < 2 || grupos.length % 2 !== 0) return normalizado
+  const mitad = grupos.length / 2
+  const primeraMitad = grupos.slice(0, mitad).map(g => g.trim())
+  const segundaMitad = grupos.slice(mitad).map(g => g.trim())
+  const esDuplicado = primeraMitad.every((g, i) => g === segundaMitad[i])
+  return esDuplicado ? primeraMitad.join('\n\n') : normalizado
+}
+
 function imprimirTexto(articulo, pronunciacion) {
   const lineasHtml = pronunciacion.split('\n').map(linea => {
     if (!linea.trim()) return '<div class="espacio"></div>'
@@ -253,7 +267,7 @@ export function ArticuloDetalle() {
         })
       })
       const data = await response.json()
-      setPronunciacion(data.texto || '')
+      setPronunciacion(limpiarPronunciacionDuplicada(data.texto || ''))
     } catch (e) {
       setErrorPron('No se pudo generar la pronunciación. Intentá de nuevo.')
     }
