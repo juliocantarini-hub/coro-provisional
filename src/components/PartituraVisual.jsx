@@ -172,6 +172,19 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
       <div
         ref={containerRef}
         onClick={manejarClicPartitura}
+        // OSMD dibuja los textos (letra, nombres de instrumento, etc.) como
+        // <text> de SVG, que el navegador trata como texto seleccionable por
+        // default. Al tocar/clickear para saltar de compás, ese mismo gesto
+        // (mousedown + un mínimo arrastre, algo normal en un tap táctil)
+        // arrancaba una selección de texto que terminaba pintando de celeste
+        // toda la partitura — y, en varios navegadores, esa selección
+        // cancelaba el evento click, por lo que el salto tampoco llegaba a
+        // dispararse. user-select:none saca la partitura de la selección de
+        // texto; onMouseDown/onTouchStart con preventDefault evita que el
+        // gesto arranque una selección para empezar, tanto con mouse como
+        // con el dedo.
+        onMouseDown={(e) => e.preventDefault()}
+        onTouchStart={(e) => e.preventDefault()}
         style={{
           display: 'block',
           visibility: estado === 'lista' ? 'visible' : 'hidden',
@@ -180,6 +193,11 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
           borderRadius: '10px',
           padding: '10px',
           cursor: estado === 'lista' && onClickCompas ? 'pointer' : 'default',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          MozUserSelect: 'none',
+          msUserSelect: 'none',
+          WebkitTouchCallout: 'none',
         }}
       />
     </div>
