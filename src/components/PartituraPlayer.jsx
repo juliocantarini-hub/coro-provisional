@@ -337,7 +337,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
       analyser.fftSize = 2048
       fuente.connect(analyser)
 
-      micRefs.current = { contexto, analyser, stream, intervalo: null, historial: [], ultimaNotaObjetivo: undefined }
+      micRefs.current = { contexto, analyser, stream, intervalo: null, historial: [], ultimaNotaObjetivo: undefined, deteccionesSeguidas: 0 }
 
       const buffer = new Float32Array(analyser.fftSize)
       micRefs.current.intervalo = setInterval(() => {
@@ -345,9 +345,11 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         const freqCruda = detectarFrecuencia(buffer, contexto.sampleRate)
         if (!freqCruda) {
           micRefs.current.historial = []
+          micRefs.current.deteccionesSeguidas = 0
           setLectura(null)
           return
         }
+        micRefs.current.deteccionesSeguidas = (micRefs.current.deteccionesSeguidas || 0) + 1
 
         // Si hay una nota objetivo en este instante (se está reproduciendo la
         // partitura), la buscamos ANTES de suavizar: la autocorrelación con voz
@@ -426,6 +428,18 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         const objetivo = cantandoElObjetivo
           ? { nombre: notaObjetivoNombre, cents: centsRespectoObjetivo, tiempo: notaObjetivoTiempo }
           : null
+
+        // Un solo cuadro con una lectura de frecuencia (aunque haya pasado el
+        // filtro de silencio y de claridad de detectarFrecuencia) todavía
+        // puede ser un pico aislado de ruido — una voz cantando se sostiene
+        // por mucho más que un cuadro (80ms). Pedimos un par de cuadros
+        // seguidos con lectura antes de mostrar algo: así un blip suelto no
+        // prende el piano ni mueve el medidor, pero una nota real cantada
+        // (que dura cientos de milisegundos) no se nota más lenta.
+        const MIN_DETECCIONES_SEGUIDAS = 2
+        if (micRefs.current.deteccionesSeguidas < MIN_DETECCIONES_SEGUIDAS) {
+          return
+        }
 
         setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
       }, 80)

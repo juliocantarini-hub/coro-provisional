@@ -4,6 +4,17 @@
 
 const NOMBRES_NOTA = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
+// Umbral mínimo de "claridad" (ver detectarFrecuencia) para aceptar una
+// lectura de frecuencia como confiable. Ya hubo un intento anterior con este
+// umbral en 0.85: resultó demasiado estricto y rechazaba lecturas válidas de
+// voz cantada real (sobre todo a capela, sin acompañamiento de referencia),
+// así que se sacó por completo — pero sin ningún filtro, cualquier ruido de
+// fondo o ruido propio del micrófono con algo de periodicidad también se
+// aceptaba como si fuera una nota cantada. 0.5 es un punto medio: pensado
+// para dejar pasar una voz cantando (aunque sea con un tono imperfecto/
+// respirado) y al mismo tiempo cortar ruido sin una periodicidad marcada.
+const UMBRAL_CLARIDAD = 0.5
+
 export function notaAMidi(nombreNota) {
   const m = (nombreNota || '').match(/^([A-G])(#{1,2}|b{1,2})?(-?\d+)$/)
   if (!m) return null
@@ -65,6 +76,15 @@ export function detectarFrecuencia(buffer, sampleRate) {
     if (correlacion[lag] > mejorValor) { mejorValor = correlacion[lag]; mejorLag = lag }
   }
   if (mejorLag <= 0) return null
+
+  // "Claridad" de la lectura: cuán marcado es el pico de autocorrelación
+  // encontrado comparado con la energía total de la señal (correlacion[0]).
+  // Para un tono periódico (una voz cantando, aunque no sea perfecta) da un
+  // valor relativamente alto; para ruido sin una altura definida da un valor
+  // bajo. La descartamos (igual que el silencio) en vez de reportarla como
+  // si fuera una frecuencia real.
+  const claridad = correlacion[0] > 0 ? mejorValor / correlacion[0] : 0
+  if (claridad < UMBRAL_CLARIDAD) return null
 
   // Interpolación parabólica alrededor del pico para afinar la estimación del período.
   let lagFino = mejorLag
