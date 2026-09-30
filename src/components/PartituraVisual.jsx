@@ -124,8 +124,6 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
   // (RealValue * divisions * 4, la misma conversión inversa que ya usa
   // moverCursor con `new Fraction(tickInicio, divisions * 4)`).
   function manejarClicPartitura(e) {
-    // eslint-disable-next-line no-console
-    console.log('[partitura] click detectado', e.clientX, e.clientY, 'estado:', estado, 'onClickCompas:', !!onClickCompas)
     if (!onClickCompas || estado !== 'lista') return
     try {
       const osmd = osmdRef.current
@@ -136,15 +134,17 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
       const puntoDom = new PointF2D(e.clientX, e.clientY)
       const puntoSvg = graphic.domToSvg(puntoDom)
       const puntoOsmd = graphic.svgToOsmd(puntoSvg)
-      const timestamp = graphic.tryGetTimestampFromPosition(puntoOsmd)
-      // eslint-disable-next-line no-console
-      console.log('[partitura] puntoSvg:', puntoSvg, 'puntoOsmd:', puntoOsmd, 'timestamp:', timestamp)
-      if (!timestamp) return
+      const timestamp = encontrarTimestampCercano(graphic, puntoOsmd)
+      if (!timestamp) {
+        // eslint-disable-next-line no-console
+        console.warn('[partitura] el punto tocado no cayó dentro de ningún compás', puntoOsmd)
+        return
+      }
       const tick = timestamp.RealValue * divisions * 4
       onClickCompas(tick)
     } catch (e) {
-      // Log temporal para diagnosticar por qué no salta en algunos
-      // dispositivos — no debería quedar así de forma permanente.
+      // Log temporal para diagnosticar — el cantante puede seguir usando la
+      // barra de progreso para saltar si esto sigue fallando.
       // eslint-disable-next-line no-console
       console.error('[partitura] error al calcular la posición del click', e)
     }
@@ -240,6 +240,47 @@ function aplicarVozYVisibilidad(osmd, vozNombre) {
   } catch (e) {
     // Si algo falla al colorear/ocultar, seguimos mostrando la partitura completa sin resaltar la voz.
   }
+}
+
+// Busca el compás (GraphicalMeasure) cuyo área en la partitura contiene el
+// punto tocado y, dentro de ese compás, la nota/silencio (GraphicalStaffEntry)
+// más cercana por posición horizontal — snapea al pulso más próximo ANTES o
+// en el punto tocado, el mismo criterio que ya usa buscarPosicionPorTick en
+// PartituraPlayer para ir de un tick al segundo de audio más cercano.
+//
+// No usamos el tryGetTimestampFromPosition propio de OSMD: internamente hace
+// getClickedObjectOfType(punto), que devuelve CUALQUIER objeto gráfico cuyo
+// bounding box contenga el punto (una nota, una ligadura, la letra de la
+// canción...) sin filtrar por tipo, y después llama directo a
+// .getAbsoluteTimestamp() sobre eso — método que solo existe en
+// GraphicalStaffEntry. Como lo más común es tocar justo sobre una nota (el
+// blanco más grande y visible), casi siempre devuelve un GraphicalNote en vez
+// de un GraphicalStaffEntry, y tryGetTimestampFromPosition tira
+// "getAbsoluteTimestamp is not a function". Acá en cambio buscamos nosotros
+// mismos el compás por su propio bounding box (que si cubre el punto tocado
+// de forma confiable) y después el staff entry más cercano dentro de él.
+function encontrarTimestampCercano(graphic, puntoOsmd) {
+  let medidaEncontrada = null
+  for (const fila of graphic.MeasureList) {
+    for (const medida of fila) {
+      if (medida && medida.PositionAndShape && medida.PositionAndShape.pointLiesInsideBorders(puntoOsmd)) {
+        medidaEncontrada = medida
+        break
+      }
+    }
+    if (medidaEncontrada) break
+  }
+  if (!medidaEncontrada || !medidaEncontrada.staffEntries || !medidaEncontrada.staffEntries.length) return null
+
+  let entradaElegida = medidaEncontrada.staffEntries[0]
+  for (const entrada of medidaEncontrada.staffEntries) {
+    if (entrada.PositionAndShape.AbsolutePosition.x <= puntoOsmd.x) {
+      entradaElegida = entrada
+    } else {
+      break
+    }
+  }
+  return entradaElegida.getAbsoluteTimestamp()
 }
 
 function moverCursor(osmd, mod, tickInicio, divisions) {
