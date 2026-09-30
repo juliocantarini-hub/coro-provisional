@@ -404,8 +404,27 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         const freq = ordenado[Math.floor(ordenado.length / 2)]
 
         const cercana = frecuenciaANotaCercana(freq)
-        const objetivo = objetivoFreq
-          ? { nombre: notaObjetivoNombre, cents: centsEntre(freq, objetivoFreq), tiempo: notaObjetivoTiempo }
+
+        // Que exista una nota objetivo y que se haya detectado ALGÚN sonido no
+        // alcanza para decir "está cantando esa nota". Cualquier ruido de
+        // fondo (o el propio ruido de base del micrófono) pasa el filtro de
+        // silencio de detectarFrecuencia y, ya corregido de octava, puede caer
+        // en cualquier punto dentro de esa octava — antes de este chequeo
+        // mostrábamos igual el nombre de la nota objetivo (el de la
+        // partitura, no el que realmente se oyó), así que la tecla se prendía
+        // con la nota "correcta" aunque no se hubiera cantado nada, por
+        // ejemplo con el acompañamiento silenciado y la partitura avanzando
+        // sola. Ahora solo la tratamos como "está cantando esa nota" si lo
+        // detectado, ya corregido de octava, cae razonablemente cerca del
+        // objetivo (menos de un semitono); más allá de eso asumimos que no es
+        // esa nota, y mostramos lo que realmente se detectó (nombreCercano)
+        // en vez de la nota de la partitura.
+        const centsRespectoObjetivo = objetivoFreq ? centsEntre(freq, objetivoFreq) : null
+        const TOLERANCIA_OBJETIVO_CENTS = 70
+        const cantandoElObjetivo =
+          centsRespectoObjetivo != null && Math.abs(centsRespectoObjetivo) <= TOLERANCIA_OBJETIVO_CENTS
+        const objetivo = cantandoElObjetivo
+          ? { nombre: notaObjetivoNombre, cents: centsRespectoObjetivo, tiempo: notaObjetivoTiempo }
           : null
 
         setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
