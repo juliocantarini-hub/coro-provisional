@@ -4,6 +4,12 @@
 
 const NOMBRES_NOTA = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
+// Umbral mínimo de "claridad" (ver detectarFrecuencia) para aceptar una
+// lectura de frecuencia como confiable. Más alto = más estricto (se descartan
+// más lecturas dudosas, pero el medidor puede sentirse menos responsivo);
+// más bajo = más permisivo (responde más rápido, pero deja pasar más ruido).
+const UMBRAL_CLARIDAD = 0.85
+
 export function notaAMidi(nombreNota) {
   const m = (nombreNota || '').match(/^([A-G])(#{1,2}|b{1,2})?(-?\d+)$/)
   if (!m) return null
@@ -65,6 +71,20 @@ export function detectarFrecuencia(buffer, sampleRate) {
     if (correlacion[lag] > mejorValor) { mejorValor = correlacion[lag]; mejorLag = lag }
   }
   if (mejorLag <= 0) return null
+
+  // "Claridad" de la lectura: cuán marcado es el pico de autocorrelación
+  // encontrado comparado con la energía total de la señal (correlacion[0]).
+  // Para un tono limpio y periódico (una voz cantando una nota sostenida) da
+  // un valor cercano a 1; para ruido o una mezcla de sonidos sin una altura
+  // clara (consonantes, silencios, ruido de fondo, la propia voz solapada
+  // con el acompañamiento coleándose por el micrófono) da un valor bajo.
+  // Antes se aceptaba cualquier pico, por chico que fuera, como una lectura
+  // válida — eso era buena parte de por qué el medidor se veía errante:
+  // lecturas de baja confianza (básicamente ruido) se mostraban igual que
+  // una nota bien cantada. Ahora las descartamos (igual que el silencio) en
+  // vez de reportarlas como si fueran una frecuencia real.
+  const claridad = correlacion[0] > 0 ? mejorValor / correlacion[0] : 0
+  if (claridad < UMBRAL_CLARIDAD) return null
 
   // Interpolación parabólica alrededor del pico para afinar la estimación del período.
   let lagFino = mejorLag
