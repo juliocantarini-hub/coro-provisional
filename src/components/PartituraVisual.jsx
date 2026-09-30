@@ -35,8 +35,11 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         if (cancelado || !containerRef.current) return
 
         containerRef.current.innerHTML = ''
+        // autoResize:true habilita el propio manejo de resize de OSMD (recalcula
+        // el ancho del pentagrama si cambia el tamaño de la ventana, por ejemplo
+        // al rotar el celular o cambiar el tamaño de la ventana en desktop).
         const osmd = new OpenSheetMusicDisplay(containerRef.current, {
-          autoResize: false,
+          autoResize: true,
           backend: 'svg',
           drawPartNames: true,
           // El título/compositor de la obra ya se muestra arriba, en la tarjeta de
@@ -123,11 +126,23 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
       {/* Sin alto ni scroll propios: el único contenedor que scrollea es el
           panel de práctica (PartituraPlayer) que envuelve este componente.
           Tener dos contenedores con scroll independiente hacía que el
-          seguimiento automático del cursor (scrollIntoView) fuera errático. */}
+          seguimiento automático del cursor (scrollIntoView) fuera errático.
+
+          display SIEMPRE 'block' (nunca 'none'): OSMD calcula el ancho de la
+          partitura leyendo el ancho real del contenedor en el momento de
+          renderizar (container.offsetWidth). Un elemento con display:none
+          mide 0 de ancho, así que renderizar mientras todavía se estaba
+          "cargando" (como hacía antes) dejaba a OSMD con un ancho de 0 y
+          terminaba usando un ancho fijo por defecto, sin relación con el
+          tamaño real de la pantalla — por eso la partitura no se adaptaba ni
+          en mobile ni en desktop. Ahora ocultamos el contenedor vacío durante
+          la carga con visibility:hidden en su lugar, que sigue reservando su
+          tamaño real en el layout. */}
       <div
         ref={containerRef}
         style={{
-          display: estado === 'lista' ? 'block' : 'none',
+          display: 'block',
+          visibility: estado === 'lista' ? 'visible' : 'hidden',
           background: '#FFFFFF',
           border: '1px solid #E8E6DF',
           borderRadius: '10px',
