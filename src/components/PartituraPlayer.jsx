@@ -411,8 +411,19 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         // lo más probable es que sea el acompañamiento solo, sin voz real
         // encima, y no mostramos nada (en vez de, por ejemplo, prender el
         // piano con la nota que toca el acompañamiento).
+        //
+        // Este piso más exigente solo tiene sentido MIENTRAS SUENA el
+        // acompañamiento — es la razón de ser de toda esta calibración. En
+        // pausa (que es cuando, siguiendo el flujo recomendado, se termina
+        // cantando) no hay acompañamiento que se pueda colar, así que
+        // usamos el piso de silencio de siempre (0.01): si no, quedaba un
+        // piso "viejo" calibrado de cuando sonaba el acompañamiento, que
+        // podía ser más alto de lo que da cantar solo y sin querer tapaba
+        // la voz real — el piano se quedaba pegado en la última nota que
+        // sí había alcanzado a pasar ese piso, en vez de seguir lo que se
+        // estaba cantando.
         const MARGEN_SOBRE_PISO = 1.6
-        const umbralRms = micRefs.current.pisoBleed != null
+        const umbralRms = (reproduciendoAhora && micRefs.current.pisoBleed != null)
           ? Math.max(0.01, micRefs.current.pisoBleed * MARGEN_SOBRE_PISO)
           : 0.01
         if (rms < umbralRms) {
