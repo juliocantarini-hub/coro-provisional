@@ -432,13 +432,24 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         micRefs.current.deteccionesSeguidas = (micRefs.current.deteccionesSeguidas || 0) + 1
 
         // Si hay una nota objetivo en este instante, corregimos la lectura
-        // cruda a la octava más cercana a esa nota antes de compararla: la
-        // autocorrelación con voz cantada suele "engancharse" en un armónico
-        // (típicamente el doble o la mitad de la frecuencia real), y como ya
-        // sabemos qué nota debería sonar, un error de octava en la detección
-        // no se confunde con estar realmente desafinado.
+        // cruda antes de compararla: la autocorrelación con voz cantada
+        // suele "engancharse" en un armónico o subarmónico — no solo al
+        // doble/mitad (error de octava), sino a veces al triple/tercio
+        // (por ejemplo detecta SOL3 como si fuera DO2, una octava y quinta
+        // más abajo: 1/3 de la frecuencia real) u otras razones simples.
+        // Probamos la lectura cruda multiplicada por cada una de esas
+        // razones y nos quedamos con la que cae más cerca de la nota
+        // objetivo — como ya sabemos qué nota debería sonar, un error de
+        // "engancharse" en la detección no se confunde con estar realmente
+        // desafinado.
+        const RAZONES_ENGANCHE = [1, 2, 0.5, 3, 1 / 3, 4, 0.25, 1.5, 2 / 3]
         const freqCorregida = objetivoFreq
-          ? freqCruda * Math.pow(2, Math.round(Math.log2(objetivoFreq / freqCruda)))
+          ? RAZONES_ENGANCHE.reduce((mejor, razon) => {
+              const candidata = freqCruda * razon
+              const distanciaMejor = Math.abs(centsEntre(mejor, objetivoFreq))
+              const distanciaCandidata = Math.abs(centsEntre(candidata, objetivoFreq))
+              return distanciaCandidata < distanciaMejor ? candidata : mejor
+            }, freqCruda)
           : freqCruda
 
         // Si cambió la nota objetivo (la melodía avanzó a la siguiente nota),
@@ -749,18 +760,14 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
                 </div>
               )}
               <MedidorAfinacion cents={centsMostrados} />
-              {/* Mientras hay una nota de la melodía sonando, el piano muestra
-                  ESA nota (fija, la que hay que cantar) en vez de la nota más
-                  cercana a lo que capta el micrófono: así el piano no salta de
-                  tecla en tecla con cada lectura ruidosa del mic, y es el
-                  medidor — no el piano — el que muestra qué tan afinado está
-                  el cantante respecto de esa nota fija. Sin nota objetivo
-                  (fuera de reproducción, o silencio) mostramos la nota más
-                  cercana a lo que se está cantando, como referencia general. */}
-              <PianoVisual
-                notaActiva={lectura?.objetivo?.nombre || lectura?.nombreCercano || null}
-                ataqueId={lectura?.objetivo?.tiempo}
-              />
+              {/* El piano acá muestra la nota de LA PARTITURA (la misma
+                  fuente que el modo "🎹 Piano", notaSonandoAhora) y no lo que
+                  detecta el micrófono: así es una referencia visual estable
+                  de "esto es lo que hay que cantar" para mirar/imitar antes o
+                  mientras se canta, en vez de una tecla que depende de si el
+                  mic llegó a captar algo. Qué tan afinado está el cantante
+                  respecto de esa nota lo muestra el medidor, no el piano. */}
+              <PianoVisual notaActiva={notaSonandoAhora} ataqueId={notaSonandoInfo?.tiempo} />
             </div>
           )}
 
