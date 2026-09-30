@@ -316,19 +316,20 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
       return
     }
     try {
-      // Por defecto el navegador aplica cancelación de eco, supresión de
-      // ruido y control automático de ganancia al micrófono. Esas funciones
-      // están pensadas para llamadas de voz, no para este caso: mientras
-      // suena el acompañamiento por el parlante, el navegador las trata como
-      // "ruido de fondo" a tapar — y en la práctica eso atenuaba tanto la
-      // señal que la propia voz del cantante dejaba de detectarse (por eso
-      // afinación marcaba notas bien a capela, pero no con el acompañamiento
-      // sonando). Las desactivamos para quedarnos con la señal del mic tal
-      // cual. Ojo: sin auriculares, el parlante puede colarse en el mic junto
-      // con la voz — para practicar afinación con el acompañamiento sonando,
-      // lo ideal sigue siendo usar auriculares.
+      // Por defecto el navegador aplica tres cosas al micrófono, pensadas
+      // para llamadas de voz: supresión de ruido, control automático de
+      // ganancia y cancelación de eco. Las primeras dos las dejamos
+      // desactivadas: en la práctica atenuaban tanto la señal que la propia
+      // voz del cantante dejaba de detectarse bien. Pero la cancelación de
+      // eco es distinta — es justamente la que, usando de referencia lo que
+      // el propio navegador está reproduciendo, filtra el acompañamiento que
+      // se cuela por el parlante hacia el mic (sin auriculares). Sin ella,
+      // cualquier nota del acompañamiento que suena por el parlante se
+      // detecta en el mic como si el cantante la estuviera cantando — por
+      // eso el piano marcaba también las notas del acompañamiento. La
+      // reactivamos.
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
       })
       const Ctx = window.AudioContext || window.webkitAudioContext
       const contexto = new Ctx()
