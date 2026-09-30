@@ -45,6 +45,16 @@ export function centsEntre(frecuencia, frecuenciaReferencia) {
   return 1200 * Math.log2(frecuencia / frecuenciaReferencia)
 }
 
+// Volumen (RMS) de una ventana de audio (Float32Array, -1..1). Se usa tanto
+// para el filtro de silencio de detectarFrecuencia como, por separado, para
+// calibrar en vivo cuánto se cuela el acompañamiento por el parlante hacia
+// el mic (ver PartituraPlayer, activarMicrofono).
+export function calcularRms(buffer) {
+  let suma = 0
+  for (let i = 0; i < buffer.length; i++) suma += buffer[i] * buffer[i]
+  return Math.sqrt(suma / buffer.length)
+}
+
 // Autocorrelación sobre una ventana de audio (Float32Array, -1..1): busca el primer
 // "pozo" después del pico trivial en offset 0 y desde ahí el máximo siguiente —
 // es el método clásico (Chris Wilson / html5rocks) para no engancharse en octavas
@@ -53,9 +63,7 @@ export function centsEntre(frecuencia, frecuenciaReferencia) {
 export function detectarFrecuencia(buffer, sampleRate) {
   const SIZE = buffer.length
 
-  let rms = 0
-  for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i]
-  rms = Math.sqrt(rms / SIZE)
+  const rms = calcularRms(buffer)
   if (rms < 0.01) return null // demasiado silencio / ruido de fondo
 
   const MAX_SAMPLES = Math.min(SIZE - 1, Math.floor(sampleRate / 60)) // ~60 Hz, voz grave

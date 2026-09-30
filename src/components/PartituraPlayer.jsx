@@ -5,7 +5,7 @@ import { parsearMusicXML } from '../lib/musicxml'
 import { getPianoSampler } from '../lib/pianoSampler'
 import { tomarControlReproduccion, liberarControlReproduccion } from '../lib/reproductorActivo'
 import {
-  notaAMidi, midiAFrecuencia, centsEntre, detectarFrecuencia, frecuenciaANotaCercana,
+  notaAMidi, midiAFrecuencia, centsEntre, detectarFrecuencia, frecuenciaANotaCercana, calcularRms,
 } from '../lib/afinacion'
 import PartituraVisual from './PartituraVisual'
 import PianoVisual from './PianoVisual'
@@ -318,18 +318,18 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     try {
       // Por defecto el navegador aplica tres cosas al micrófono, pensadas
       // para llamadas de voz: supresión de ruido, control automático de
-      // ganancia y cancelación de eco. Las primeras dos las dejamos
-      // desactivadas: en la práctica atenuaban tanto la señal que la propia
-      // voz del cantante dejaba de detectarse bien. Pero la cancelación de
-      // eco es distinta — es justamente la que, usando de referencia lo que
-      // el propio navegador está reproduciendo, filtra el acompañamiento que
-      // se cuela por el parlante hacia el mic (sin auriculares). Sin ella,
-      // cualquier nota del acompañamiento que suena por el parlante se
-      // detecta en el mic como si el cantante la estuviera cantando — por
-      // eso el piano marcaba también las notas del acompañamiento. La
-      // reactivamos.
+      // ganancia y cancelación de eco. Las tres las dejamos desactivadas:
+      // en la práctica atenuaban tanto la señal que la propia voz del
+      // cantante dejaba de detectarse bien. Probamos con la cancelación de
+      // eco activada para filtrar el acompañamiento que se cuela por el
+      // parlante (sin auriculares) — funcionó para eso, pero de paso
+      // bloqueaba también la voz real del cantante en esa misma situación
+      // (sin auriculares + acompañamiento sonando no detectaba nada, ni
+      // siquiera cantando bien). La volvemos a desactivar: en vez de un
+      // filtro genérico del navegador, más abajo calibramos nosotros mismos
+      // cuánto se cuela el acompañamiento, específicamente para este caso.
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       })
       const Ctx = window.AudioContext || window.webkitAudioContext
       const contexto = new Ctx()
@@ -338,36 +338,34 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
       analyser.fftSize = 2048
       fuente.connect(analyser)
 
-      micRefs.current = { contexto, analyser, stream, intervalo: null, historial: [], ultimaNotaObjetivo: undefined, deteccionesSeguidas: 0 }
+      micRefs.current = {
+        contexto, analyser, stream, intervalo: null, historial: [], ultimaNotaObjetivo: undefined,
+        deteccionesSeguidas: 0,
+        // Piso de volumen (RMS) que se cuela del acompañamiento por el
+        // parlante hacia el mic, sin auriculares. Se calibra solo (ver más
+        // abajo) y arranca en null: hasta la primera calibración no exigimos
+        // nada por encima del umbral de silencio fijo de detectarFrecuencia.
+        pisoBleed: null,
+      }
 
       const buffer = new Float32Array(analyser.fftSize)
       micRefs.current.intervalo = setInterval(() => {
         analyser.getFloatTimeDomainData(buffer)
-        const freqCruda = detectarFrecuencia(buffer, contexto.sampleRate)
-        if (!freqCruda) {
-          micRefs.current.historial = []
-          micRefs.current.deteccionesSeguidas = 0
-          setLectura(null)
-          return
-        }
-        micRefs.current.deteccionesSeguidas = (micRefs.current.deteccionesSeguidas || 0) + 1
 
-        // Si hay una nota objetivo en este instante (se está reproduciendo la
-        // partitura), la buscamos ANTES de suavizar: la autocorrelación con voz
-        // cantada suele "engancharse" en un armónico (típicamente el doble o la
-        // mitad de la frecuencia real), lo que antes hacía que el medidor casi
-        // nunca marcara "afinado" aunque el cantante estuviera bien. Como ya
-        // sabemos qué nota debería sonar, corregimos la lectura cruda a la
-        // octava más cercana a esa nota antes de compararla — así un error de
-        // octava en la detección no se confunde con estar realmente desafinado.
-        let objetivoFreq = null
+        // Necesitamos saber si la partitura está sonando y si la voz propia
+        // tiene una nota en este instante ANTES de decidir si esta lectura
+        // cuenta o no — tanto para la calibración del "piso" de acompañamiento
+        // (más abajo) como para la corrección de octava de siempre.
         const { reproduciendo: reproduciendoAhora, tiempoActual: tiempoAhora, velocidad: velocidadAhora, miVoz: miVozAhora } = vivosRef.current
+        let objetivoFreq = null
         let notaObjetivoNombre = null
         let notaObjetivoTiempo = null
+        let hayNotaPropia = false
         if (miVozAhora && reproduciendoAhora) {
           const voz = vocesOrdenadas.find(v => v.id === miVozAhora)
           const notaObjetivo = voz && notaEnInstante(voz.notas, tiempoAhora * velocidadAhora)
           if (notaObjetivo) {
+            hayNotaPropia = true
             const midiObjetivo = notaAMidi(notaObjetivo.nota)
             if (midiObjetivo != null) {
               objetivoFreq = midiAFrecuencia(midiObjetivo)
@@ -381,6 +379,56 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
           }
         }
 
+        const rms = calcularRms(buffer)
+
+        // Calibración: en los silencios de LA PROPIA VOZ (no hay nota que
+        // cantar en este instante) mientras el acompañamiento sigue sonando,
+        // lo que capta el mic es, por definición, solo el acompañamiento
+        // colándose desde el parlante — no hay voz real que pueda estar
+        // aportando. Promediamos ese volumen (con más peso a las lecturas
+        // recientes, por si cambia el volumen del parlante) como referencia
+        // de "esto es puro acompañamiento, no cantaron nada".
+        if (reproduciendoAhora && !hayNotaPropia) {
+          const ALPHA_CALIBRACION = 0.2
+          micRefs.current.pisoBleed = micRefs.current.pisoBleed == null
+            ? rms
+            : micRefs.current.pisoBleed * (1 - ALPHA_CALIBRACION) + rms * ALPHA_CALIBRACION
+        }
+
+        // Mientras no haya auriculares y el acompañamiento esté sonando,
+        // parte de lo que capta el mic es directamente ese acompañamiento
+        // colándose — no la voz. Si ya calibramos cuánto "piso" de
+        // acompañamiento hay (arriba), exigimos que el volumen actual lo
+        // supere con margen antes de confiar en la lectura; si no lo supera,
+        // lo más probable es que sea el acompañamiento solo, sin voz real
+        // encima, y no mostramos nada (en vez de, por ejemplo, prender el
+        // piano con la nota que toca el acompañamiento).
+        const MARGEN_SOBRE_PISO = 1.6
+        const umbralRms = micRefs.current.pisoBleed != null
+          ? Math.max(0.01, micRefs.current.pisoBleed * MARGEN_SOBRE_PISO)
+          : 0.01
+        if (rms < umbralRms) {
+          micRefs.current.historial = []
+          micRefs.current.deteccionesSeguidas = 0
+          setLectura(null)
+          return
+        }
+
+        const freqCruda = detectarFrecuencia(buffer, contexto.sampleRate)
+        if (!freqCruda) {
+          micRefs.current.historial = []
+          micRefs.current.deteccionesSeguidas = 0
+          setLectura(null)
+          return
+        }
+        micRefs.current.deteccionesSeguidas = (micRefs.current.deteccionesSeguidas || 0) + 1
+
+        // Si hay una nota objetivo en este instante, corregimos la lectura
+        // cruda a la octava más cercana a esa nota antes de compararla: la
+        // autocorrelación con voz cantada suele "engancharse" en un armónico
+        // (típicamente el doble o la mitad de la frecuencia real), y como ya
+        // sabemos qué nota debería sonar, un error de octava en la detección
+        // no se confunde con estar realmente desafinado.
         const freqCorregida = objetivoFreq
           ? freqCruda * Math.pow(2, Math.round(Math.log2(objetivoFreq / freqCruda)))
           : freqCruda
@@ -456,7 +504,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     if (intervalo) clearInterval(intervalo)
     if (stream) stream.getTracks().forEach(t => t.stop())
     if (contexto && contexto.state !== 'closed') contexto.close()
-    micRefs.current = { contexto: null, analyser: null, stream: null, intervalo: null, historial: [], ultimaNotaObjetivo: undefined }
+    micRefs.current = { contexto: null, analyser: null, stream: null, intervalo: null, historial: [], ultimaNotaObjetivo: undefined, deteccionesSeguidas: 0, pisoBleed: null }
     setMicActivo(false)
     setLectura(null)
   }
