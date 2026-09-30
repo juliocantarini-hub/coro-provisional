@@ -226,15 +226,14 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     reproducirDesde(0, velocidad)
   }
 
-  // Ir directo a un punto de la partitura (click/tap en la barra de progreso).
-  // Si ya estaba sonando, sigue sonando desde el nuevo punto; si estaba pausada
-  // o detenida, deja todo listo en la nueva posición sin arrancar el audio solo,
-  // para que Reproducir/Reanudar retome justo desde ahí.
-  async function buscarPosicion(fraccion) {
+  // Ir directo a una posición musical dada (en segundos "de partitura", sin
+  // escalar por tempo). Si ya estaba sonando, sigue sonando desde el nuevo
+  // punto; si estaba pausada o detenida, deja todo listo en la nueva posición
+  // sin arrancar el audio solo, para que Reproducir/Reanudar retome justo
+  // desde ahí. Usado tanto por la barra de progreso como por tocar un compás
+  // directamente en la partitura.
+  async function irAPosicionMusical(posicionMusical) {
     if (!partituraParseada) return
-    const duracion = partitura.duracion_seg || partituraParseada.duracionTotal
-    const f = Math.min(1, Math.max(0, fraccion))
-    const posicionMusical = f * duracion
     if (!reproduciendo) tomarControlReproduccion(detener)
     const estabaSonando = reproduciendo && !pausado
     await reproducirDesde(posicionMusical, velocidad)
@@ -243,6 +242,32 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
       limpiarIntervalo()
       setPausado(true)
     }
+  }
+
+  // Click/tap en la barra de progreso: fracción (0 a 1) del total de la obra.
+  function buscarPosicion(fraccion) {
+    if (!partituraParseada) return
+    const duracion = partitura.duracion_seg || partituraParseada.duracionTotal
+    const f = Math.min(1, Math.max(0, fraccion))
+    return irAPosicionMusical(f * duracion)
+  }
+
+  // Click/tap directo sobre un compás de la partitura: PartituraVisual ya
+  // resolvió a qué tick corresponde el punto tocado (usando la propia
+  // detección de coordenadas de OSMD), acá solo lo traducimos al segundo
+  // "de partitura" más cercano usando el mismo arreglo `tiempos` que ya usa
+  // el cursor — así cantar desde ahí vuelve a sonar exactamente igual que si
+  // se hubiera llegado tocando la barra de progreso.
+  function buscarPosicionPorTick(tick) {
+    if (!partituraParseada) return
+    const tiempos = partituraParseada.tiempos
+    if (!tiempos || !tiempos.length) return
+    let posicionMusical = tiempos[0].tiempo
+    for (const p of tiempos) {
+      if (p.tickInicio <= tick) posicionMusical = p.tiempo
+      else break
+    }
+    return irAPosicionMusical(posicionMusical)
   }
 
   // Cambiar el tempo mientras suena antes no hacía nada audible: las notas ya
@@ -412,6 +437,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
           tiempoActual={tiempoActual}
           velocidad={velocidad}
           reproduciendo={reproduciendo}
+          onClickCompas={buscarPosicionPorTick}
         />
       </div>
 

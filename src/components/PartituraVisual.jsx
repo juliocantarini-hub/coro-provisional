@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 // alineado con lo que se escucha, pulso a pulso (no solo compás a compás), sin
 // importar si la partitura tiene repeticiones escritas.
 
-export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombre, tiempoActual, velocidad, reproduciendo }) {
+export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombre, tiempoActual, velocidad, reproduciendo, onClickCompas }) {
   const containerRef = useRef(null)
   const osmdRef = useRef(null)
   const osmdModRef = useRef(null)
@@ -113,6 +113,37 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tiempoActual, velocidad, estado])
 
+  // Tocar/clickear directamente sobre un compás de la partitura salta la
+  // reproducción a ese punto. Usamos la propia API de OSMD para saber a qué
+  // instante musical corresponde el lugar donde se tocó: convierte la
+  // coordenada del click (en píxeles de pantalla) al sistema de coordenadas
+  // interno de OSMD y después busca qué objeto gráfico (nota, silencio, etc.)
+  // cae ahí, devolviendo su "timestamp" (posición musical medida en redondas
+  // desde el principio de la obra). Ese valor se pasa para arriba (onClickCompas)
+  // convertido a la misma unidad de "tick" que ya usa el resto de la app
+  // (RealValue * divisions * 4, la misma conversión inversa que ya usa
+  // moverCursor con `new Fraction(tickInicio, divisions * 4)`).
+  function manejarClicPartitura(e) {
+    if (!onClickCompas || estado !== 'lista') return
+    try {
+      const osmd = osmdRef.current
+      const mod = osmdModRef.current
+      if (!osmd || !mod) return
+      const { PointF2D } = mod
+      const graphic = osmd.GraphicSheet
+      const puntoDom = new PointF2D(e.clientX, e.clientY)
+      const puntoSvg = graphic.domToSvg(puntoDom)
+      const puntoOsmd = graphic.svgToOsmd(puntoSvg)
+      const timestamp = graphic.tryGetTimestampFromPosition(puntoOsmd)
+      if (!timestamp) return
+      const tick = timestamp.RealValue * divisions * 4
+      onClickCompas(tick)
+    } catch (e) {
+      // Si algo falla al calcular la posición, simplemente no hacemos nada
+      // (el cantante puede seguir usando la barra de progreso para saltar).
+    }
+  }
+
   return (
     <div style={{ marginTop: '14px' }}>
       {estado === 'error' && (
@@ -140,6 +171,7 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
           tamaño real en el layout. */}
       <div
         ref={containerRef}
+        onClick={manejarClicPartitura}
         style={{
           display: 'block',
           visibility: estado === 'lista' ? 'visible' : 'hidden',
@@ -147,6 +179,7 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
           border: '1px solid #E8E6DF',
           borderRadius: '10px',
           padding: '10px',
+          cursor: estado === 'lista' && onClickCompas ? 'pointer' : 'default',
         }}
       />
     </div>
