@@ -436,13 +436,22 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         // suele "engancharse" en un armónico o subarmónico — no solo al
         // doble/mitad (error de octava), sino a veces al triple/tercio
         // (por ejemplo detecta SOL3 como si fuera DO2, una octava y quinta
-        // más abajo: 1/3 de la frecuencia real) u otras razones simples.
-        // Probamos la lectura cruda multiplicada por cada una de esas
-        // razones y nos quedamos con la que cae más cerca de la nota
-        // objetivo — como ya sabemos qué nota debería sonar, un error de
-        // "engancharse" en la detección no se confunde con estar realmente
-        // desafinado.
-        const RAZONES_ENGANCHE = [1, 2, 0.5, 3, 1 / 3, 4, 0.25, 1.5, 2 / 3]
+        // más abajo: 1/3 de la frecuencia real). Probamos la lectura cruda
+        // multiplicada por cada una de esas razones y nos quedamos con la
+        // que cae más cerca de la nota objetivo — como ya sabemos qué nota
+        // debería sonar, un error de "engancharse" en la detección no se
+        // confunde con estar realmente desafinado.
+        //
+        // OJO: acá probamos solo octava (2, 1/2, 4, 1/4) y octava+quinta
+        // (3, 1/3) — las dos que se confirmaron en la práctica. Agregamos
+        // también quinta sola (1.5, 2/3) en un intento anterior, pero una
+        // quinta está mucho más cerca en altura que una octava, así que de
+        // cuadro a cuadro con una lectura apenas ruidosa el "más cercano"
+        // podía saltar entre la lectura real (razón 1) y una falsa lectura
+        // "a distancia de quinta" — el medidor terminaba moviéndose para
+        // cualquier lado y casi nunca se quedaba quieto en afinado. Las
+        // sacamos.
+        const RAZONES_ENGANCHE = [1, 2, 0.5, 3, 1 / 3, 4, 0.25]
         const freqCorregida = objetivoFreq
           ? RAZONES_ENGANCHE.reduce((mejor, razon) => {
               const candidata = freqCruda * razon
@@ -760,14 +769,20 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
                 </div>
               )}
               <MedidorAfinacion cents={centsMostrados} />
-              {/* El piano acá muestra la nota de LA PARTITURA (la misma
-                  fuente que el modo "🎹 Piano", notaSonandoAhora) y no lo que
-                  detecta el micrófono: así es una referencia visual estable
-                  de "esto es lo que hay que cantar" para mirar/imitar antes o
-                  mientras se canta, en vez de una tecla que depende de si el
-                  mic llegó a captar algo. Qué tan afinado está el cantante
-                  respecto de esa nota lo muestra el medidor, no el piano. */}
-              <PianoVisual notaActiva={notaSonandoAhora} ataqueId={notaSonandoInfo?.tiempo} />
+              {/* El piano tiene dos momentos distintos acá. Mientras la
+                  partitura está sonando, muestra la nota de LA PARTITURA (la
+                  misma fuente que el modo "🎹 Piano", notaSonandoAhora): una
+                  referencia visual estable de "esto es lo que hay que
+                  cantar", para mirar/imitar antes de pausar. Pero en pausa —
+                  que es cuando en la práctica se termina cantando, según el
+                  flujo recomendado (ver el botón "?") — notaSonandoAhora
+                  queda clavada en la nota de donde se pausó y ya no sirve de
+                  nada; ahí mostramos lo que el mic realmente detecta, para
+                  que el piano siga reflejando lo que se está cantando. */}
+              <PianoVisual
+                notaActiva={reproduciendo ? notaSonandoAhora : (lectura?.objetivo?.nombre || lectura?.nombreCercano || null)}
+                ataqueId={reproduciendo ? notaSonandoInfo?.tiempo : lectura?.objetivo?.tiempo}
+              />
             </div>
           )}
 
