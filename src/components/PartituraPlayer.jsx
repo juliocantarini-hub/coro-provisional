@@ -299,7 +299,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
       analyser.fftSize = 2048
       fuente.connect(analyser)
 
-      micRefs.current = { contexto, analyser, stream, intervalo: null, historial: [] }
+      micRefs.current = { contexto, analyser, stream, intervalo: null, historial: [], ultimaNotaObjetivo: undefined }
 
       const buffer = new Float32Array(analyser.fftSize)
       micRefs.current.intervalo = setInterval(() => {
@@ -338,6 +338,18 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
           ? freqCruda * Math.pow(2, Math.round(Math.log2(objetivoFreq / freqCruda)))
           : freqCruda
 
+        // Si cambió la nota objetivo (la melodía avanzó a la siguiente nota),
+        // arrancamos el suavizado de cero. Si no hacíamos esto, el historial
+        // quedaba con lecturas de la nota ANTERIOR mezcladas con las de la
+        // nueva durante un puñado de cuadros (hasta ~400ms) cada vez que
+        // cambiaba de nota — en una melodía con notas cortas eso pasa
+        // constantemente, y era la causa principal de que el medidor y el
+        // piano se vieran errantes en vez de seguir la melodía con firmeza.
+        if (notaObjetivoNombre !== micRefs.current.ultimaNotaObjetivo) {
+          micRefs.current.historial = []
+          micRefs.current.ultimaNotaObjetivo = notaObjetivoNombre
+        }
+
         // Suavizado por mediana: una sola lectura ruidosa (ya corregida de
         // octava) queda descartada por las lecturas vecinas en vez de hacer
         // "saltar" el medidor.
@@ -366,7 +378,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     if (intervalo) clearInterval(intervalo)
     if (stream) stream.getTracks().forEach(t => t.stop())
     if (contexto && contexto.state !== 'closed') contexto.close()
-    micRefs.current = { contexto: null, analyser: null, stream: null, intervalo: null, historial: [] }
+    micRefs.current = { contexto: null, analyser: null, stream: null, intervalo: null, historial: [], ultimaNotaObjetivo: undefined }
     setMicActivo(false)
     setLectura(null)
   }
@@ -566,10 +578,18 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
           {micActivo && (
             <div style={{ marginTop: '14px' }}>
               <MedidorAfinacion cents={centsMostrados} />
-              <PianoVisual notaActiva={lectura?.nombreCercano || null} />
+              {/* Mientras hay una nota de la melodía sonando, el piano muestra
+                  ESA nota (fija, la que hay que cantar) en vez de la nota más
+                  cercana a lo que capta el micrófono: así el piano no salta de
+                  tecla en tecla con cada lectura ruidosa del mic, y es el
+                  medidor — no el piano — el que muestra qué tan afinado está
+                  el cantante respecto de esa nota fija. Sin nota objetivo
+                  (fuera de reproducción, o silencio) mostramos la nota más
+                  cercana a lo que se está cantando, como referencia general. */}
+              <PianoVisual notaActiva={lectura?.objetivo?.nombre || lectura?.nombreCercano || null} />
               <div style={{ fontSize: '11px', color: '#888780', marginTop: '6px' }}>
                 {lectura?.objetivo
-                  ? 'nota que estás cantando ahora en la partitura'
+                  ? 'nota de la melodía que estás cantando ahora — el medidor muestra qué tan afinado está'
                   : reproduciendo ? 'silencio en este instante' : 'nota más cercana a lo que cantás'}
               </div>
             </div>
