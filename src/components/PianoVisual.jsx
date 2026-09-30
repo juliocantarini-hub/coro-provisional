@@ -8,7 +8,7 @@ export default function PianoVisual({ notaActiva }) {
   const notaOctava = notaActiva ? parseInt(notaActiva.match(/\d+$/)?.[0]) : null;
 
   return (
-    <div style={{ width: "100%", maxWidth: 500, marginTop: 10 }}>
+    <div style={{ width: "100%", marginTop: 10 }}>
       <div style={{ display: "flex", width: "100%", height: 60, position: "relative", userSelect: "none" }}>
         {OCTAVAS.map((octava) =>
           TECLAS_BLANCAS.map((tecla) => {
