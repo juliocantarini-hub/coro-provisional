@@ -15,6 +15,16 @@ const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5]
 
 const ORDEN_VOZ = { soprano: 0, contralto: 1, tenor: 2, bajo: 3 }
 
+// Cada cuánto releemos el reloj del Transport para mover el cursor/barra de
+// progreso. Antes eran 100ms: parte de por qué el cursor se sentía adelantado
+// al sonido era esta resolución gruesa, sumada a la latencia real de salida
+// de audio (altavoz/Bluetooth) que latenciaSalidaSeg() intenta descontar pero
+// no siempre puede medir con exactitud (sobre todo en Bluetooth, donde el
+// navegador no expone la latencia real del dispositivo). Bajar el intervalo
+// no elimina esa latencia de hardware, pero sí achica el margen de error
+// propio de nuestro muestreo.
+const INTERVALO_CURSOR_MS = 50
+
 // Cuántas lecturas de frecuencia guardamos para suavizar (mediana) y evitar que un
 // solo salto de octava (típico de la autocorrelación con voz cantada) haga
 // saltar el medidor de un lado a otro sin motivo.
@@ -168,7 +178,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     limpiarIntervalo()
     intervalRef.current = setInterval(() => {
       setTiempoActual(Math.max(0, offsetTiempoRef.current + Tone.Transport.seconds - latenciaSalidaSeg()))
-    }, 100)
+    }, INTERVALO_CURSOR_MS)
     Tone.Transport.start()
     setPausado(false)
   }
@@ -213,7 +223,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     limpiarIntervalo()
     intervalRef.current = setInterval(() => {
       setTiempoActual(Math.max(0, offsetTiempoRef.current + Tone.Transport.seconds - latenciaSalidaSeg()))
-    }, 100)
+    }, INTERVALO_CURSOR_MS)
 
     Tone.Transport.start()
     setReproduciendo(true)
@@ -273,13 +283,28 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   // Cambiar el tempo mientras suena antes no hacía nada audible: las notas ya
   // estaban programadas a la velocidad vieja. Ahora se reprograma lo que falta,
   // a la nueva velocidad, desde la posición actual (sin volver al principio).
-  function cambiarVelocidad(nueva) {
+  //
+  // reproducirDesde() siempre termina arrancando el Transport (para sonar).
+  // Eso estaba bien mientras se estaba reproduciendo de verdad, pero
+  // "reproduciendo" sigue siendo true también en PAUSA (pausar() no lo pone en
+  // false) — así que cambiar la velocidad estando en pausa reprogramaba todo
+  // y de paso REANUDABA el audio solo, sin que el cantante tocara play. Ahora,
+  // si estaba en pausa, volvemos a pausar apenas termina de reprogramar: la
+  // nueva velocidad queda lista para cuando el cantante retome, pero el audio
+  // no arranca solo.
+  async function cambiarVelocidad(nueva) {
     if (nueva === velocidad) return
     const vieja = velocidad
+    const estabaPausado = pausado
     setVelocidad(nueva)
     if (reproduciendo) {
       const posicionMusical = tiempoActual * vieja
-      reproducirDesde(posicionMusical, nueva)
+      await reproducirDesde(posicionMusical, nueva)
+      if (estabaPausado) {
+        Tone.Transport.pause()
+        limpiarIntervalo()
+        setPausado(true)
+      }
     }
   }
 
@@ -291,7 +316,20 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
       return
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Por defecto el navegador aplica cancelación de eco, supresión de
+      // ruido y control automático de ganancia al micrófono. Esas funciones
+      // están pensadas para llamadas de voz, no para este caso: mientras
+      // suena el acompañamiento por el parlante, el navegador las trata como
+      // "ruido de fondo" a tapar — y en la práctica eso atenuaba tanto la
+      // señal que la propia voz del cantante dejaba de detectarse (por eso
+      // afinación marcaba notas bien a capela, pero no con el acompañamiento
+      // sonando). Las desactivamos para quedarnos con la señal del mic tal
+      // cual. Ojo: sin auriculares, el parlante puede colarse en el mic junto
+      // con la voz — para practicar afinación con el acompañamiento sonando,
+      // lo ideal sigue siendo usar auriculares.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      })
       const Ctx = window.AudioContext || window.webkitAudioContext
       const contexto = new Ctx()
       const fuente = contexto.createMediaStreamSource(stream)
@@ -322,6 +360,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         let objetivoFreq = null
         const { reproduciendo: reproduciendoAhora, tiempoActual: tiempoAhora, velocidad: velocidadAhora, miVoz: miVozAhora } = vivosRef.current
         let notaObjetivoNombre = null
+        let notaObjetivoTiempo = null
         if (miVozAhora && reproduciendoAhora) {
           const voz = vocesOrdenadas.find(v => v.id === miVozAhora)
           const notaObjetivo = voz && notaEnInstante(voz.notas, tiempoAhora * velocidadAhora)
@@ -330,6 +369,11 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
             if (midiObjetivo != null) {
               objetivoFreq = midiAFrecuencia(midiObjetivo)
               notaObjetivoNombre = notaObjetivo.nota
+              // El instante de inicio de la nota (único por nota, aunque se
+              // repita la misma altura) — se lo pasamos al piano como
+              // "ataqueId" para que pueda distinguir "sigue sonando la misma
+              // nota" de "empezó una nota nueva de la misma altura" (do-do-do).
+              notaObjetivoTiempo = notaObjetivo.tiempo
             }
           }
         }
@@ -361,7 +405,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
 
         const cercana = frecuenciaANotaCercana(freq)
         const objetivo = objetivoFreq
-          ? { nombre: notaObjetivoNombre, cents: centsEntre(freq, objetivoFreq) }
+          ? { nombre: notaObjetivoNombre, cents: centsEntre(freq, objetivoFreq), tiempo: notaObjetivoTiempo }
           : null
 
         setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
@@ -425,7 +469,8 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   // pero acá se usa para mostrarla en el piano tal cual, sin comparar contra
   // el micrófono.
   const vozPropia = vocesOrdenadas.find(v => v.id === miVoz)
-  const notaSonandoAhora = vozPropia ? notaEnInstante(vozPropia.notas, tiempoActual * velocidad)?.nota || null : null
+  const notaSonandoInfo = vozPropia ? notaEnInstante(vozPropia.notas, tiempoActual * velocidad) : null
+  const notaSonandoAhora = notaSonandoInfo?.nota || null
 
   // El bloque entero está siempre en "modo práctica": altura acotada donde solo
   // la partitura scrollea, y el panel de control (reproducción, tempo y
@@ -586,18 +631,30 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
                   el cantante respecto de esa nota fija. Sin nota objetivo
                   (fuera de reproducción, o silencio) mostramos la nota más
                   cercana a lo que se está cantando, como referencia general. */}
-              <PianoVisual notaActiva={lectura?.objetivo?.nombre || lectura?.nombreCercano || null} />
+              <PianoVisual
+                notaActiva={lectura?.objetivo?.nombre || lectura?.nombreCercano || null}
+                ataqueId={lectura?.objetivo?.tiempo}
+              />
               <div style={{ fontSize: '11px', color: '#888780', marginTop: '6px' }}>
                 {lectura?.objetivo
                   ? 'nota de la melodía que estás cantando ahora — el medidor muestra qué tan afinado está'
                   : reproduciendo ? 'silencio en este instante' : 'nota más cercana a lo que cantás'}
               </div>
+              {/* Practicar con el acompañamiento sonando por el parlante (sin
+                  auriculares) hace que el propio parlante se cuele en el
+                  micrófono junto con la voz del cantante — el aviso solo
+                  aparece en ese caso puntual, no todo el tiempo. */}
+              {reproduciendo && (
+                <div style={{ fontSize: '11px', color: '#888780', marginTop: '2px' }}>
+                  Para una lectura más precisa con el acompañamiento sonando, usá auriculares.
+                </div>
+              )}
             </div>
           )}
 
           {pianoNotasAbierto && !micActivo && (
             <div style={{ marginTop: '14px' }}>
-              <PianoVisual notaActiva={notaSonandoAhora} />
+              <PianoVisual notaActiva={notaSonandoAhora} ataqueId={notaSonandoInfo?.tiempo} />
               <div style={{ fontSize: '11px', color: '#888780', marginTop: '6px' }}>
                 {notaSonandoAhora
                   ? 'nota que suena ahora en tu voz'
