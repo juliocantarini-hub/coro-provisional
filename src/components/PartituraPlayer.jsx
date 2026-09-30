@@ -94,13 +94,13 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   const [errorMic, setErrorMic] = useState('')
   const micRefs = useRef({ contexto: null, analyser: null, stream: null, intervalo: null, historial: [] })
   // El intervalo del micrófono se crea una sola vez (al activarlo) y no se vuelve a
-  // crear en cada render, así que su callback no puede leer reproduciendo/tiempoActual/
-  // velocidad/miVoz directamente (quedarían "congelados" en el valor que tenían al
-  // activar el mic). Este ref se mantiene al día en cada render para que el callback
-  // siempre lea el valor actual.
-  const vivosRef = useRef({ reproduciendo, tiempoActual, velocidad, miVoz })
+  // crear en cada render, así que su callback no puede leer reproduciendo/pausado/
+  // tiempoActual/velocidad/miVoz directamente (quedarían "congelados" en el valor que
+  // tenían al activar el mic). Este ref se mantiene al día en cada render para que el
+  // callback siempre lea el valor actual.
+  const vivosRef = useRef({ reproduciendo, pausado, tiempoActual, velocidad, miVoz })
   useEffect(() => {
-    vivosRef.current = { reproduciendo, tiempoActual, velocidad, miVoz }
+    vivosRef.current = { reproduciendo, pausado, tiempoActual, velocidad, miVoz }
   })
 
   // Piano en modo "ver las notas": sin usar el micrófono, muestra en el piano
@@ -364,12 +364,24 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         // tiene una nota en este instante ANTES de decidir si esta lectura
         // cuenta o no — tanto para la calibración del "piso" de acompañamiento
         // (más abajo) como para la corrección de octava de siempre.
-        const { reproduciendo: reproduciendoAhora, tiempoActual: tiempoAhora, velocidad: velocidadAhora, miVoz: miVozAhora } = vivosRef.current
+        //
+        // "reproduciendo" queda en true también durante la PAUSA (pausar() no
+        // lo pone en false, solo prende "pausado" — ver el comentario junto a
+        // "estabaSonando" más arriba en este archivo). Si usáramos
+        // "reproduciendo" solo, en pausa
+        // seguiríamos tomando como objetivo la nota de la partitura
+        // congelada en el instante donde se pausó, y comparando lo que
+        // realmente se canta contra esa nota vieja — exactamente la causa de
+        // que en pausa el piano no siguiera la voz y el medidor mostrara una
+        // desafinación que no era real. "sonandoAhora" es reproduciendo Y
+        // NO pausado: solo true mientras la partitura de verdad avanza.
+        const { reproduciendo: reproduciendoAhora, pausado: pausadoAhora, tiempoActual: tiempoAhora, velocidad: velocidadAhora, miVoz: miVozAhora } = vivosRef.current
+        const sonandoAhora = reproduciendoAhora && !pausadoAhora
         let objetivoFreq = null
         let notaObjetivoNombre = null
         let notaObjetivoTiempo = null
         let hayNotaPropia = false
-        if (miVozAhora && reproduciendoAhora) {
+        if (miVozAhora && sonandoAhora) {
           const voz = vocesOrdenadas.find(v => v.id === miVozAhora)
           const notaObjetivo = voz && notaEnInstante(voz.notas, tiempoAhora * velocidadAhora)
           if (notaObjetivo) {
@@ -396,7 +408,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         // aportando. Promediamos ese volumen (con más peso a las lecturas
         // recientes, por si cambia el volumen del parlante) como referencia
         // de "esto es puro acompañamiento, no cantaron nada".
-        if (reproduciendoAhora && !hayNotaPropia) {
+        if (sonandoAhora && !hayNotaPropia) {
           const ALPHA_CALIBRACION = 0.2
           micRefs.current.pisoBleed = micRefs.current.pisoBleed == null
             ? rms
@@ -423,7 +435,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         // sí había alcanzado a pasar ese piso, en vez de seguir lo que se
         // estaba cantando.
         const MARGEN_SOBRE_PISO = 1.6
-        const umbralRms = (reproduciendoAhora && micRefs.current.pisoBleed != null)
+        const umbralRms = (sonandoAhora && micRefs.current.pisoBleed != null)
           ? Math.max(0.01, micRefs.current.pisoBleed * MARGEN_SOBRE_PISO)
           : 0.01
         if (rms < umbralRms) {
@@ -781,18 +793,22 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
               )}
               <MedidorAfinacion cents={centsMostrados} />
               {/* El piano tiene dos momentos distintos acá. Mientras la
-                  partitura está sonando, muestra la nota de LA PARTITURA (la
-                  misma fuente que el modo "🎹 Piano", notaSonandoAhora): una
-                  referencia visual estable de "esto es lo que hay que
-                  cantar", para mirar/imitar antes de pausar. Pero en pausa —
-                  que es cuando en la práctica se termina cantando, según el
-                  flujo recomendado (ver el botón "?") — notaSonandoAhora
-                  queda clavada en la nota de donde se pausó y ya no sirve de
-                  nada; ahí mostramos lo que el mic realmente detecta, para
-                  que el piano siga reflejando lo que se está cantando. */}
+                  partitura está REALMENTE sonando (reproduciendo Y no
+                  pausado — "reproduciendo" solo se queda en true durante la
+                  pausa, no alcanza para distinguir "sonando" de "pausado",
+                  ver el comentario en activarMicrofono), muestra la nota de
+                  LA PARTITURA (la misma fuente que el modo "🎹 Piano",
+                  notaSonandoAhora): una referencia visual estable de "esto
+                  es lo que hay que cantar", para mirar/imitar antes de
+                  pausar. Pero en pausa — que es cuando en la práctica se
+                  termina cantando, según el flujo recomendado (ver el botón
+                  "?") — notaSonandoAhora queda clavada en la nota de donde
+                  se pausó y ya no sirve de nada; ahí mostramos lo que el mic
+                  realmente detecta, para que el piano siga reflejando lo que
+                  se está cantando. */}
               <PianoVisual
-                notaActiva={reproduciendo ? notaSonandoAhora : (lectura?.objetivo?.nombre || lectura?.nombreCercano || null)}
-                ataqueId={reproduciendo ? notaSonandoInfo?.tiempo : lectura?.objetivo?.tiempo}
+                notaActiva={(reproduciendo && !pausado) ? notaSonandoAhora : (lectura?.objetivo?.nombre || lectura?.nombreCercano || null)}
+                ataqueId={(reproduciendo && !pausado) ? notaSonandoInfo?.tiempo : lectura?.objetivo?.tiempo}
               />
             </div>
           )}
