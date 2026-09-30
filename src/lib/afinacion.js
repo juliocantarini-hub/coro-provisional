@@ -94,12 +94,34 @@ export function detectarFrecuencia(buffer, sampleRate) {
   const claridad = correlacion[0] > 0 ? mejorValor / correlacion[0] : 0
   if (claridad < UMBRAL_CLARIDAD) return null
 
+  // El máximo global de la autocorrelación no siempre es el período
+  // correcto: como una voz cantando tiene armónicos, el lag que corresponde
+  // a la MITAD/TERCIO/CUARTO de la frecuencia real (el doble/triple/
+  // cuádruple del período real) también acumula bastante correlación —
+  // a veces incluso más que el propio período real — y el método se
+  // "engancha" ahí (reportado en la práctica: SOL3 detectado como DO2, un
+  // enganche de tercio). Esta corrección no depende de saber de antemano
+  // qué nota debería sonar (importante a capela, donde no hay ninguna nota
+  // objetivo con la que comparar): buscamos desde el lag más corto posible
+  // (la frecuencia más alta) hacia el máximo global, y aceptamos el primer
+  // lag que tenga una correlación ya casi tan fuerte como ese máximo — si
+  // hay uno, es la fundamental real; el máximo global más largo es su
+  // armónico reforzado, no una nota distinta.
+  const UMBRAL_SUBARMONICO = 0.9
+  let lagElegido = mejorLag
+  for (let lag = d; lag < mejorLag; lag++) {
+    if (correlacion[lag] >= mejorValor * UMBRAL_SUBARMONICO) {
+      lagElegido = lag
+      break
+    }
+  }
+
   // Interpolación parabólica alrededor del pico para afinar la estimación del período.
-  let lagFino = mejorLag
-  if (mejorLag > 0 && mejorLag < MAX_SAMPLES) {
-    const c0 = correlacion[mejorLag - 1], c1 = correlacion[mejorLag], c2 = correlacion[mejorLag + 1]
+  let lagFino = lagElegido
+  if (lagElegido > 0 && lagElegido < MAX_SAMPLES) {
+    const c0 = correlacion[lagElegido - 1], c1 = correlacion[lagElegido], c2 = correlacion[lagElegido + 1]
     const denom = (c0 - 2 * c1 + c2)
-    if (denom !== 0) lagFino = mejorLag + 0.5 * (c0 - c2) / denom
+    if (denom !== 0) lagFino = lagElegido + 0.5 * (c0 - c2) / denom
   }
 
   return sampleRate / lagFino
