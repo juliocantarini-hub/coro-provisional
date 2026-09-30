@@ -124,6 +124,8 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
   // (RealValue * divisions * 4, la misma conversión inversa que ya usa
   // moverCursor con `new Fraction(tickInicio, divisions * 4)`).
   function manejarClicPartitura(e) {
+    // eslint-disable-next-line no-console
+    console.log('[partitura] click detectado', e.clientX, e.clientY, 'estado:', estado, 'onClickCompas:', !!onClickCompas)
     if (!onClickCompas || estado !== 'lista') return
     try {
       const osmd = osmdRef.current
@@ -135,12 +137,16 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
       const puntoSvg = graphic.domToSvg(puntoDom)
       const puntoOsmd = graphic.svgToOsmd(puntoSvg)
       const timestamp = graphic.tryGetTimestampFromPosition(puntoOsmd)
+      // eslint-disable-next-line no-console
+      console.log('[partitura] puntoSvg:', puntoSvg, 'puntoOsmd:', puntoOsmd, 'timestamp:', timestamp)
       if (!timestamp) return
       const tick = timestamp.RealValue * divisions * 4
       onClickCompas(tick)
     } catch (e) {
-      // Si algo falla al calcular la posición, simplemente no hacemos nada
-      // (el cantante puede seguir usando la barra de progreso para saltar).
+      // Log temporal para diagnosticar por qué no salta en algunos
+      // dispositivos — no debería quedar así de forma permanente.
+      // eslint-disable-next-line no-console
+      console.error('[partitura] error al calcular la posición del click', e)
     }
   }
 
@@ -177,14 +183,13 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         // default. Al tocar/clickear para saltar de compás, ese mismo gesto
         // (mousedown + un mínimo arrastre, algo normal en un tap táctil)
         // arrancaba una selección de texto que terminaba pintando de celeste
-        // toda la partitura — y, en varios navegadores, esa selección
-        // cancelaba el evento click, por lo que el salto tampoco llegaba a
-        // dispararse. user-select:none saca la partitura de la selección de
-        // texto; onMouseDown/onTouchStart con preventDefault evita que el
-        // gesto arranque una selección para empezar, tanto con mouse como
-        // con el dedo.
+        // toda la partitura. user-select:none (más abajo) alcanza para evitar
+        // esa selección tanto con mouse como con el dedo, sin tocar el evento
+        // touch: llamar preventDefault() en onTouchStart puede cancelar el
+        // click sintético que el navegador dispara después en varios
+        // navegadores móviles (Safari/Chrome iOS en particular), así que acá
+        // solo prevenimos el gesto de selección en mouse.
         onMouseDown={(e) => e.preventDefault()}
-        onTouchStart={(e) => e.preventDefault()}
         style={{
           display: 'block',
           visibility: estado === 'lista' ? 'visible' : 'hidden',
