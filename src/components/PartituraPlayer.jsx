@@ -511,6 +511,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         <div style={{ padding: '12px 18px 14px' }}>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button onClick={alternarMicrofono}
+              title="Cantá y mirá en el medidor y el piano qué tan afinado estás"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
                 borderRadius: '20px', border: `1px solid ${micActivo ? '#D85A30' : '#D3D1C7'}`,
