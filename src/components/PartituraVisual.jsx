@@ -124,6 +124,16 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
   // (RealValue * divisions * 4, la misma conversión inversa que ya usa
   // moverCursor con `new Fraction(tickInicio, divisions * 4)`).
   function manejarClicPartitura(e) {
+    // En mobile, tocar un compás seguía disparando bien el salto (abajo),
+    // pero el toque en sí ya alcanzaba a iniciar una selección de texto
+    // nativa del navegador (la partitura se pintaba de celeste) antes de que
+    // llegáramos acá — user-select:none en el contenedor no la frena del
+    // todo en algunos navegadores de celular. En vez de seguir peleando por
+    // PREVENIRLA (ya intentamos con preventDefault en touchstart, pero eso
+    // terminaba cancelando el click en varios navegadores — ver más abajo),
+    // la dejamos pasar y la borramos apenas entramos acá: para cuando se
+    // pinta el siguiente frame ya no queda nada seleccionado.
+    limpiarSeleccionTexto()
     if (!onClickCompas || estado !== 'lista') return
     try {
       const osmd = osmdRef.current
@@ -188,8 +198,11 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
         // touch: llamar preventDefault() en onTouchStart puede cancelar el
         // click sintético que el navegador dispara después en varios
         // navegadores móviles (Safari/Chrome iOS en particular), así que acá
-        // solo prevenimos el gesto de selección en mouse.
+        // solo prevenimos el gesto de selección en mouse. En touch, en vez
+        // de prevenir, limpiamos la selección apenas termina el toque (antes
+        // incluso de que llegue el click) — ver limpiarSeleccionTexto arriba.
         onMouseDown={(e) => e.preventDefault()}
+        onTouchEnd={limpiarSeleccionTexto}
         style={{
           display: 'block',
           visibility: estado === 'lista' ? 'visible' : 'hidden',
@@ -207,6 +220,20 @@ export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombr
       />
     </div>
   )
+}
+
+// Borra cualquier selección de texto que el navegador haya podido arrancar
+// con el toque/click (ver el comentario en manejarClicPartitura). Usamos la
+// API de selección del navegador directamente, no algo propio de React: la
+// selección es un estado del documento, ajeno a los componentes.
+function limpiarSeleccionTexto() {
+  try {
+    const seleccion = window.getSelection && window.getSelection()
+    if (seleccion && seleccion.rangeCount) seleccion.removeAllRanges()
+  } catch (e) {
+    // Si la API de selección no está disponible o falla, no hay nada más
+    // que hacer acá — la partitura sigue funcionando igual.
+  }
 }
 
 // Colorea las notas de la voz propia y oculta el resto de los pentagramas
