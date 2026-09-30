@@ -522,6 +522,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
             </button>
 
             <button onClick={alternarPianoNotas}
+              title="Ver en el piano las notas que van sonando, sin usar el micrófono"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
                 borderRadius: '20px', border: `1px solid ${pianoNotasAbierto ? '#0F6E56' : '#D3D1C7'}`,
