@@ -93,6 +93,11 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     vivosRef.current = { reproduciendo, tiempoActual, velocidad, miVoz }
   })
 
+  // Piano en modo "ver las notas": sin usar el micrófono, muestra en el piano
+  // la nota de la voz propia que está sonando en el audio en cada instante —
+  // útil para seguir la partitura de oído/vista sin tener que cantar.
+  const [pianoNotasAbierto, setPianoNotasAbierto] = useState(false)
+
   const partituraParseada = useMemo(() => {
     try {
       return parsearMusicXML(partitura.musicxml)
@@ -341,6 +346,25 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     setLectura(null)
   }
 
+  // Prende/apaga el mic — y si el piano en modo "ver las notas" estaba abierto,
+  // lo cierra, para no mostrar dos pianos (uno con lo cantado y otro con lo que
+  // suena) al mismo tiempo.
+  function alternarMicrofono() {
+    if (micActivo) {
+      detenerMicrofono()
+    } else {
+      setPianoNotasAbierto(false)
+      activarMicrofono()
+    }
+  }
+
+  // Igual que arriba pero al revés: abrir el piano de "ver las notas" apaga el
+  // micrófono si estaba prendido.
+  function alternarPianoNotas() {
+    if (micActivo) detenerMicrofono()
+    setPianoNotasAbierto(v => !v)
+  }
+
   if (error) {
     return (
       <div style={{ fontSize: '13px', color: '#A32D2D', padding: '10px 0' }}>{error}</div>
@@ -358,6 +382,13 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   // realmente importa al practicar); si no, mostramos qué tan cerca está de
   // la nota más próxima en afinación estándar, como referencia general.
   const centsMostrados = lectura?.objetivo ? lectura.objetivo.cents : lectura?.centsCercano
+
+  // Nota de la voz propia que está sonando en el audio en este instante —
+  // la misma cuenta que usa el afinador para saber qué nota "debería" sonar,
+  // pero acá se usa para mostrarla en el piano tal cual, sin comparar contra
+  // el micrófono.
+  const vozPropia = vocesOrdenadas.find(v => v.id === miVoz)
+  const notaSonandoAhora = vozPropia ? notaEnInstante(vozPropia.notas, tiempoActual * velocidad)?.nota || null : null
 
   // El bloque entero está siempre en "modo práctica": altura acotada donde solo
   // la partitura scrollea, y el panel de control (reproducción, tempo y
@@ -475,19 +506,32 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
 
         <div style={{ height: '1px', background: '#E8E6DF', margin: '0 18px' }} />
 
-        {/* Afinación: medidor de centésimas + piano resaltando la nota que se
-            está cantando en cada instante. */}
+        {/* Afinación (con micrófono) y piano de "ver las notas" (sin micrófono):
+            dos formas de usar el piano, una sola a la vez. */}
         <div style={{ padding: '12px 18px 14px' }}>
-          <button onClick={micActivo ? detenerMicrofono : activarMicrofono}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-              borderRadius: '20px', border: `1px solid ${micActivo ? '#D85A30' : '#D3D1C7'}`,
-              background: micActivo ? '#FAECE7' : '#FFFFFF',
-              color: micActivo ? '#712B13' : '#5F5E5A',
-              fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-            }}>
-            {micActivo ? '🎤 Apagar micrófono' : '🎤 Practicar afinación'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button onClick={alternarMicrofono}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+                borderRadius: '20px', border: `1px solid ${micActivo ? '#D85A30' : '#D3D1C7'}`,
+                background: micActivo ? '#FAECE7' : '#FFFFFF',
+                color: micActivo ? '#712B13' : '#5F5E5A',
+                fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+              }}>
+              {micActivo ? '🎤 Apagar micrófono' : '🎤 Practicar afinación'}
+            </button>
+
+            <button onClick={alternarPianoNotas}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+                borderRadius: '20px', border: `1px solid ${pianoNotasAbierto ? '#0F6E56' : '#D3D1C7'}`,
+                background: pianoNotasAbierto ? '#E1F5EE' : '#FFFFFF',
+                color: pianoNotasAbierto ? '#04342C' : '#5F5E5A',
+                fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+              }}>
+              {pianoNotasAbierto ? '🎹 Cerrar piano' : '🎹 Piano'}
+            </button>
+          </div>
 
           {errorMic && <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '8px' }}>{errorMic}</div>}
 
@@ -499,6 +543,17 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
                 {lectura?.objetivo
                   ? 'nota que estás cantando ahora en la partitura'
                   : reproduciendo ? 'silencio en este instante' : 'nota más cercana a lo que cantás'}
+              </div>
+            </div>
+          )}
+
+          {pianoNotasAbierto && !micActivo && (
+            <div style={{ marginTop: '14px' }}>
+              <PianoVisual notaActiva={notaSonandoAhora} />
+              <div style={{ fontSize: '11px', color: '#888780', marginTop: '6px' }}>
+                {notaSonandoAhora
+                  ? 'nota que suena ahora en tu voz'
+                  : reproduciendo ? 'silencio en este instante' : 'reproducí la obra para ver las notas'}
               </div>
             </div>
           )}
