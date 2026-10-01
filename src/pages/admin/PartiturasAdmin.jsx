@@ -158,18 +158,19 @@ export default function PartiturasAdmin() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 4px' }}>
-            Partituras — Práctica por voz
+          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
+            Entrenamiento
           </h2>
-          <p style={{ fontSize: '13px', color: '#888780', margin: 0 }}>
-            Subí un MusicXML y el cantante puede practicar cada voz sola o con las demás, desde Entrenamiento
+          <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
+            {cargando ? 'Cargando...' : `${partituras.length} obra${partituras.length !== 1 ? 's' : ''}`}
           </p>
         </div>
         <button onClick={() => setMostrarForm(true)}
-          style={{ fontSize: '13px', color: '#FFFFFF', background: '#0F6E56', border: 'none', padding: '9px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>
-          + Nueva partitura
+          style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Nueva partitura
         </button>
       </div>
 
