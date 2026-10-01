@@ -9,6 +9,10 @@ import {
   activarEjercicioEntrenamiento, eliminarEjercicioEntrenamiento,
 } from '../../hooks/useEntrenamiento'
 
+const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'vocalizacion']
+const CATEGORIA_LABEL = { respiracion: 'Respiración', resonancia: 'Resonancia', vocalizacion: 'Vocalización' }
+const CATEGORIA_NOTA = { respiracion: 'Estos todavía se cargan directo en Supabase — no son ejercicios armados a partir de notas.' }
+
 function formatoTiempo(seg) {
   if (!seg || !isFinite(seg)) return '—'
   const m = Math.floor(seg / 60)
@@ -139,7 +143,8 @@ function ModalNuevaPartitura({ onCerrar, onGuardada }) {
   )
 }
 
-function ModalNuevoEjercicio({ proximoOrden, onCerrar, onGuardada }) {
+function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
+  const [categoria, setCategoria] = useState('vocalizacion')
   const [nombre, setNombre] = useState('')
   const [instruccionTexto, setInstruccionTexto] = useState('')
   const [tempoBpm, setTempoBpm] = useState('')
@@ -181,8 +186,12 @@ function ModalNuevoEjercicio({ proximoOrden, onCerrar, onGuardada }) {
       transporte_por_ciclo: Array.from({ length: reps }, (_, i) => i * transporte),
     }
 
+    const proximoOrden = ejercicios
+      .filter(e => e.categoria === categoria)
+      .reduce((max, e) => Math.max(max, e.orden || 0), -1) + 1
+
     const resultado = await crearEjercicioEntrenamiento({
-      categoria: 'vocalizacion',
+      categoria,
       nombre: nombre.trim(),
       instruccionTexto,
       patronTone,
@@ -197,8 +206,18 @@ function ModalNuevoEjercicio({ proximoOrden, onCerrar, onGuardada }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
       <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', margin: '0 0 16px' }}>
-          Nuevo ejercicio de vocalización
+          Nuevo ejercicio
         </h3>
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Categoría</label>
+        <select value={categoria} onChange={e => setCategoria(e.target.value)}
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box', background: '#FFFFFF' }}>
+          <option value="vocalizacion">Vocalización</option>
+          <option value="resonancia">Resonancia</option>
+        </select>
+        <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '-10px 0 14px' }}>
+          Respiración no está disponible acá todavía — esos ejercicios no se arman a partir de notas.
+        </p>
 
         <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Archivo MusicXML (exportado de MuseScore)</label>
         <input type="file" accept=".xml,.musicxml,.mxl" onChange={handleArchivo}
@@ -270,7 +289,10 @@ export default function PartiturasAdmin() {
   const [confirmEliminar, setConfirmEliminar] = useState(null)
 
   const { ejercicios, cargando: cargandoEjercicios, error: errorEjercicios, recargar: recargarEjercicios } = useEjerciciosEntrenamientoAdmin()
-  const ejerciciosVocalizacion = ejercicios.filter(e => e.categoria === 'vocalizacion')
+  const categoriasExtra = [...new Set(ejercicios.map(e => e.categoria).filter(Boolean))]
+    .filter(c => !ORDEN_CATEGORIAS.includes(c))
+    .sort()
+  const categoriasAMostrar = [...ORDEN_CATEGORIAS, ...categoriasExtra]
   const [mostrarFormEjercicio, setMostrarFormEjercicio] = useState(false)
   const [procesandoEjercicio, setProcesandoEjercicio] = useState(null)
   const [confirmEliminarEjercicio, setConfirmEliminarEjercicio] = useState(null)
@@ -380,10 +402,10 @@ export default function PartiturasAdmin() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '32px 0 14px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
-            Vocalización
+            Ejercicios de entrenamiento
           </h3>
           <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
-            {cargandoEjercicios ? 'Cargando...' : `${ejerciciosVocalizacion.length} ejercicio${ejerciciosVocalizacion.length !== 1 ? 's' : ''}`}
+            {cargandoEjercicios ? 'Cargando...' : `${ejercicios.length} en total`}
           </p>
         </div>
         <button onClick={() => setMostrarFormEjercicio(true)}
@@ -397,51 +419,66 @@ export default function PartiturasAdmin() {
 
       {cargandoEjercicios && <div style={{ color: '#888780', fontSize: '13px' }}>Cargando...</div>}
 
-      {!cargandoEjercicios && ejerciciosVocalizacion.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '48px 24px', color: '#888780', fontSize: '14px' }}>
-          Todavía no cargaste ningún ejercicio de vocalización.
-        </div>
-      )}
+      {!cargandoEjercicios && categoriasAMostrar.map(categoria => {
+        const items = ejercicios.filter(e => e.categoria === categoria)
+        return (
+          <div key={categoria} style={{ marginBottom: '24px' }}>
+            <h4 style={{ fontFamily: 'Georgia, serif', fontSize: '14px', fontWeight: 'normal', color: '#5F5E5A', margin: '0 0 2px' }}>
+              {CATEGORIA_LABEL[categoria] || categoria}
+            </h4>
+            <p style={{ fontSize: '11px', color: '#888780', margin: '0 0 10px' }}>
+              {items.length} ejercicio{items.length !== 1 ? 's' : ''}
+              {CATEGORIA_NOTA[categoria] ? ` · ${CATEGORIA_NOTA[categoria]}` : ''}
+            </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {ejerciciosVocalizacion.map(ej => (
-          <div key={ej.id} style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '180px' }}>
-              <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{ej.nombre}</div>
-              {ej.instruccion_texto && (
-                <div style={{ fontSize: '12px', color: '#888780' }}>{ej.instruccion_texto}</div>
-              )}
-            </div>
-
-            <button onClick={() => toggleActivoEjercicio(ej)} disabled={procesandoEjercicio === ej.id}
-              style={{
-                fontSize: '12px', fontWeight: '500', border: 'none', borderRadius: '20px', padding: '5px 14px', cursor: 'pointer',
-                background: ej.activo ? '#E1F5EE' : '#F1EFE8',
-                color: ej.activo ? '#04342C' : '#5F5E5A',
-              }}>
-              {ej.activo ? '✓ Activo' : 'Desactivado'}
-            </button>
-
-            {confirmEliminarEjercicio === ej.id ? (
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => handleEliminarEjercicio(ej.id)} disabled={procesandoEjercicio === ej.id}
-                  style={{ fontSize: '12px', color: '#FFFFFF', background: '#A32D2D', border: 'none', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
-                  Confirmar
-                </button>
-                <button onClick={() => setConfirmEliminarEjercicio(null)}
-                  style={{ fontSize: '12px', color: '#5F5E5A', background: 'none', border: '1px solid #D3D1C7', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
-                  Cancelar
-                </button>
+            {items.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '24px', color: '#B4B2A9', fontSize: '13px', background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px' }}>
+                Todavía no hay ejercicios acá.
               </div>
-            ) : (
-              <button onClick={() => setConfirmEliminarEjercicio(ej.id)}
-                style={{ fontSize: '12px', color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer' }}>
-                Eliminar
-              </button>
             )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {items.map(ej => (
+                <div key={ej.id} style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '180px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{ej.nombre}</div>
+                    {ej.instruccion_texto && (
+                      <div style={{ fontSize: '12px', color: '#888780' }}>{ej.instruccion_texto}</div>
+                    )}
+                  </div>
+
+                  <button onClick={() => toggleActivoEjercicio(ej)} disabled={procesandoEjercicio === ej.id}
+                    style={{
+                      fontSize: '12px', fontWeight: '500', border: 'none', borderRadius: '20px', padding: '5px 14px', cursor: 'pointer',
+                      background: ej.activo ? '#E1F5EE' : '#F1EFE8',
+                      color: ej.activo ? '#04342C' : '#5F5E5A',
+                    }}>
+                    {ej.activo ? '✓ Activo' : 'Desactivado'}
+                  </button>
+
+                  {confirmEliminarEjercicio === ej.id ? (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={() => handleEliminarEjercicio(ej.id)} disabled={procesandoEjercicio === ej.id}
+                        style={{ fontSize: '12px', color: '#FFFFFF', background: '#A32D2D', border: 'none', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
+                        Confirmar
+                      </button>
+                      <button onClick={() => setConfirmEliminarEjercicio(null)}
+                        style={{ fontSize: '12px', color: '#5F5E5A', background: 'none', border: '1px solid #D3D1C7', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmEliminarEjercicio(ej.id)}
+                      style={{ fontSize: '12px', color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-      </div>
+        )
+      })}
 
       {mostrarForm && (
         <ModalNuevaPartitura
@@ -452,7 +489,7 @@ export default function PartiturasAdmin() {
 
       {mostrarFormEjercicio && (
         <ModalNuevoEjercicio
-          proximoOrden={ejerciciosVocalizacion.reduce((max, e) => Math.max(max, e.orden || 0), -1) + 1}
+          ejercicios={ejercicios}
           onCerrar={() => setMostrarFormEjercicio(false)}
           onGuardada={() => { setMostrarFormEjercicio(false); recargarEjercicios() }}
         />
