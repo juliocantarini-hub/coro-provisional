@@ -195,6 +195,16 @@ export async function activarEjercicioEntrenamiento(id, activo) {
 }
 
 export async function eliminarEjercicioEntrenamiento(id) {
+  // Si algún cantante ya completó este ejercicio, queda un registro en
+  // actividad_entrenamiento que referencia su id (para la racha y el
+  // contador de "hoy"). Esa referencia bloquea el borrado directo, así
+  // que primero borramos esa actividad y recién después el ejercicio.
+  const { error: errorActividad } = await supabase
+    .from('actividad_entrenamiento')
+    .delete()
+    .eq('ejercicio_id', id)
+  if (errorActividad) return { ok: false, error: errorActividad.message }
+
   const { error } = await supabase
     .from('ejercicios_entrenamiento')
     .delete()
