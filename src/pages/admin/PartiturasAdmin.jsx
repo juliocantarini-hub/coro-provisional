@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import JSZip from 'jszip'
-import { parsearMusicXML } from '../../lib/musicxml'
+import { parsearMusicXML, parsearPatronVocalizacion } from '../../lib/musicxml'
 import {
   usePartiturasAdmin, crearPartitura, publicarPartitura, eliminarPartitura,
 } from '../../hooks/usePartituras'
+import {
+  useEjerciciosEntrenamientoAdmin, crearEjercicioEntrenamiento,
+  activarEjercicioEntrenamiento, eliminarEjercicioEntrenamiento,
+} from '../../hooks/useEntrenamiento'
 
 function formatoTiempo(seg) {
   if (!seg || !isFinite(seg)) return '—'
@@ -135,11 +139,141 @@ function ModalNuevaPartitura({ onCerrar, onGuardada }) {
   )
 }
 
+function ModalNuevoEjercicio({ proximoOrden, onCerrar, onGuardada }) {
+  const [nombre, setNombre] = useState('')
+  const [instruccionTexto, setInstruccionTexto] = useState('')
+  const [tempoBpm, setTempoBpm] = useState('')
+  const [repeticiones, setRepeticiones] = useState(1)
+  const [transporteSemitonos, setTransporteSemitonos] = useState(0)
+  const [patron, setPatron] = useState(null)
+  const [procesando, setProcesando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleArchivo(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPatron(null)
+    setError('')
+    if (!nombre) setNombre(file.name.replace(/\.(mxl|xml|musicxml)$/i, ''))
+
+    try {
+      const texto = await extraerXmlDeArchivo(file)
+      const detectado = parsearPatronVocalizacion(texto)
+      setPatron(detectado)
+      if (detectado.tempoDetectado) setTempoBpm(String(detectado.tempoDetectado))
+    } catch (err) {
+      setError(err.message || 'No pudimos leer ese archivo.')
+    }
+  }
+
+  async function handleGuardar() {
+    if (!nombre.trim() || !patron) return
+    setProcesando(true)
+
+    const reps = Math.max(1, parseInt(repeticiones, 10) || 1)
+    const transporte = parseInt(transporteSemitonos, 10) || 0
+    const patronTone = {
+      tipo: 'patron_ritmico',
+      nota_inicial: patron.notaInicial,
+      notas_semitonos: patron.notasSemitonos,
+      duraciones_16avos: patron.duraciones16avos,
+      tempo_bpm: parseInt(tempoBpm, 10) || 80,
+      transporte_por_ciclo: Array.from({ length: reps }, (_, i) => i * transporte),
+    }
+
+    const resultado = await crearEjercicioEntrenamiento({
+      categoria: 'vocalizacion',
+      nombre: nombre.trim(),
+      instruccionTexto,
+      patronTone,
+      orden: proximoOrden,
+    })
+    setProcesando(false)
+    if (resultado.ok) onGuardada()
+    else setError(resultado.error || 'No pudimos guardar el ejercicio.')
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
+      <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', margin: '0 0 16px' }}>
+          Nuevo ejercicio de vocalización
+        </h3>
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Archivo MusicXML (exportado de MuseScore)</label>
+        <input type="file" accept=".xml,.musicxml,.mxl" onChange={handleArchivo}
+          style={{ width: '100%', fontSize: '13px', marginBottom: '14px' }} />
+
+        {error && (
+          <div style={{ fontSize: '13px', color: '#A32D2D', background: '#FCEBEB', borderRadius: '8px', padding: '8px 12px', marginBottom: '14px' }}>
+            {error}
+          </div>
+        )}
+
+        {patron && (
+          <div style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px' }}>
+            Se detectaron {patron.cantidadNotas} notas, desde {patron.notaInicial}
+            {patron.tempoDetectado ? ` · tempo detectado ${patron.tempoDetectado} bpm` : ' · no encontramos tempo en el archivo, usamos 80 bpm por defecto'}
+          </div>
+        )}
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nombre</label>
+        <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Instrucción para el cantante (opcional)</label>
+        <textarea value={instruccionTexto} onChange={e => setInstruccionTexto(e.target.value)} rows={2}
+          style={{ width: '100%', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Tempo (bpm)</label>
+        <input type="number" value={tempoBpm} onChange={e => setTempoBpm(e.target.value)} placeholder="80"
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+          Repetir transportando (dejá 1 repetición si ya escribiste todas las transposiciones en el MusicXML)
+        </label>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ flex: 1 }}>
+            <input type="number" min="1" value={repeticiones} onChange={e => setRepeticiones(e.target.value)}
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <div style={{ fontSize: '11px', color: '#B4B2A9', marginTop: '3px' }}>Repeticiones</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <input type="number" value={transporteSemitonos} onChange={e => setTransporteSemitonos(e.target.value)}
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <div style={{ fontSize: '11px', color: '#B4B2A9', marginTop: '3px' }}>Semitonos por repetición</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={onCerrar}
+            style={{ flex: 1, height: '40px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', cursor: 'pointer', fontSize: '13px' }}>
+            Cancelar
+          </button>
+          <button onClick={handleGuardar} disabled={!nombre.trim() || !patron || procesando}
+            style={{
+              flex: 2, height: '40px', borderRadius: '8px', border: 'none', cursor: (!nombre.trim() || !patron || procesando) ? 'not-allowed' : 'pointer',
+              background: (!nombre.trim() || !patron) ? '#D3D1C7' : '#0F6E56', color: '#FFFFFF', fontSize: '13px', fontWeight: '500',
+            }}>
+            {procesando ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PartiturasAdmin() {
   const { partituras, cargando, error, recargar } = usePartiturasAdmin()
   const [mostrarForm, setMostrarForm] = useState(false)
   const [procesando, setProcesando] = useState(null)
   const [confirmEliminar, setConfirmEliminar] = useState(null)
+
+  const { ejercicios, cargando: cargandoEjercicios, error: errorEjercicios, recargar: recargarEjercicios } = useEjerciciosEntrenamientoAdmin()
+  const ejerciciosVocalizacion = ejercicios.filter(e => e.categoria === 'vocalizacion')
+  const [mostrarFormEjercicio, setMostrarFormEjercicio] = useState(false)
+  const [procesandoEjercicio, setProcesandoEjercicio] = useState(null)
+  const [confirmEliminarEjercicio, setConfirmEliminarEjercicio] = useState(null)
 
   async function togglePublicar(p) {
     setProcesando(p.id)
@@ -156,13 +290,32 @@ export default function PartiturasAdmin() {
     setProcesando(null)
   }
 
+  async function toggleActivoEjercicio(ej) {
+    setProcesandoEjercicio(ej.id)
+    await activarEjercicioEntrenamiento(ej.id, !ej.activo)
+    await recargarEjercicios()
+    setProcesandoEjercicio(null)
+  }
+
+  async function handleEliminarEjercicio(id) {
+    setProcesandoEjercicio(id)
+    await eliminarEjercicioEntrenamiento(id)
+    setConfirmEliminarEjercicio(null)
+    await recargarEjercicios()
+    setProcesandoEjercicio(null)
+  }
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+      <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 20px' }}>
+        Entrenamiento
+      </h2>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
-            Entrenamiento
-          </h2>
+          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
+            Partituras
+          </h3>
           <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
             {cargando ? 'Cargando...' : `${partituras.length} obra${partituras.length !== 1 ? 's' : ''}`}
           </p>
@@ -224,10 +377,84 @@ export default function PartiturasAdmin() {
         ))}
       </div>
 
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '32px 0 14px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
+            Vocalización
+          </h3>
+          <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
+            {cargandoEjercicios ? 'Cargando...' : `${ejerciciosVocalizacion.length} ejercicio${ejerciciosVocalizacion.length !== 1 ? 's' : ''}`}
+          </p>
+        </div>
+        <button onClick={() => setMostrarFormEjercicio(true)}
+          style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Nuevo ejercicio
+        </button>
+      </div>
+
+      {errorEjercicios && <div style={{ color: '#A32D2D', fontSize: '13px', marginBottom: '16px' }}>{errorEjercicios}</div>}
+
+      {cargandoEjercicios && <div style={{ color: '#888780', fontSize: '13px' }}>Cargando...</div>}
+
+      {!cargandoEjercicios && ejerciciosVocalizacion.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 24px', color: '#888780', fontSize: '14px' }}>
+          Todavía no cargaste ningún ejercicio de vocalización.
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {ejerciciosVocalizacion.map(ej => (
+          <div key={ej.id} style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '180px' }}>
+              <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{ej.nombre}</div>
+              {ej.instruccion_texto && (
+                <div style={{ fontSize: '12px', color: '#888780' }}>{ej.instruccion_texto}</div>
+              )}
+            </div>
+
+            <button onClick={() => toggleActivoEjercicio(ej)} disabled={procesandoEjercicio === ej.id}
+              style={{
+                fontSize: '12px', fontWeight: '500', border: 'none', borderRadius: '20px', padding: '5px 14px', cursor: 'pointer',
+                background: ej.activo ? '#E1F5EE' : '#F1EFE8',
+                color: ej.activo ? '#04342C' : '#5F5E5A',
+              }}>
+              {ej.activo ? '✓ Activo' : 'Desactivado'}
+            </button>
+
+            {confirmEliminarEjercicio === ej.id ? (
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button onClick={() => handleEliminarEjercicio(ej.id)} disabled={procesandoEjercicio === ej.id}
+                  style={{ fontSize: '12px', color: '#FFFFFF', background: '#A32D2D', border: 'none', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
+                  Confirmar
+                </button>
+                <button onClick={() => setConfirmEliminarEjercicio(null)}
+                  style={{ fontSize: '12px', color: '#5F5E5A', background: 'none', border: '1px solid #D3D1C7', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmEliminarEjercicio(ej.id)}
+                style={{ fontSize: '12px', color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Eliminar
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
       {mostrarForm && (
         <ModalNuevaPartitura
           onCerrar={() => setMostrarForm(false)}
           onGuardada={() => { setMostrarForm(false); recargar() }}
+        />
+      )}
+
+      {mostrarFormEjercicio && (
+        <ModalNuevoEjercicio
+          proximoOrden={ejerciciosVocalizacion.reduce((max, e) => Math.max(max, e.orden || 0), -1) + 1}
+          onCerrar={() => setMostrarFormEjercicio(false)}
+          onGuardada={() => { setMostrarFormEjercicio(false); recargarEjercicios() }}
         />
       )}
     </div>

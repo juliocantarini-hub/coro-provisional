@@ -242,3 +242,65 @@ export function parsearMusicXML(xmlTexto) {
     divisions: divisionsGlobal,
   }
 }
+
+// ─── Ejercicios de vocalización (Entrenamiento) ──────────────────────────────
+// A diferencia de una obra coral, acá nos interesa UNA sola línea melódica
+// (como se escribe en MuseScore para un calentamiento) convertida a la forma
+// que espera un ejercicio "patron_ritmico" en EjercicioPlayer.jsx: nota
+// inicial + semitonos relativos a esa nota + duración de cada nota en
+// dieciseisavos + el tempo del archivo (si lo trae).
+
+const SEMITONOS_STEP = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
+
+// "C#4" / "Bb3" / "C4" (el mismo formato que devuelve pitchANota) -> semitono
+// absoluto (número MIDI), para poder calcular intervalos entre notas.
+function notaASemitonoAbsoluto(notaStr) {
+  const m = notaStr.match(/^([A-G])(#{1,2}|b{1,2})?(-?\d+)$/)
+  if (!m) return null
+  const [, step, alteracion, octavaStr] = m
+  let alter = 0
+  if (alteracion === '#') alter = 1
+  else if (alteracion === '##') alter = 2
+  else if (alteracion === 'b') alter = -1
+  else if (alteracion === 'bb') alter = -2
+  return SEMITONOS_STEP[step] + alter + (parseInt(octavaStr, 10) + 1) * 12
+}
+
+export function parsearPatronVocalizacion(xmlTexto) {
+  const parser = new DOMParser()
+  const dom = parser.parseFromString(xmlTexto, 'application/xml')
+
+  const errorParseo = dom.getElementsByTagName('parsererror')[0]
+  if (errorParseo) throw new Error('El archivo no es un MusicXML válido.')
+
+  const partesEl = Array.from(dom.getElementsByTagName('part'))
+  if (!partesEl.length) throw new Error('El MusicXML no tiene ninguna parte.')
+
+  // Tomamos la primera parte (un ejercicio de vocalización es una sola línea).
+  const crudos = extraerEventosCrudos(partesEl[0])
+  const vozIds = Object.keys(crudos.eventosPorVoz)
+  if (!vozIds.length) throw new Error('No encontramos notas en el archivo.')
+
+  // Si hubiera más de una <voice> interna, usamos la que tiene más eventos.
+  const vozId = vozIds.reduce((mejor, id) =>
+    crudos.eventosPorVoz[id].length > (crudos.eventosPorVoz[mejor]?.length || 0) ? id : mejor
+  , vozIds[0])
+
+  const eventos = crudos.eventosPorVoz[vozId]
+    .filter(e => e.ticks > 0 && e.nota)
+    .sort((a, b) => a.tickInicio - b.tickInicio)
+
+  if (!eventos.length) throw new Error('No encontramos notas con altura en el archivo (¿solo silencios?).')
+
+  const divisions = crudos.divisions || 1
+  const semitonosAbsolutos = eventos.map(e => notaASemitonoAbsoluto(e.nota))
+  const base = semitonosAbsolutos[0]
+
+  return {
+    notaInicial: eventos[0].nota,
+    notasSemitonos: semitonosAbsolutos.map(s => s - base),
+    duraciones16avos: eventos.map(e => Math.max(1, Math.round((e.ticks / divisions) * 4))),
+    tempoDetectado: crudos.cambiosTempo.length ? Math.round(crudos.cambiosTempo[0].bpm) : null,
+    cantidadNotas: eventos.length,
+  }
+}
