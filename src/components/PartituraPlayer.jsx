@@ -854,7 +854,12 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         {/* Afinación (con micrófono) y piano de "ver las notas" (sin micrófono):
             dos formas de usar el piano, una sola a la vez. */}
         <div style={{ padding: '12px 18px 14px' }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Centrados en la pantalla, como pidió Julio (antes arrancaban
+              pegados a la izquierda). El botón de ayuda ahora vive siempre
+              acá en el medio, no solo con el mic activo: explica el flujo de
+              práctica en general (piano Y afinación), así que tiene sentido
+              aunque todavía no se haya prendido el micrófono. */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
             <button onClick={alternarMicrofono}
               title="Cantá y mirá en el medidor y el piano qué tan afinado estás"
               style={{
@@ -867,10 +872,16 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
               {micActivo ? '🎤 Apagar micrófono' : '🎤 Practicar afinación'}
             </button>
 
-            {micActivo && (
+            {/* Ayuda: antes el texto aparecía pegado debajo de estos botones y
+                empujaba el piano/medidor hacia abajo al abrirse (un bloque
+                que cambiaba de alto). Ahora es un menú flotante — mismo
+                patrón que el de velocidad en la barra de transporte — que se
+                superpone sin mover nada de lugar, con una capa invisible
+                atrás para cerrarlo tocando afuera. */}
+            <div style={{ position: 'relative' }}>
               <button onClick={() => setAyudaAfinacionAbierta(a => !a)}
-                title="Cómo usar la afinación"
-                aria-label="Cómo usar la afinación"
+                title="Cómo practicar la afinación"
+                aria-label="Cómo practicar la afinación"
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   width: '26px', height: '26px', borderRadius: '50%',
@@ -880,7 +891,27 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
                 }}>
                 ?
               </button>
-            )}
+              {ayudaAfinacionAbierta && (
+                <>
+                  <div onClick={() => setAyudaAfinacionAbierta(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 10, width: '260px', maxWidth: '72vw',
+                    fontSize: '12px', color: '#5F5E5A', background: '#FFFFFF', lineHeight: '1.5',
+                    border: '1px solid #E8E6DF', borderRadius: '10px', padding: '12px 14px',
+                    boxShadow: '0 4px 14px rgba(26,26,24,0.18)',
+                  }}>
+                    Para practicar la afinación, escuchá primero una sección, pausá
+                    y repetila cantándola. Tu afinación se refleja en las teclas del
+                    piano, y el medidor de afinación muestra tu rango: si se
+                    mantiene en verde y amarillo, tu afinación es estable.
+                    <br /><br />
+                    La primera vez el navegador va a pedir permiso para usar el
+                    micrófono — hace falta aceptarlo para que esto funcione.
+                  </div>
+                </>
+              )}
+            </div>
 
             <button onClick={alternarPianoNotas}
               title="Ver en el piano las notas que van sonando, sin usar el micrófono"
@@ -899,27 +930,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
 
           {micActivo && (
             <div style={{ marginTop: '14px' }}>
-              {/* El texto de ayuda es fijo (no cambia con lo que se va
-                  cantando) para que el bloque no cambie de alto solo — antes
-                  había una línea que iba cambiando de contenido todo el
-                  tiempo (y un aviso de auriculares que aparecía y
-                  desaparecía) y eso hacía que el resto de la pantalla
-                  "saltara" mientras se cantaba. Ahora esa explicación vive en
-                  el signo de ayuda (el botón "?"), que el cantante abre
-                  cuando quiere. */}
-              {ayudaAfinacionAbierta && (
-                <div style={{
-                  fontSize: '12px', color: '#5F5E5A', background: '#F7F6F1',
-                  border: '1px solid #E8E6DF', borderRadius: '8px', padding: '10px 12px',
-                  marginBottom: '10px', lineHeight: '1.5',
-                }}>
-                  Escuchá (o cantá) tu parte con el acompañamiento y pausá. Después
-                  cantala sola, sin que suene el acompañamiento: ahí el medidor y
-                  el piano reflejan mejor tu voz. Cantar con el acompañamiento
-                  sonando al mismo tiempo, sin auriculares, puede no funcionar
-                  bien — lo más confiable es cantar en pausa.
-                </div>
-              )}
               <MedidorAfinacion cents={centsMostrados} />
               {/* El piano tiene dos momentos distintos acá. Mientras la
                   partitura está REALMENTE sonando (reproduciendo Y no
@@ -942,14 +952,13 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
             </div>
           )}
 
+          {/* Sin texto dinámico debajo del piano (antes "nota que suena
+              ahora en tu voz" / "silencio en este instante" / "reproducí la
+              obra para ver las notas", que iba cambiando todo el tiempo y
+              hacía que el diseño subiera y bajara). Solo el piano. */}
           {pianoNotasAbierto && !micActivo && (
             <div style={{ marginTop: '14px' }}>
               <PianoVisual notaActiva={notaSonandoAhora} ataqueId={notaSonandoInfo?.tiempo} />
-              <div style={{ fontSize: '11px', color: '#888780', marginTop: '6px' }}>
-                {notaSonandoAhora
-                  ? 'nota que suena ahora en tu voz'
-                  : reproduciendo ? 'silencio en este instante' : 'reproducí la obra para ver las notas'}
-              </div>
             </div>
           )}
         </div>
