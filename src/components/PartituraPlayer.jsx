@@ -116,6 +116,14 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   // que el cantante abre cuando quiere (no cambia de tamaño solo).
   const [ayudaAfinacionAbierta, setAyudaAfinacionAbierta] = useState(false)
 
+  // Menú flotante de velocidad (se abre con el ícono de hamburguesa, en vez de
+  // tener las 5 opciones siempre expuestas en la barra de controles) y, por
+  // separado, la posición "en vivo" mientras se arrastra la barra de progreso
+  // (null = no se está arrastrando; si no, la fracción 0-1 bajo el dedo/mouse,
+  // que todavía no se aplicó — recién se busca esa posición al soltar).
+  const [velocidadMenuAbierto, setVelocidadMenuAbierto] = useState(false)
+  const [arrastreFraccion, setArrastreFraccion] = useState(null)
+
   const partituraParseada = useMemo(() => {
     try {
       return parsearMusicXML(partitura.musicxml)
@@ -286,6 +294,25 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
       else break
     }
     return irAPosicionMusical(posicionMusical)
+  }
+
+  // Botones "compás anterior" / "compás siguiente": saltan al principio del
+  // compás vecino al que está sonando ahora mismo (no al compás actual), para
+  // poder tomar carrera y repetir un pasaje desde un poco antes, o adelantarse
+  // uno a uno. Cada toque mueve un compás más — apretar varias veces seguidas
+  // retrocede/avanza esa misma cantidad de compases.
+  function saltarCompas(direccion) {
+    if (!partituraParseada) return
+    const medidas = partituraParseada.medidas
+    if (!medidas || !medidas.length) return
+    const posicionMusical = tiempoActual * velocidad
+    let indice = 0
+    for (let i = 0; i < medidas.length; i++) {
+      if (medidas[i].tiempo <= posicionMusical) indice = i
+      else break
+    }
+    const nuevoIndice = Math.max(0, Math.min(medidas.length - 1, indice + direccion))
+    irAPosicionMusical(medidas[nuevoIndice].tiempo)
   }
 
   // Cambiar el tempo mientras suena antes no hacía nada audible: las notas ya
@@ -590,6 +617,11 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
   const duracionTotal = partitura.duracion_seg || partituraParseada.duracionTotal
   const duracionEscalada = duracionTotal / velocidad
   const progresoPct = duracionEscalada > 0 ? Math.min(100, Math.max(0, (tiempoActual / duracionEscalada) * 100)) : 0
+  // Mientras se arrastra la barra de progreso, mostramos la posición bajo el
+  // dedo/mouse en vez de la real (que todavía no cambió — recién se busca al
+  // soltar, ver el manejador onPointerUp de la barra).
+  const progresoMostradoPct = arrastreFraccion != null ? arrastreFraccion * 100 : progresoPct
+  const tiempoMostrado = arrastreFraccion != null ? arrastreFraccion * duracionEscalada : tiempoActual
 
   // Qué centésimas mostramos en el medidor: si hay una nota de la partitura
   // sonando ahora mismo en la voz propia, comparamos contra ESA nota (lo que
@@ -639,85 +671,182 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
         <div style={{ padding: '14px 18px 4px', borderTop: '1px solid #E8E6DF' }}>
           {/* Área de toque más alta que la barra visual (3px es muy fino para
               tocar con el dedo) — permite ir directo a un punto de la partitura
-              tocando/clickeando en la barra, no solo mirarla. */}
+              tocando/clickeando en la barra, y también arrastrar el círculo
+              para buscar una posición antes de soltar. Mientras se arrastra
+              (arrastreFraccion no es null) solo actualizamos la posición
+              mostrada en pantalla, sin re-programar el audio en cada
+              movimiento — eso recién pasa una vez, al soltar, para no generar
+              decenas de saltos/recalculos mientras el dedo se mueve. */}
           <div
-            onClick={(e) => {
+            onPointerDown={(e) => {
               const rect = e.currentTarget.getBoundingClientRect()
-              buscarPosicion((e.clientX - rect.left) / rect.width)
+              e.currentTarget.setPointerCapture(e.pointerId)
+              setArrastreFraccion(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)))
             }}
-            style={{ position: 'relative', height: '20px', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            onPointerMove={(e) => {
+              if (arrastreFraccion == null) return
+              const rect = e.currentTarget.getBoundingClientRect()
+              setArrastreFraccion(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)))
+            }}
+            onPointerUp={() => {
+              if (arrastreFraccion == null) return
+              buscarPosicion(arrastreFraccion)
+              setArrastreFraccion(null)
+            }}
+            onPointerCancel={() => setArrastreFraccion(null)}
+            style={{
+              position: 'relative', height: '20px', display: 'flex', alignItems: 'center',
+              cursor: 'pointer', touchAction: 'none',
+            }}>
             <div style={{ position: 'relative', width: '100%', height: '3px', borderRadius: '2px', background: '#E8E6DF' }}>
               <div style={{
                 position: 'absolute', left: 0, top: 0, height: '100%', borderRadius: '2px',
-                width: `${progresoPct}%`, background: '#1D9E75',
+                width: `${progresoMostradoPct}%`, background: '#1D9E75',
+                transition: arrastreFraccion == null ? 'width 0.1s linear' : 'none',
               }} />
               <div style={{
-                position: 'absolute', top: '50%', left: `${progresoPct}%`, transform: 'translate(-50%, -50%)',
-                width: '12px', height: '12px', borderRadius: '50%',
+                position: 'absolute', top: '50%', left: `${progresoMostradoPct}%`, transform: 'translate(-50%, -50%)',
+                width: arrastreFraccion != null ? '16px' : '12px', height: arrastreFraccion != null ? '16px' : '12px',
+                borderRadius: '50%',
                 background: '#0F6E56', border: '2.5px solid #FFFFFF', boxShadow: '0 1px 3px rgba(26,26,24,0.3)',
+                transition: arrastreFraccion == null ? 'left 0.1s linear, width 0.1s, height 0.1s' : 'none',
               }} />
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
             <span style={{ fontSize: '11px', color: '#888780', fontVariantNumeric: 'tabular-nums' }}>
-              {formatoTiempo(tiempoActual)}
+              {formatoTiempo(tiempoMostrado)}
             </span>
             <span style={{ fontSize: '11px', color: '#888780', fontVariantNumeric: 'tabular-nums' }}>
-              -{formatoTiempo(Math.max(0, duracionEscalada - tiempoActual))}
+              -{formatoTiempo(Math.max(0, duracionEscalada - tiempoMostrado))}
             </span>
           </div>
         </div>
 
-        <div style={{ padding: '4px 18px 10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        {/* Fila de transporte, al estilo de un reproductor de música: menú de
+            velocidad (hamburguesa) — compás anterior — reproducir/pausar —
+            compás siguiente — volver al inicio. Reemplaza la fila anterior,
+            donde las 5 velocidades estaban siempre expuestas junto al botón
+            de reproducir. */}
+        <div style={{ padding: '4px 18px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+          {/* Velocidad: antes era un grupo de 5 botones siempre visible acá
+              mismo; ahora vive detrás de este ícono, en un menú flotente que
+              se abre encima del botón, para no ocupar espacio permanente en
+              una fila que ya tiene bastante. */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setVelocidadMenuAbierto(a => !a)}
+              title="Velocidad" aria-label="Velocidad"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                width: '38px', height: '38px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+                background: velocidadMenuAbierto ? '#EAE7DD' : 'transparent', color: '#5F5E5A',
+              }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <rect x="1" y="2.5" width="14" height="2" rx="1" />
+                <rect x="1" y="7" width="14" height="2" rx="1" />
+                <rect x="1" y="11.5" width="14" height="2" rx="1" />
+              </svg>
+            </button>
+            {velocidadMenuAbierto && (
+              <>
+                {/* Capa invisible de pantalla completa: tocar afuera del menú lo cierra. */}
+                <div onClick={() => setVelocidadMenuAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
+                <div style={{
+                  position: 'absolute', bottom: '100%', left: 0, marginBottom: '8px', zIndex: 10,
+                  display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '96px',
+                  background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px',
+                  padding: '4px', boxShadow: '0 4px 14px rgba(26,26,24,0.18)',
+                }}>
+                  {VELOCIDADES.map(v => (
+                    <button key={v} onClick={() => { cambiarVelocidad(v); setVelocidadMenuAbierto(false) }}
+                      style={{
+                        padding: '7px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                        fontSize: '13px', textAlign: 'left', whiteSpace: 'nowrap',
+                        fontWeight: velocidad === v ? '700' : '500',
+                        background: velocidad === v ? '#EAE7DD' : 'transparent',
+                        color: velocidad === v ? '#04342C' : '#5F5E5A',
+                      }}>
+                      {v === 1 ? 'Normal' : `${v}x`}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Compás anterior: salta al principio del compás de ANTES del que
+              suena ahora (no al actual) — pensado para tomar carrera y
+              repetir un pasaje desde un poco antes. Cada toque retrocede un
+              compás más. */}
+          <button onClick={() => saltarCompas(-1)}
+            disabled={!vocesOrdenadas.length}
+            title="Compás anterior" aria-label="Compás anterior"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              width: '38px', height: '38px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: 'transparent', color: '#5F5E5A',
+              opacity: vocesOrdenadas.length ? 1 : 0.5,
+            }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="2" y="2" width="2" height="12" rx="1" />
+              <path d="M14 2.5v11a.5.5 0 0 1-.76.42l-8-5.5a.5.5 0 0 1 0-.84l8-5.5a.5.5 0 0 1 .76.42z" />
+            </svg>
+          </button>
+
           <button onClick={alternarPlayPausa}
             disabled={!vocesOrdenadas.length}
             title={!reproduciendo ? 'Reproducir' : pausado ? 'Reanudar' : 'Pausar'}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              width: '46px', height: '46px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+              width: '50px', height: '50px', borderRadius: '50%', border: 'none', cursor: 'pointer',
               background: '#0F6E56', color: '#FFFFFF',
               boxShadow: '0 3px 8px rgba(15,110,86,0.35)',
               opacity: vocesOrdenadas.length ? 1 : 0.5,
             }}>
             {reproduciendo && !pausado ? (
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                 <rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" />
               </svg>
             ) : (
-              <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.5v13l11-6.5-11-6.5z" /></svg>
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.5v13l11-6.5-11-6.5z" /></svg>
             )}
           </button>
 
-          {reproduciendo && (
-            <button onClick={detener} title="Detener"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                width: '32px', height: '32px', borderRadius: '50%', border: '1px solid #D3D1C7', cursor: 'pointer',
-                background: '#FFFFFF', color: '#5F5E5A',
-              }}>
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2" /></svg>
-            </button>
-          )}
+          {/* Compás siguiente: avanza al principio del próximo compás. Cada
+              toque adelanta uno más. */}
+          <button onClick={() => saltarCompas(1)}
+            disabled={!vocesOrdenadas.length}
+            title="Compás siguiente" aria-label="Compás siguiente"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              width: '38px', height: '38px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: 'transparent', color: '#5F5E5A',
+              opacity: vocesOrdenadas.length ? 1 : 0.5,
+            }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="12" y="2" width="2" height="12" rx="1" />
+              <path d="M2 2.5v11a.5.5 0 0 0 .76.42l8-5.5a.5.5 0 0 0 0-.84l-8-5.5A.5.5 0 0 0 2 2.5z" />
+            </svg>
+          </button>
 
-          {/* Selector de tempo con el mismo estilo de "grupo segmentado" que ya
-              usa la app (ver las pestañas de Entrenamiento): fondo neutro y el
-              valor activo resaltado en blanco con sombra, en vez de un menú
-              desplegable aparte. */}
-          <div style={{ display: 'flex', gap: '2px', background: '#EAE7DD', borderRadius: '16px', padding: '3px' }}>
-            {VELOCIDADES.map(v => (
-              <button key={v} onClick={() => cambiarVelocidad(v)}
-                style={{
-                  padding: '5px 9px', borderRadius: '13px', border: 'none', cursor: 'pointer',
-                  fontSize: '11px', whiteSpace: 'nowrap',
-                  fontWeight: velocidad === v ? '700' : '500',
-                  background: velocidad === v ? '#FFFFFF' : 'transparent',
-                  color: velocidad === v ? '#04342C' : '#5F5E5A',
-                  boxShadow: velocidad === v ? '0 1px 3px rgba(26,26,24,0.12)' : 'none',
-                }}>
-                {v === 1 ? 'Normal' : `${v}x`}
-              </button>
-            ))}
-          </div>
+          {/* Volver al inicio: mismo comportamiento que el botón "Detener" de
+              antes (vuelve al segundo 0 y corta el audio), reubicado acá y
+              siempre presente (antes solo aparecía mientras sonaba, lo que
+              corría el resto de los botones de lugar cada vez). */}
+          <button onClick={detener}
+            disabled={!reproduciendo}
+            title="Volver al inicio" aria-label="Volver al inicio"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              width: '38px', height: '38px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: 'transparent', color: '#5F5E5A',
+              opacity: reproduciendo ? 1 : 0.5,
+            }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.7 0 3.2.77 4.2 2" />
+              <path d="M12.5 1.8v3h-3" />
+            </svg>
+          </button>
         </div>
 
         <div style={{ height: '1px', background: '#E8E6DF', margin: '0 18px' }} />
