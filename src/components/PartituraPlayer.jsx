@@ -73,7 +73,7 @@ function latenciaSalidaSeg() {
   }
 }
 
-export default function PartituraPlayer({ partitura, pantallaCompleta }) {
+export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) {
   const { perfil } = useAuth()
   const [reproduciendo, setReproduciendo] = useState(false)
   const [pausado, setPausado] = useState(false)
@@ -153,6 +153,16 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
     setMiVoz(vozPropia ? vozPropia.id : vocesOrdenadas[0].id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vocesOrdenadas, perfil?.voz])
+
+  // Avisa hacia afuera (Entrenamiento, para mostrar "Obra | Voz" en el
+  // encabezado de la práctica en pantalla completa) qué voz quedó resuelta
+  // para este cantante, cada vez que cambia. Es la misma fuente que ya usa
+  // la partitura visual para el nombre de la voz (vozNombre, más abajo).
+  useEffect(() => {
+    if (!onVoz) return
+    const voz = vocesOrdenadas.find(v => v.id === miVoz)
+    onVoz(voz?.nombre || null)
+  }, [vocesOrdenadas, miVoz, onVoz])
 
   useEffect(() => {
     if (!partituraParseada) setError('No pudimos leer este archivo MusicXML.')

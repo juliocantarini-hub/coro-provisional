@@ -1,10 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useEjerciciosEntrenamiento, useEjerciciosHoy } from '../../hooks/useEntrenamiento'
 import EjercicioPlayer from '../../components/EjercicioPlayer'
 import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
 import { usePartituras, usePartitura } from '../../hooks/usePartituras'
 import PartituraPlayer from '../../components/PartituraPlayer'
+
+function useEsMovil() {
+  const [esMovil, setEsMovil] = useState(window.innerWidth <= 768)
+  useEffect(() => {
+    const fn = () => setEsMovil(window.innerWidth <= 768)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+  return esMovil
+}
 
 const CATEGORIAS = {
   respiracion:  { label: 'Respiración',  color: '#0F6E56', bg: '#E1F5EE' },
@@ -30,6 +40,11 @@ function formatoTiempoPartitura(seg) {
 function PartituraCard({ resumen }) {
   const [abierta, setAbierta] = useState(false)
   const { partitura, cargando } = usePartitura(abierta ? resumen.id : null)
+  // La voz (cuerda) se resuelve adentro de PartituraPlayer, a partir del
+  // perfil del cantante — PartituraPlayer la reporta acá por este callback
+  // para poder mostrarla junto al título ("Going Home | Tenor"), ya que el
+  // encabezado de la pantalla completa lo arma este componente, no el player.
+  const [voz, setVoz] = useState(null)
 
   return (
     <>
@@ -73,12 +88,12 @@ function PartituraCard({ resumen }) {
               </svg>
             </button>
             <div style={{ fontSize: '14px', fontWeight: '600', color: '#1A1A18', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {resumen.titulo}
+              {resumen.titulo}{voz ? ` | ${voz}` : ''}
             </div>
           </div>
           <div style={{ flex: '1 1 auto', minHeight: 0, padding: '12px', display: 'flex', flexDirection: 'column' }}>
             {cargando && <div style={{ fontSize: '13px', color: '#888780' }}>Cargando...</div>}
-            {partitura && <PartituraPlayer partitura={partitura} pantallaCompleta />}
+            {partitura && <PartituraPlayer partitura={partitura} pantallaCompleta onVoz={setVoz} />}
           </div>
         </div>
       )}
@@ -93,14 +108,26 @@ export default function Entrenamiento() {
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
   const [categoriaActiva, setCategoriaActiva] = useState('respiracion')
   const [pianoAbierto, setPianoAbierto] = useState(false)
+  const esMovil = useEsMovil()
 
   const TABS = [
     ...ORDEN_CATEGORIAS.map(cat => ({ id: cat, label: CATEGORIAS[cat]?.label || cat, icono: null })),
-    { id: PRACTICA, label: 'Practica tu voz', icono: '🎤' },
+    { id: PRACTICA, label: 'Práctica', icono: '🎤' },
   ]
 
   return (
     <div>
+      {/* En mobile "Buscá tu nota" flota fijo arriba a la derecha, a la misma
+          altura que el botón de hamburguesa de AppLayout (fixed, top 12px) —
+          así se mantiene la estética que ya tienen los demás coros. Antes
+          vivía dentro de esta fila, junto al título, y en pantallas angostas
+          el flexWrap lo mandaba a una fila nueva debajo del título en vez de
+          quedar parejo con el menú. */}
+      {esMovil && (
+        <div style={{ position: 'fixed', top: '12px', right: '16px', zIndex: 60 }}>
+          <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
@@ -119,7 +146,7 @@ export default function Entrenamiento() {
               </span>
             </div>
           )}
-          <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
+          {!esMovil && <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />}
         </div>
       </div>
 
