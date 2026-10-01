@@ -13,7 +13,7 @@ const NAV_CANTANTE = [
   { ruta: '/avisos',     label: 'Avisos',         icono: 'campana', badge: true },
   { ruta: '/encuestas',  label: 'Encuestas',      icono: 'encuestas', badgeEncuestas: true },
   { ruta: '/blog',       label: 'Textos',         icono: 'blog' },
-  { ruta: '/asistencia', label: 'Mi asistencia',  icono: 'calendario' },
+  { ruta: '/asistencia', label: 'Mi asistencia',  icono: 'asistencia' },
   { ruta: '/companeros', label: 'Mis compañeros', icono: 'usuarios', presencia: true },
   { ruta: '/perfil',     label: 'Mi perfil',      icono: 'perfil' },
 ]
@@ -22,9 +22,9 @@ const NAV_ADMIN = [
   { ruta: '/admin',              label: 'Dashboard',  icono: 'dashboard' },
   { ruta: '/admin/obras',        label: 'Obras',      icono: 'musica' },
   { ruta: '/admin/eventos',      label: 'Eventos',    icono: 'calendario' },
-  { ruta: '/admin/asistencia',   label: 'Asistencia', icono: 'calendario' },
+  { ruta: '/admin/asistencia',   label: 'Asistencia', icono: 'asistencia' },
   { ruta: '/admin/estudio',      label: 'Estudio',    icono: 'estudio' },
-  { ruta: '/admin/partituras',   label: 'Entrenamiento', icono: 'musica' },
+  { ruta: '/admin/partituras',   label: 'Entrenamiento', icono: 'entrenamiento' },
   { ruta: '/admin/estadistica',  label: 'Estadística', icono: 'estadistica' },
   { ruta: '/admin/avisos',       label: 'Avisos',     icono: 'campana' },
   { ruta: '/admin/encuestas',    label: 'Encuestas',  icono: 'encuestas' },
@@ -44,6 +44,11 @@ const ICONOS = {
   dashboard:  "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
   usuarios:   "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
   estudio:    "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z",
+  // Antes compartía el mismo ícono de calendario que "Eventos" (y del lado
+  // cantante, que "Calendario") — una planilla con un broche arriba y un
+  // tilde adentro, bien distinta de ambos, para una pantalla que en
+  // realidad es un registro de quién vino, no una fecha.
+  asistencia: "M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z",
   asistente:  "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z",
   pagos: "M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z",
   encuestas:  "M5 9h3v11H5zm11-5h3v16h-3zM10.5 13h3v8h-3z",
