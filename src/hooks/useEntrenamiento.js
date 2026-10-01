@@ -201,3 +201,15 @@ export async function eliminarEjercicioEntrenamiento(id) {
     .eq('id', id)
   return { ok: !error, error: error?.message }
 }
+
+export async function actualizarEjercicioEntrenamiento(id, { nombre, instruccionTexto, patronTone }) {
+  const { error } = await supabase
+    .from('ejercicios_entrenamiento')
+    .update({
+      nombre,
+      instruccion_texto: instruccionTexto?.trim() || null,
+      patron_tone: patronTone,
+    })
+    .eq('id', id)
+  return { ok: !error, error: error?.message }
+}

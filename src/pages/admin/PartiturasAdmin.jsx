@@ -2,16 +2,32 @@ import { useState } from 'react'
 import JSZip from 'jszip'
 import { parsearMusicXML, parsearPatronVocalizacion } from '../../lib/musicxml'
 import {
-  usePartiturasAdmin, crearPartitura, publicarPartitura, eliminarPartitura,
+  usePartiturasAdmin, crearPartitura, publicarPartitura, eliminarPartitura, actualizarPartitura,
 } from '../../hooks/usePartituras'
 import {
   useEjerciciosEntrenamientoAdmin, crearEjercicioEntrenamiento,
-  activarEjercicioEntrenamiento, eliminarEjercicioEntrenamiento,
+  activarEjercicioEntrenamiento, eliminarEjercicioEntrenamiento, actualizarEjercicioEntrenamiento,
 } from '../../hooks/useEntrenamiento'
 
 const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'vocalizacion']
 const CATEGORIA_LABEL = { respiracion: 'Respiración', resonancia: 'Resonancia', vocalizacion: 'Vocalización' }
 const CATEGORIA_NOTA = { respiracion: 'Estos todavía se cargan directo en Supabase — no son ejercicios armados a partir de notas.' }
+
+// Distintos tipos de patron_tone usan distinta clave para la nota de arranque
+// (ver EjercicioPlayer.jsx). Detectamos cuál aplica para mostrar un solo campo.
+const NOTA_KEYS = ['nota_inicial', 'nota', 'nota_base']
+
+function detectarNotaKey(patronTone) {
+  if (!patronTone) return null
+  return NOTA_KEYS.find(k => typeof patronTone[k] === 'string') || null
+}
+
+function normalizarNota(valor) {
+  const m = (valor || '').trim().match(/^([A-Ga-g])(#{1,2}|b{1,2})?(-?\d+)$/)
+  if (!m) return null
+  const [, letra, alteracion, octava] = m
+  return `${letra.toUpperCase()}${alteracion || ''}${octava}`
+}
 
 function formatoTiempo(seg) {
   if (!seg || !isFinite(seg)) return '—'
@@ -282,11 +298,169 @@ function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
   )
 }
 
+function ModalEditarPartitura({ partitura, onCerrar, onGuardada }) {
+  const [titulo, setTitulo] = useState(partitura.titulo || '')
+  const [compositor, setCompositor] = useState(partitura.compositor || '')
+  const [procesando, setProcesando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleGuardar() {
+    if (!titulo.trim()) return
+    setProcesando(true)
+    const resultado = await actualizarPartitura(partitura.id, { titulo: titulo.trim(), compositor })
+    setProcesando(false)
+    if (resultado.ok) onGuardada()
+    else setError(resultado.error || 'No pudimos guardar los cambios.')
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
+      <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', margin: '0 0 16px' }}>
+          Editar partitura
+        </h3>
+
+        {error && (
+          <div style={{ fontSize: '13px', color: '#A32D2D', background: '#FCEBEB', borderRadius: '8px', padding: '8px 12px', marginBottom: '14px' }}>
+            {error}
+          </div>
+        )}
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Título</label>
+        <input type="text" value={titulo} onChange={e => setTitulo(e.target.value)}
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Compositor (opcional)</label>
+        <input type="text" value={compositor} onChange={e => setCompositor(e.target.value)}
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '20px', boxSizing: 'border-box' }} />
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={onCerrar}
+            style={{ flex: 1, height: '40px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', cursor: 'pointer', fontSize: '13px' }}>
+            Cancelar
+          </button>
+          <button onClick={handleGuardar} disabled={!titulo.trim() || procesando}
+            style={{
+              flex: 2, height: '40px', borderRadius: '8px', border: 'none', cursor: (!titulo.trim() || procesando) ? 'not-allowed' : 'pointer',
+              background: !titulo.trim() ? '#D3D1C7' : '#0F6E56', color: '#FFFFFF', fontSize: '13px', fontWeight: '500',
+            }}>
+            {procesando ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
+  const [nombre, setNombre] = useState(ejercicio.nombre || '')
+  const [instruccionTexto, setInstruccionTexto] = useState(ejercicio.instruccion_texto || '')
+  const notaKey = detectarNotaKey(ejercicio.patron_tone)
+  const [notaInicial, setNotaInicial] = useState(notaKey ? ejercicio.patron_tone[notaKey] : '')
+  const tieneTempo = !!ejercicio.patron_tone && typeof ejercicio.patron_tone.tempo_bpm === 'number'
+  const [tempoBpm, setTempoBpm] = useState(tieneTempo ? String(ejercicio.patron_tone.tempo_bpm) : '')
+  const [procesando, setProcesando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleGuardar() {
+    if (!nombre.trim()) return
+    setError('')
+
+    let patronTone = ejercicio.patron_tone
+
+    if (notaKey) {
+      const notaNormalizada = normalizarNota(notaInicial)
+      if (!notaNormalizada) {
+        setError('La nota inicial tiene que tener el formato de nota + octava, por ejemplo "C4" o "G#5".')
+        return
+      }
+      patronTone = { ...patronTone, [notaKey]: notaNormalizada }
+    }
+
+    if (tieneTempo) {
+      const tempo = parseInt(tempoBpm, 10)
+      if (!tempo || tempo <= 0) {
+        setError('El tempo tiene que ser un número mayor a 0.')
+        return
+      }
+      patronTone = { ...patronTone, tempo_bpm: tempo }
+    }
+
+    setProcesando(true)
+    const resultado = await actualizarEjercicioEntrenamiento(ejercicio.id, {
+      nombre: nombre.trim(),
+      instruccionTexto,
+      patronTone,
+    })
+    setProcesando(false)
+    if (resultado.ok) onGuardada()
+    else setError(resultado.error || 'No pudimos guardar los cambios.')
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' }}>
+      <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', margin: '0 0 16px' }}>
+          Editar ejercicio
+        </h3>
+
+        {error && (
+          <div style={{ fontSize: '13px', color: '#A32D2D', background: '#FCEBEB', borderRadius: '8px', padding: '8px 12px', marginBottom: '14px' }}>
+            {error}
+          </div>
+        )}
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nombre</label>
+        <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Instrucción para el cantante (opcional)</label>
+        <textarea value={instruccionTexto} onChange={e => setInstruccionTexto(e.target.value)} rows={2}
+          style={{ width: '100%', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
+
+        {notaKey && (
+          <>
+            <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nota inicial</label>
+            <input type="text" value={notaInicial} onChange={e => setNotaInicial(e.target.value)} placeholder="C4"
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box' }} />
+            <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
+              Nota + octava. Ej: C4 si el patrón asciende desde el Do central, G5 si desciende desde ahí.
+            </p>
+          </>
+        )}
+
+        {tieneTempo && (
+          <>
+            <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Tempo (bpm)</label>
+            <input type="number" value={tempoBpm} onChange={e => setTempoBpm(e.target.value)}
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '20px', boxSizing: 'border-box' }} />
+          </>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={onCerrar}
+            style={{ flex: 1, height: '40px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', cursor: 'pointer', fontSize: '13px' }}>
+            Cancelar
+          </button>
+          <button onClick={handleGuardar} disabled={!nombre.trim() || procesando}
+            style={{
+              flex: 2, height: '40px', borderRadius: '8px', border: 'none', cursor: (!nombre.trim() || procesando) ? 'not-allowed' : 'pointer',
+              background: !nombre.trim() ? '#D3D1C7' : '#0F6E56', color: '#FFFFFF', fontSize: '13px', fontWeight: '500',
+            }}>
+            {procesando ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PartiturasAdmin() {
   const { partituras, cargando, error, recargar } = usePartiturasAdmin()
   const [mostrarForm, setMostrarForm] = useState(false)
   const [procesando, setProcesando] = useState(null)
   const [confirmEliminar, setConfirmEliminar] = useState(null)
+  const [editandoPartitura, setEditandoPartitura] = useState(null)
 
   const { ejercicios, cargando: cargandoEjercicios, error: errorEjercicios, recargar: recargarEjercicios } = useEjerciciosEntrenamientoAdmin()
   const categoriasExtra = [...new Set(ejercicios.map(e => e.categoria).filter(Boolean))]
@@ -296,6 +470,7 @@ export default function PartiturasAdmin() {
   const [mostrarFormEjercicio, setMostrarFormEjercicio] = useState(false)
   const [procesandoEjercicio, setProcesandoEjercicio] = useState(null)
   const [confirmEliminarEjercicio, setConfirmEliminarEjercicio] = useState(null)
+  const [editandoEjercicio, setEditandoEjercicio] = useState(null)
 
   async function togglePublicar(p) {
     setProcesando(p.id)
@@ -378,6 +553,11 @@ export default function PartiturasAdmin() {
               {p.publicada ? '✓ Publicada' : 'Sin publicar'}
             </button>
 
+            <button onClick={() => setEditandoPartitura(p)}
+              style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+              Editar
+            </button>
+
             {confirmEliminar === p.id ? (
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button onClick={() => handleEliminar(p.id)} disabled={procesando === p.id}
@@ -456,6 +636,11 @@ export default function PartiturasAdmin() {
                     {ej.activo ? '✓ Activo' : 'Desactivado'}
                   </button>
 
+                  <button onClick={() => setEditandoEjercicio(ej)}
+                    style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+                    Editar
+                  </button>
+
                   {confirmEliminarEjercicio === ej.id ? (
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button onClick={() => handleEliminarEjercicio(ej.id)} disabled={procesandoEjercicio === ej.id}
@@ -492,6 +677,22 @@ export default function PartiturasAdmin() {
           ejercicios={ejercicios}
           onCerrar={() => setMostrarFormEjercicio(false)}
           onGuardada={() => { setMostrarFormEjercicio(false); recargarEjercicios() }}
+        />
+      )}
+
+      {editandoPartitura && (
+        <ModalEditarPartitura
+          partitura={editandoPartitura}
+          onCerrar={() => setEditandoPartitura(null)}
+          onGuardada={() => { setEditandoPartitura(null); recargar() }}
+        />
+      )}
+
+      {editandoEjercicio && (
+        <ModalEditarEjercicio
+          ejercicio={editandoEjercicio}
+          onCerrar={() => setEditandoEjercicio(null)}
+          onGuardada={() => { setEditandoEjercicio(null); recargarEjercicios() }}
         />
       )}
     </div>
