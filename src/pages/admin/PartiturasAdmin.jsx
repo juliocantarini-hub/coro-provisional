@@ -262,13 +262,6 @@ function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
           </div>
         )}
 
-        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nota inicial</label>
-        <input type="text" value={notaInicial} onChange={e => setNotaInicial(e.target.value)} placeholder="C4"
-          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box' }} />
-        <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
-          Nota + octava. Ej: C4 si el patrón asciende desde el Do central, G5 si desciende desde ahí. Se precarga con lo que detectamos del archivo, pero la podés escribir vos.
-        </p>
-
         <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nombre</label>
         <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
           style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
@@ -280,6 +273,13 @@ function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
         <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Tempo (bpm)</label>
         <input type="number" value={tempoBpm} onChange={e => setTempoBpm(e.target.value)} placeholder="80"
           style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nota inicial</label>
+        <input type="text" value={notaInicial} onChange={e => setNotaInicial(e.target.value)} placeholder="C4"
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box' }} />
+        <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
+          Nota + octava. Ej: C4 si el patrón asciende desde el Do central, G5 si desciende desde ahí. Se precarga con lo que detectamos del archivo, pero la podés escribir vos.
+        </p>
 
         <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
           Repetir transportando (dejá 1 repetición si ya escribiste todas las transposiciones en el MusicXML)
