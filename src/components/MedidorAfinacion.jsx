@@ -31,7 +31,17 @@ export default function MedidorAfinacion({ cents, bandaVerde = 10, bandaAmarilla
           <div style={{
             position: 'absolute', left: `${posicionPct}%`, top: 0, bottom: 0,
             width: '3px', marginLeft: '-1.5px', background: '#1A1A18', borderRadius: '2px',
-            transition: 'left 0.1s linear',
+            // Lecturas nuevas llegan cada 80ms (ver intervalo del mic en
+            // PartituraPlayer); con una transición tan corta como la anterior
+            // (0.1s linear) la marca prácticamente saltaba de golpe a cada
+            // lectura en vez de deslizarse. Alargarla a 0.25s con "ease-out"
+            // la hace deslizar en vez de saltar. Esto es puramente visual: no
+            // toca ni retrasa el cálculo de cents (el que decide verde/
+            // amarillo/rojo), solo cómo se anima la marca entre los valores
+            // que ya recibía antes — el único costo es que la marca tarda
+            // una fracción de segundo más en terminar de llegar a su
+            // posición final tras un cambio real de nota.
+            transition: 'left 0.25s ease-out',
           }} />
         )}
       </div>
