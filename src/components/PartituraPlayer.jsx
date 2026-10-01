@@ -898,18 +898,26 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
                 title="Cómo practicar la afinación"
                 aria-label="Cómo practicar la afinación"
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-                  borderRadius: '20px', border: `1px solid ${ayudaAfinacionAbierta ? '#8A8878' : '#D3D1C7'}`,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: '26px', height: '26px', borderRadius: '50%',
+                  border: `1px solid ${ayudaAfinacionAbierta ? '#8A8878' : '#D3D1C7'}`,
                   background: ayudaAfinacionAbierta ? '#EFEEE7' : '#FFFFFF',
-                  color: '#5F5E5A', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+                  color: '#5F5E5A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: 0,
                 }}>
-                ❓ Ayuda
+                ?
               </button>
               {ayudaAfinacionAbierta && (
                 <>
                   <div onClick={() => setAyudaAfinacionAbierta(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
+                  {/* Antes centrada bajo el botón (left: 50% + translateX):
+                      como este botón es el más a la derecha de los tres, la
+                      ventana centrada se iba de la pantalla por el lado
+                      derecho y el texto quedaba cortado. Ahora el borde
+                      DERECHO de la ventana queda alineado al borde derecho
+                      del botón (right: 0, sin left/transform) y se extiende
+                      hacia la izquierda, que es donde hay lugar. */}
                   <div style={{
-                    position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+                    position: 'absolute', bottom: 'calc(100% + 8px)', right: 0,
                     zIndex: 10, width: '260px', maxWidth: '72vw',
                     fontSize: '12px', color: '#5F5E5A', background: '#FFFFFF', lineHeight: '1.5',
                     border: '1px solid #E8E6DF', borderRadius: '10px', padding: '12px 14px',
