@@ -336,7 +336,7 @@ export default function PartiturasAdmin() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
-            Partituras
+            Práctica
           </h3>
           <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
             {cargando ? 'Cargando...' : `${partituras.length} obra${partituras.length !== 1 ? 's' : ''}`}
@@ -402,7 +402,7 @@ export default function PartiturasAdmin() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '32px 0 14px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
-            Ejercicios de entrenamiento
+            Ejercicios
           </h3>
           <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
             {cargandoEjercicios ? 'Cargando...' : `${ejercicios.length} en total`}
