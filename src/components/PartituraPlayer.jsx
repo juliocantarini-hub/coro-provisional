@@ -860,6 +860,18 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
               práctica en general (piano Y afinación), así que tiene sentido
               aunque todavía no se haya prendido el micrófono. */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={alternarPianoNotas}
+              title="Ver en el piano las notas que van sonando, sin usar el micrófono"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+                borderRadius: '20px', border: `1px solid ${pianoNotasAbierto ? '#0F6E56' : '#D3D1C7'}`,
+                background: pianoNotasAbierto ? '#E1F5EE' : '#FFFFFF',
+                color: pianoNotasAbierto ? '#04342C' : '#5F5E5A',
+                fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+              }}>
+              {pianoNotasAbierto ? '🎹 Cerrar piano' : '🎹 Piano'}
+            </button>
+
             <button onClick={alternarMicrofono}
               title="Cantá y mirá en el medidor y el piano qué tan afinado estás"
               style={{
@@ -872,30 +884,32 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
               {micActivo ? '🎤 Apagar micrófono' : '🎤 Practicar afinación'}
             </button>
 
-            {/* Ayuda: antes el texto aparecía pegado debajo de estos botones y
+            {/* Ayuda: el texto aparecía antes pegado debajo de estos botones y
                 empujaba el piano/medidor hacia abajo al abrirse (un bloque
-                que cambiaba de alto). Ahora es un menú flotante — mismo
-                patrón que el de velocidad en la barra de transporte — que se
-                superpone sin mover nada de lugar, con una capa invisible
-                atrás para cerrarlo tocando afuera. */}
+                que cambiaba de alto). Es un menú flotante — mismo patrón que
+                el de velocidad en la barra de transporte — que se superpone
+                sin mover nada de lugar, con una capa invisible atrás para
+                cerrarlo tocando afuera. Se abre hacia ARRIBA (bottom: 100%,
+                no top): esta fila está cerca del borde inferior del panel, y
+                desplegado hacia abajo el contenido quedaba tapado/afuera de
+                la pantalla. */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => setAyudaAfinacionAbierta(a => !a)}
                 title="Cómo practicar la afinación"
                 aria-label="Cómo practicar la afinación"
                 style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: '26px', height: '26px', borderRadius: '50%',
-                  border: `1px solid ${ayudaAfinacionAbierta ? '#8A8878' : '#D3D1C7'}`,
+                  display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+                  borderRadius: '20px', border: `1px solid ${ayudaAfinacionAbierta ? '#8A8878' : '#D3D1C7'}`,
                   background: ayudaAfinacionAbierta ? '#EFEEE7' : '#FFFFFF',
-                  color: '#5F5E5A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', padding: 0,
+                  color: '#5F5E5A', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
                 }}>
-                ?
+                ❓ Ayuda
               </button>
               {ayudaAfinacionAbierta && (
                 <>
                   <div onClick={() => setAyudaAfinacionAbierta(false)} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
                   <div style={{
-                    position: 'absolute', top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+                    position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
                     zIndex: 10, width: '260px', maxWidth: '72vw',
                     fontSize: '12px', color: '#5F5E5A', background: '#FFFFFF', lineHeight: '1.5',
                     border: '1px solid #E8E6DF', borderRadius: '10px', padding: '12px 14px',
@@ -912,18 +926,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta }) {
                 </>
               )}
             </div>
-
-            <button onClick={alternarPianoNotas}
-              title="Ver en el piano las notas que van sonando, sin usar el micrófono"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-                borderRadius: '20px', border: `1px solid ${pianoNotasAbierto ? '#0F6E56' : '#D3D1C7'}`,
-                background: pianoNotasAbierto ? '#E1F5EE' : '#FFFFFF',
-                color: pianoNotasAbierto ? '#04342C' : '#5F5E5A',
-                fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-              }}>
-              {pianoNotasAbierto ? '🎹 Cerrar piano' : '🎹 Piano'}
-            </button>
           </div>
 
           {errorMic && <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '8px' }}>{errorMic}</div>}
