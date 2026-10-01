@@ -100,7 +100,8 @@ export default function App() {
             <Route path="/admin/blog/nuevo" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ArticuloForm /></ConLayout></RutaProtegida>} />
             <Route path="/admin/blog/:id" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><ArticuloForm /></ConLayout></RutaProtegida>} />
             <Route path="/admin/estudio" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><EstudioAdmin /></ConLayout></RutaProtegida>} />
-            <Route path="/admin/partituras" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><PartiturasAdmin /></ConLayout></RutaProtegida>} />
+            <Route path="/admin/entrenamiento" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><PartiturasAdmin /></ConLayout></RutaProtegida>} />
+            <Route path="/admin/partituras" element={<Navigate to="/admin/entrenamiento" replace />} />
             <Route path="/admin/estadistica" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><EstadisticaAdmin /></ConLayout></RutaProtegida>} />
 
             <Route path="/admin/asistente" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><AsistenteRepertorio /></ConLayout></RutaProtegida>} />
