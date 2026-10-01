@@ -163,6 +163,7 @@ function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
   const [categoria, setCategoria] = useState('vocalizacion')
   const [nombre, setNombre] = useState('')
   const [instruccionTexto, setInstruccionTexto] = useState('')
+  const [notaInicial, setNotaInicial] = useState('')
   const [tempoBpm, setTempoBpm] = useState('')
   const [repeticiones, setRepeticiones] = useState(1)
   const [transporteSemitonos, setTransporteSemitonos] = useState(0)
@@ -181,6 +182,7 @@ function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
       const texto = await extraerXmlDeArchivo(file)
       const detectado = parsearPatronVocalizacion(texto)
       setPatron(detectado)
+      setNotaInicial(detectado.notaInicial)
       if (detectado.tempoDetectado) setTempoBpm(String(detectado.tempoDetectado))
     } catch (err) {
       setError(err.message || 'No pudimos leer ese archivo.')
@@ -189,13 +191,21 @@ function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
 
   async function handleGuardar() {
     if (!nombre.trim() || !patron) return
+    setError('')
+
+    const notaNormalizada = normalizarNota(notaInicial)
+    if (!notaNormalizada) {
+      setError('La nota inicial tiene que tener el formato de nota + octava, por ejemplo "C4" o "G#5".')
+      return
+    }
+
     setProcesando(true)
 
     const reps = Math.max(1, parseInt(repeticiones, 10) || 1)
     const transporte = parseInt(transporteSemitonos, 10) || 0
     const patronTone = {
       tipo: 'patron_ritmico',
-      nota_inicial: patron.notaInicial,
+      nota_inicial: notaNormalizada,
       notas_semitonos: patron.notasSemitonos,
       duraciones_16avos: patron.duraciones16avos,
       tempo_bpm: parseInt(tempoBpm, 10) || 80,
@@ -252,6 +262,17 @@ function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
           </div>
         )}
 
+        {patron && (
+          <>
+            <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nota inicial</label>
+            <input type="text" value={notaInicial} onChange={e => setNotaInicial(e.target.value)} placeholder="C4"
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box' }} />
+            <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
+              Nota + octava. Ej: C4 si el patrón asciende desde el Do central, G5 si desciende desde ahí. Viene precargada con lo que detectamos en el archivo, pero la podés cambiar.
+            </p>
+          </>
+        )}
+
         <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nombre</label>
         <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
           style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
@@ -301,13 +322,36 @@ function ModalNuevoEjercicio({ ejercicios, onCerrar, onGuardada }) {
 function ModalEditarPartitura({ partitura, onCerrar, onGuardada }) {
   const [titulo, setTitulo] = useState(partitura.titulo || '')
   const [compositor, setCompositor] = useState(partitura.compositor || '')
+  const [previsualizacion, setPrevisualizacion] = useState(null)
+  const [xmlTexto, setXmlTexto] = useState(null)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
+
+  async function handleArchivo(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPrevisualizacion(null)
+    setXmlTexto(null)
+    setError('')
+
+    try {
+      const texto = await extraerXmlDeArchivo(file)
+      const datos = parsearMusicXML(texto)
+      setXmlTexto(texto)
+      setPrevisualizacion(datos)
+    } catch (err) {
+      setError(err.message || 'No pudimos leer ese archivo.')
+    }
+  }
 
   async function handleGuardar() {
     if (!titulo.trim()) return
     setProcesando(true)
-    const resultado = await actualizarPartitura(partitura.id, { titulo: titulo.trim(), compositor })
+    const resultado = await actualizarPartitura(partitura.id, {
+      titulo: titulo.trim(),
+      compositor,
+      ...(xmlTexto ? { musicxml: xmlTexto, duracionSeg: previsualizacion?.duracionTotal } : {}),
+    })
     setProcesando(false)
     if (resultado.ok) onGuardada()
     else setError(resultado.error || 'No pudimos guardar los cambios.')
@@ -334,6 +378,19 @@ function ModalEditarPartitura({ partitura, onCerrar, onGuardada }) {
         <input type="text" value={compositor} onChange={e => setCompositor(e.target.value)}
           style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '20px', boxSizing: 'border-box' }} />
 
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Reemplazar MusicXML (opcional)</label>
+        <input type="file" accept=".xml,.musicxml,.mxl" onChange={handleArchivo}
+          style={{ width: '100%', fontSize: '13px', marginBottom: '6px' }} />
+        <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
+          Solo si subís un archivo nuevo se reemplaza la partitura (todas las voces). Si no, se guardan los otros cambios tal cual.
+        </p>
+
+        {previsualizacion && (
+          <div style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px' }}>
+            Se detectaron {previsualizacion.voces.length} voces ({previsualizacion.voces.map(v => v.nombre).join(', ')}) · duración {formatoTiempo(previsualizacion.duracionTotal)}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={onCerrar}
             style={{ flex: 1, height: '40px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', cursor: 'pointer', fontSize: '13px' }}>
@@ -359,14 +416,44 @@ function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
   const [notaInicial, setNotaInicial] = useState(notaKey ? ejercicio.patron_tone[notaKey] : '')
   const tieneTempo = !!ejercicio.patron_tone && typeof ejercicio.patron_tone.tempo_bpm === 'number'
   const [tempoBpm, setTempoBpm] = useState(tieneTempo ? String(ejercicio.patron_tone.tempo_bpm) : '')
+  // Solo los ejercicios armados a partir de un MusicXML (vía "Nuevo ejercicio") tienen
+  // esta forma de patrón, y por lo tanto se les puede reemplazar el archivo de origen.
+  const puedeReemplazarXml = ejercicio.patron_tone?.tipo === 'patron_ritmico'
+  const [patronDetectado, setPatronDetectado] = useState(null)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
+
+  async function handleArchivo(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPatronDetectado(null)
+    setError('')
+
+    try {
+      const texto = await extraerXmlDeArchivo(file)
+      const detectado = parsearPatronVocalizacion(texto)
+      setPatronDetectado(detectado)
+      setNotaInicial(detectado.notaInicial)
+      if (detectado.tempoDetectado) setTempoBpm(String(detectado.tempoDetectado))
+    } catch (err) {
+      setError(err.message || 'No pudimos leer ese archivo.')
+    }
+  }
 
   async function handleGuardar() {
     if (!nombre.trim()) return
     setError('')
 
-    let patronTone = ejercicio.patron_tone
+    let patronTone = patronDetectado
+      ? {
+          tipo: 'patron_ritmico',
+          nota_inicial: patronDetectado.notaInicial,
+          notas_semitonos: patronDetectado.notasSemitonos,
+          duraciones_16avos: patronDetectado.duraciones16avos,
+          tempo_bpm: ejercicio.patron_tone?.tempo_bpm ?? 80,
+          transporte_por_ciclo: ejercicio.patron_tone?.transporte_por_ciclo ?? [0],
+        }
+      : ejercicio.patron_tone
 
     if (notaKey) {
       const notaNormalizada = normalizarNota(notaInicial)
@@ -417,6 +504,24 @@ function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
         <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Instrucción para el cantante (opcional)</label>
         <textarea value={instruccionTexto} onChange={e => setInstruccionTexto(e.target.value)} rows={2}
           style={{ width: '100%', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
+
+        {puedeReemplazarXml && (
+          <>
+            <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Reemplazar MusicXML (opcional)</label>
+            <input type="file" accept=".xml,.musicxml,.mxl" onChange={handleArchivo}
+              style={{ width: '100%', fontSize: '13px', marginBottom: '6px' }} />
+            <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
+              Solo si subís un archivo nuevo se reemplaza la melodía y el ritmo del ejercicio.
+            </p>
+
+            {patronDetectado && (
+              <div style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px' }}>
+                Se detectaron {patronDetectado.cantidadNotas} notas, desde {patronDetectado.notaInicial}
+                {patronDetectado.tempoDetectado ? ` · tempo detectado ${patronDetectado.tempoDetectado} bpm` : ''}
+              </div>
+            )}
+          </>
+        )}
 
         {notaKey && (
           <>

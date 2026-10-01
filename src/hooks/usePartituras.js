@@ -115,10 +115,14 @@ export async function crearPartitura({ titulo, compositor, musicxml, duracionSeg
   return { ok: !error, data, error: error?.message }
 }
 
-export async function actualizarPartitura(id, { titulo, compositor }) {
+export async function actualizarPartitura(id, { titulo, compositor, musicxml, duracionSeg }) {
+  const payload = { titulo, compositor: compositor?.trim() || null }
+  if (musicxml !== undefined) payload.musicxml = musicxml
+  if (duracionSeg !== undefined) payload.duracion_seg = duracionSeg || null
+
   const { error } = await supabase
     .from('partituras_entrenamiento')
-    .update({ titulo, compositor: compositor?.trim() || null })
+    .update(payload)
     .eq('id', id)
   return { ok: !error, error: error?.message }
 }
