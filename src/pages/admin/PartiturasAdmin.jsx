@@ -406,15 +406,28 @@ function ModalEditarPartitura({ partitura, onCerrar, onGuardada }) {
 }
 
 function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
+  // Distintos ejercicios pueden guardar la nota de arranque bajo distinta
+  // clave (ver NOTA_KEYS más arriba). Si no encontramos ninguna (no debería
+  // pasar en un ejercicio que ya suena, pero por las dudas) escribimos bajo
+  // "nota_inicial", que es la que usa EjercicioPlayer por default.
+  const notaKeyOriginal = detectarNotaKey(ejercicio.patron_tone)
+  const notaKey = notaKeyOriginal || 'nota_inicial'
+
+  const transporteOriginal = Array.isArray(ejercicio.patron_tone?.transporte_por_ciclo)
+    ? ejercicio.patron_tone.transporte_por_ciclo
+    : [0]
+  const repeticionesIniciales = transporteOriginal.length
+  const semitonosIniciales = transporteOriginal.length > 1 ? (transporteOriginal[1] - transporteOriginal[0]) : 0
+
+  const [categoria, setCategoria] = useState(ejercicio.categoria || 'vocalizacion')
   const [nombre, setNombre] = useState(ejercicio.nombre || '')
   const [instruccionTexto, setInstruccionTexto] = useState(ejercicio.instruccion_texto || '')
-  const notaKey = detectarNotaKey(ejercicio.patron_tone)
-  const [notaInicial, setNotaInicial] = useState(notaKey ? ejercicio.patron_tone[notaKey] : '')
-  const tieneTempo = !!ejercicio.patron_tone && typeof ejercicio.patron_tone.tempo_bpm === 'number'
-  const [tempoBpm, setTempoBpm] = useState(tieneTempo ? String(ejercicio.patron_tone.tempo_bpm) : '')
-  // Solo los ejercicios armados a partir de un MusicXML (vía "Nuevo ejercicio") tienen
-  // esta forma de patrón, y por lo tanto se les puede reemplazar el archivo de origen.
-  const puedeReemplazarXml = ejercicio.patron_tone?.tipo === 'patron_ritmico'
+  const [notaInicial, setNotaInicial] = useState(notaKeyOriginal ? ejercicio.patron_tone[notaKeyOriginal] : 'C4')
+  const [tempoBpm, setTempoBpm] = useState(
+    typeof ejercicio.patron_tone?.tempo_bpm === 'number' ? String(ejercicio.patron_tone.tempo_bpm) : '80'
+  )
+  const [repeticiones, setRepeticiones] = useState(repeticionesIniciales)
+  const [transporteSemitonos, setTransporteSemitonos] = useState(semitonosIniciales)
   const [patronDetectado, setPatronDetectado] = useState(null)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
@@ -440,37 +453,38 @@ function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
     if (!nombre.trim()) return
     setError('')
 
-    let patronTone = patronDetectado
-      ? {
-          tipo: 'patron_ritmico',
-          nota_inicial: patronDetectado.notaInicial,
-          notas_semitonos: patronDetectado.notasSemitonos,
-          duraciones_16avos: patronDetectado.duraciones16avos,
-          tempo_bpm: ejercicio.patron_tone?.tempo_bpm ?? 80,
-          transporte_por_ciclo: ejercicio.patron_tone?.transporte_por_ciclo ?? [0],
-        }
-      : ejercicio.patron_tone
-
-    if (notaKey) {
-      const notaNormalizada = normalizarNota(notaInicial)
-      if (!notaNormalizada) {
-        setError('La nota inicial tiene que tener el formato de nota + octava, por ejemplo "C4" o "G#5".')
-        return
-      }
-      patronTone = { ...patronTone, [notaKey]: notaNormalizada }
-    }
-
-    if (tieneTempo) {
-      const tempo = parseInt(tempoBpm, 10)
-      if (!tempo || tempo <= 0) {
-        setError('El tempo tiene que ser un número mayor a 0.')
-        return
-      }
-      patronTone = { ...patronTone, tempo_bpm: tempo }
+    const notaNormalizada = normalizarNota(notaInicial)
+    if (!notaNormalizada) {
+      setError('La nota inicial tiene que tener el formato de nota + octava, por ejemplo "C4" o "G#5".')
+      return
     }
 
     setProcesando(true)
+
+    const reps = Math.max(1, parseInt(repeticiones, 10) || 1)
+    const transporte = parseInt(transporteSemitonos, 10) || 0
+    // Solo regeneramos transporte_por_ciclo si el admin tocó Repeticiones/
+    // Semitonos o subió un archivo nuevo — si no, dejamos el que ya tenía el
+    // ejercicio tal cual, por si no sigue el patrón simple "i × semitonos"
+    // (por ejemplo, uno cargado a mano con transposiciones irregulares).
+    const huboCambioEnRepeticion = reps !== repeticionesIniciales || transporte !== semitonosIniciales
+    const transporteFinal = (patronDetectado || huboCambioEnRepeticion)
+      ? Array.from({ length: reps }, (_, i) => i * transporte)
+      : transporteOriginal
+
+    const patronTone = {
+      ...(ejercicio.patron_tone || {}),
+      ...(patronDetectado
+        ? { notas_semitonos: patronDetectado.notasSemitonos, duraciones_16avos: patronDetectado.duraciones16avos }
+        : {}),
+      tipo: 'patron_ritmico',
+      [notaKey]: notaNormalizada,
+      tempo_bpm: parseInt(tempoBpm, 10) || 80,
+      transporte_por_ciclo: transporteFinal,
+    }
+
     const resultado = await actualizarEjercicioEntrenamiento(ejercicio.id, {
+      categoria,
       nombre: nombre.trim(),
       instruccionTexto,
       patronTone,
@@ -493,6 +507,14 @@ function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
           </div>
         )}
 
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Categoría</label>
+        <select value={categoria} onChange={e => setCategoria(e.target.value)}
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box', background: '#FFFFFF' }}>
+          {ORDEN_CATEGORIAS.map(cat => (
+            <option key={cat} value={cat}>{CATEGORIA_LABEL[cat] || cat}</option>
+          ))}
+        </select>
+
         <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nombre</label>
         <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
           style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
@@ -501,42 +523,46 @@ function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
         <textarea value={instruccionTexto} onChange={e => setInstruccionTexto(e.target.value)} rows={2}
           style={{ width: '100%', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }} />
 
-        {puedeReemplazarXml && (
-          <>
-            <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Reemplazar MusicXML (opcional)</label>
-            <input type="file" accept=".xml,.musicxml,.mxl" onChange={handleArchivo}
-              style={{ width: '100%', fontSize: '13px', marginBottom: '6px' }} />
-            <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
-              Solo si subís un archivo nuevo se reemplaza la melodía y el ritmo del ejercicio.
-            </p>
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Reemplazar MusicXML (opcional)</label>
+        <input type="file" accept=".xml,.musicxml,.mxl" onChange={handleArchivo}
+          style={{ width: '100%', fontSize: '13px', marginBottom: '6px' }} />
+        <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
+          Solo si subís un archivo nuevo se reemplaza la melodía y el ritmo del ejercicio.
+        </p>
 
-            {patronDetectado && (
-              <div style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px' }}>
-                Se detectaron {patronDetectado.cantidadNotas} notas, desde {patronDetectado.notaInicial}
-                {patronDetectado.tempoDetectado ? ` · tempo detectado ${patronDetectado.tempoDetectado} bpm` : ''}
-              </div>
-            )}
-          </>
+        {patronDetectado && (
+          <div style={{ fontSize: '12px', color: '#0F6E56', background: '#E1F5EE', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px' }}>
+            Se detectaron {patronDetectado.cantidadNotas} notas, desde {patronDetectado.notaInicial}
+            {patronDetectado.tempoDetectado ? ` · tempo detectado ${patronDetectado.tempoDetectado} bpm` : ''}
+          </div>
         )}
 
-        {notaKey && (
-          <>
-            <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nota inicial</label>
-            <input type="text" value={notaInicial} onChange={e => setNotaInicial(e.target.value)} placeholder="C4"
-              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box' }} />
-            <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
-              Nota + octava. Ej: C4 si el patrón asciende desde el Do central, G5 si desciende desde ahí.
-            </p>
-          </>
-        )}
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Tempo (bpm)</label>
+        <input type="number" value={tempoBpm} onChange={e => setTempoBpm(e.target.value)} placeholder="80"
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '14px', boxSizing: 'border-box' }} />
 
-        {tieneTempo && (
-          <>
-            <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Tempo (bpm)</label>
-            <input type="number" value={tempoBpm} onChange={e => setTempoBpm(e.target.value)}
-              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '20px', boxSizing: 'border-box' }} />
-          </>
-        )}
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nota inicial</label>
+        <input type="text" value={notaInicial} onChange={e => setNotaInicial(e.target.value)} placeholder="C4"
+          style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', marginBottom: '6px', boxSizing: 'border-box' }} />
+        <p style={{ fontSize: '11px', color: '#B4B2A9', margin: '0 0 14px' }}>
+          Nota + octava. Ej: C4 si el patrón asciende desde el Do central, G5 si desciende desde ahí.
+        </p>
+
+        <label style={{ fontSize: '12px', color: '#5F5E5A', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+          Repetir transportando (dejá 1 repetición si ya escribiste todas las transposiciones en el MusicXML)
+        </label>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ flex: 1 }}>
+            <input type="number" min="1" value={repeticiones} onChange={e => setRepeticiones(e.target.value)}
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <div style={{ fontSize: '11px', color: '#B4B2A9', marginTop: '3px' }}>Repeticiones</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <input type="number" value={transporteSemitonos} onChange={e => setTransporteSemitonos(e.target.value)}
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '13px', boxSizing: 'border-box' }} />
+            <div style={{ fontSize: '11px', color: '#B4B2A9', marginTop: '3px' }}>Semitonos por repetición</div>
+          </div>
+        </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={onCerrar}
