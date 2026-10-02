@@ -578,7 +578,19 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           return
         }
 
-        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
+        // "objetivo" (arriba) solo existe si lo cantado cae dentro del margen
+        // generoso de 70 centésimos de la nota que toca — más allá de eso,
+        // hasta ahora el medidor dejaba de comparar contra esa nota y pasaba
+        // a mostrar qué tan cerca está de la nota más próxima a lo cantado,
+        // que por definición siempre da un número chico: una nota
+        // equivocada se terminaba viendo en verde, como si nada. Acá
+        // guardamos aparte la distancia real a la nota que toca, SIN ese
+        // límite de 70 centésimos, para poder mostrarla siempre que haya una
+        // nota propia sonando — así una nota bien equivocada se ve pegada al
+        // límite del medidor (zona roja), no falsamente centrada.
+        const centsVsObjetivo = objetivoFreq != null ? centsRespectoObjetivo : null
+
+        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo, centsVsObjetivo })
       }, 80)
 
       setMicActivo(true)
@@ -637,7 +649,14 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   // sonando ahora mismo en la voz propia, comparamos contra ESA nota (lo que
   // realmente importa al practicar); si no, mostramos qué tan cerca está de
   // la nota más próxima en afinación estándar, como referencia general.
-  const centsMostrados = lectura?.objetivo ? lectura.objetivo.cents : lectura?.centsCercano
+  // Mostramos siempre la distancia real a la nota que toca el acompañamiento
+  // (centsVsObjetivo), aunque sea grande — así el medidor refleja de verdad
+  // si cantaste la nota correcta (centro/verde), cerca (amarillo) o
+  // directamente otra nota (pegado al límite, en rojo). Solo si no hay
+  // ninguna nota propia sonando en este instante (silencio en tu voz, o no
+  // elegiste voz) caemos a mostrar la nota más cercana como referencia
+  // general, igual que antes.
+  const centsMostrados = lectura?.centsVsObjetivo != null ? lectura.centsVsObjetivo : lectura?.centsCercano
 
   // Nota de la voz propia que está sonando en el audio en este instante —
   // la misma cuenta que usa el afinador para saber qué nota "debería" sonar,
