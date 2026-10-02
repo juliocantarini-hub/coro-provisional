@@ -622,7 +622,24 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
         // cantó otra nota. Antes esto se perdía en silencio (el afinador
         // pasaba a mostrar la nota más cercana a lo cantado, como si nada
         // raro hubiera pasado) — lo marcamos aparte para poder avisarlo.
-        const notaEquivocada = objetivoFreq != null && !cantandoElObjetivo
+        //
+        // Pero antes de avisar nada hace falta más confianza que la que pide
+        // el filtro de volumen de más arriba (umbralRms): ese filtro, con un
+        // margen chico (1.6x el piso de acompañamiento calibrado en los
+        // silencios propios), solo descarta el silencio total — no alcanza
+        // para asegurar que lo que se oye sea una VOZ cantando y no
+        // directamente el acompañamiento sonando un poco más fuerte que
+        // cuando se calibró ese piso (por ejemplo, un pasaje con más
+        // instrumentos o con la propia melodía doblada por el piano). Sin
+        // este chequeo aparte, sin cantar nada, el acompañamiento mismo
+        // colándose por el mic ya alcanzaba para activar la chicharra: el
+        // sistema lo confundía con "cantó una nota equivocada". Para avisar
+        // un error pedimos un margen bastante más grande sobre ese piso,
+        // señal de que hay una voz real por encima del acompañamiento.
+        const MARGEN_CONFIANZA_CANTO = 2.5
+        const hayConfianzaDeCanto = !(sonandoAhora && micRefs.current.pisoBleed != null) ||
+          rms >= micRefs.current.pisoBleed * MARGEN_CONFIANZA_CANTO
+        const notaEquivocada = hayConfianzaDeCanto && objetivoFreq != null && !cantandoElObjetivo
 
         // Un solo cuadro con una lectura de frecuencia (aunque haya pasado el
         // filtro de silencio y de claridad de detectarFrecuencia) todavía
@@ -657,7 +674,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
             m.ultimoAvisoTiempo = ahora
             m.alertaFuerteDesde = null
           }
-        } else if (objetivo && Math.abs(objetivo.cents) >= UMBRAL_ALERTA_SUAVE_CENTS) {
+        } else if (hayConfianzaDeCanto && objetivo && Math.abs(objetivo.cents) >= UMBRAL_ALERTA_SUAVE_CENTS) {
           m.alertaFuerteDesde = null
           if (m.alertaSuaveDesde == null) m.alertaSuaveDesde = ahora
           if (ahora - m.alertaSuaveDesde >= SOSTENIDO_ALERTA_SUAVE_MS && ahora - m.ultimoAvisoTiempo >= COOLDOWN_ALERTA_MS) {
