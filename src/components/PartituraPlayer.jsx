@@ -1052,11 +1052,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           {micActivo && (
             <div style={{ marginTop: '14px' }}>
               <MedidorAfinacion cents={centsMostrados} />
-              {lectura?.notaEquivocadaEnPausa && (
-                <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '6px', textAlign: 'center' }}>
-                  Tocaba {lectura.notaObjetivoNombre} — sonó {lectura.nombreCercano}
-                </div>
-              )}
               {/* El piano tiene dos momentos distintos acá. Mientras la
                   partitura está REALMENTE sonando (reproduciendo Y no
                   pausado — "reproduciendo" solo se queda en true durante la
