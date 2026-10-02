@@ -361,21 +361,24 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
       return
     }
     try {
-      // Por defecto el navegador aplica tres cosas al micrófono, pensadas
-      // para llamadas de voz: supresión de ruido, control automático de
-      // ganancia y cancelación de eco. Las tres las dejamos desactivadas:
-      // en la práctica atenuaban tanto la señal que la propia voz del
-      // cantante dejaba de detectarse bien. Probamos con la cancelación de
-      // eco activada para filtrar el acompañamiento que se cuela por el
-      // parlante (sin auriculares) — funcionó para eso, pero de paso
-      // bloqueaba también la voz real del cantante en esa misma situación
-      // (sin auriculares + acompañamiento sonando no detectaba nada, ni
-      // siquiera cantando bien). La volvemos a desactivar: en vez de un
-      // filtro genérico del navegador, más abajo calibramos nosotros mismos
-      // cuánto se cuela el acompañamiento, específicamente para este caso.
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      })
+      // PRUEBA DE DIAGNÓSTICO (Android): por defecto el navegador aplica tres
+      // cosas al micrófono, pensadas para llamadas de voz: supresión de
+      // ruido, control automático de ganancia y cancelación de eco. Las
+      // tres las habíamos desactivado a propósito, porque en la práctica
+      // atenuaban tanto la señal que la propia voz del cantante dejaba de
+      // detectarse bien (y la cancelación de eco activada, aunque filtraba
+      // el acompañamiento colándose por el parlante sin auriculares, de
+      // paso bloqueaba la voz real del cantante en esa misma situación).
+      //
+      // Julio reportó que en Android, pedir el micrófono así (sin ese
+      // procesamiento) deja el audio de TODO el teléfono bloqueado después
+      // de usar "Practicar afinación", al punto de necesitar reiniciar el
+      // celular — algo que no pasa en PC. Como prueba, volvemos a pedir el
+      // micrófono SIN forzar esas tres opciones (dejamos que el navegador
+      // use su procesamiento normal) para confirmar si así se evita el
+      // problema en Android. Si se confirma, hay que buscar un término
+      // medio que no vuelva a arruinar la detección de voz.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const Ctx = window.AudioContext || window.webkitAudioContext
       const contexto = new Ctx()
       const fuente = contexto.createMediaStreamSource(stream)
