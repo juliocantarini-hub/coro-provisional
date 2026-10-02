@@ -361,24 +361,28 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
       return
     }
     try {
-      // PRUEBA DE DIAGNÓSTICO (Android): por defecto el navegador aplica tres
-      // cosas al micrófono, pensadas para llamadas de voz: supresión de
-      // ruido, control automático de ganancia y cancelación de eco. Las
-      // tres las habíamos desactivado a propósito, porque en la práctica
-      // atenuaban tanto la señal que la propia voz del cantante dejaba de
-      // detectarse bien (y la cancelación de eco activada, aunque filtraba
-      // el acompañamiento colándose por el parlante sin auriculares, de
-      // paso bloqueaba la voz real del cantante en esa misma situación).
+      // TÉRMINO MEDIO (Android + precisión): pedir el micrófono sin tocar
+      // nada (audio: true) arregló el bloqueo de audio en Android, pero
+      // trajo de vuelta el problema de precisión que el procesamiento por
+      // defecto del navegador causaba (la razón original por la que
+      // habíamos desactivado las tres opciones de abajo).
       //
-      // Julio reportó que en Android, pedir el micrófono así (sin ese
-      // procesamiento) deja el audio de TODO el teléfono bloqueado después
-      // de usar "Practicar afinación", al punto de necesitar reiniciar el
-      // celular — algo que no pasa en PC. Como prueba, volvemos a pedir el
-      // micrófono SIN forzar esas tres opciones (dejamos que el navegador
-      // use su procesamiento normal) para confirmar si así se evita el
-      // problema en Android. Si se confirma, hay que buscar un término
-      // medio que no vuelva a arruinar la detección de voz.
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // De esas tres, la cancelación de eco (echoCancellation) es la
+      // candidata más probable a disparar en Android el modo de audio "de
+      // llamada" que dejaba bloqueado el sonido del teléfono entero — es la
+      // única pensada específicamente para audio bidireccional en tiempo
+      // real, y Chrome en Android puede forzar un modo especial del
+      // sistema (AudioManager) cuando se activa. La supresión de ruido y el
+      // control automático de ganancia no tienen ese mismo motivo para
+      // tocar el modo de audio del sistema.
+      //
+      // Probamos entonces desactivar SOLO la cancelación de eco, dejando
+      // supresión de ruido y control de ganancia en su comportamiento por
+      // defecto del navegador — a ver si esto alcanza para que no se
+      // bloquee el audio en Android, y a la vez recupera la precisión de
+      // detección. Si no alcanza con ninguna de las dos cosas, volvemos
+      // al estado de antes de hoy.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false } })
       const Ctx = window.AudioContext || window.webkitAudioContext
       const contexto = new Ctx()
       const fuente = contexto.createMediaStreamSource(stream)
