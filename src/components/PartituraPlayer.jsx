@@ -473,11 +473,18 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           const seguidorPrevio = micRefs.current.seguidor
           if (vozPausa && (pausaReciente || !seguidorPrevio || seguidorPrevio.vozId !== miVozAhora)) {
             const instantePausa = tiempoAhora * velocidadAhora
-            const notaAlPausar = notaEnInstante(vozPausa.notas, instantePausa)
-            let indiceInicial = notaAlPausar ? vozPausa.notas.indexOf(notaAlPausar) : -1
-            if (indiceInicial === -1) {
-              indiceInicial = vozPausa.notas.findIndex(n => n.tiempo > instantePausa)
-            }
+            // Elegimos directamente "la primera nota que todavía no terminó
+            // de sonar en el instante de la pausa" — cubre tanto pausar a
+            // mitad de una nota (la retoma) como pausar justo en el borde
+            // entre dos notas (pasa a la siguiente). Un margen chico
+            // (EPSILON_SEG) evita que una nota que terminó un pelín antes de
+            // la pausa, por un redondeo de milisegundos del reloj, se tome
+            // como si todavía estuviera sonando y nos deje un paso atrás de
+            // donde en realidad hay que arrancar.
+            const EPSILON_SEG = 0.03
+            const indiceInicial = vozPausa.notas.findIndex(
+              n => (n.tiempo + n.duracion) > instantePausa + EPSILON_SEG
+            )
             micRefs.current.seguidor = (indiceInicial === -1)
               ? null // no queda ninguna nota propia más por cantar de acá en adelante
               : { vozId: miVozAhora, notas: vozPausa.notas, indice: indiceInicial, lograda: false }
@@ -629,6 +636,19 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
         const objetivo = cantandoElObjetivo
           ? { nombre: notaObjetivoNombre, cents: centsRespectoObjetivo, tiempo: notaObjetivoTiempo }
           : null
+
+        // DEBUG TEMPORAL — sacar una vez que el seguidor de pausa esté
+        // confirmado funcionando bien. Ayuda a ver, cuadro a cuadro, contra
+        // qué nota está comparando y por qué.
+        if (seguidor) {
+          console.log('[afinacion-pausa]', {
+            indice: seguidor.indice,
+            notaEsperada: notaObjetivoNombre,
+            notaDetectada: cercana.nombre,
+            cents: Math.round(centsRespectoObjetivo),
+            cantandoElObjetivo,
+          })
+        }
 
         // Un solo cuadro con una lectura de frecuencia (aunque haya pasado el
         // filtro de silencio y de claridad de detectarFrecuencia) todavía
