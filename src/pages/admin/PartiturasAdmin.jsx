@@ -472,12 +472,21 @@ function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
       ? Array.from({ length: reps }, (_, i) => i * transporte)
       : transporteOriginal
 
+    // Ojo: NO forzamos tipo: 'patron_ritmico' acá. Muchos ejercicios (los de
+    // Respiración siempre, y algunos de Resonancia/Vocalización cargados a
+    // mano en Supabase) tienen otros tipos — "contador", "cronometro_exhalacion",
+    // "instruccion_libre", "arpegio", "frase", "glissando", etc. — que
+    // EjercicioPlayer.jsx reproduce de forma completamente distinta. Si
+    // pisáramos el tipo siempre, con solo abrir "Editar" y guardar (sin tocar
+    // nada) convertiríamos cualquiera de esos ejercicios en un patrón rítmico
+    // de notas y se rompería. Solo cambia a patron_ritmico cuando el admin
+    // efectivamente subió un MusicXML nuevo, porque ahí sí se está creando un
+    // patrón de notas desde cero.
     const patronTone = {
       ...(ejercicio.patron_tone || {}),
       ...(patronDetectado
-        ? { notas_semitonos: patronDetectado.notasSemitonos, duraciones_16avos: patronDetectado.duraciones16avos }
+        ? { tipo: 'patron_ritmico', notas_semitonos: patronDetectado.notasSemitonos, duraciones_16avos: patronDetectado.duraciones16avos }
         : {}),
-      tipo: 'patron_ritmico',
       [notaKey]: notaNormalizada,
       tempo_bpm: parseInt(tempoBpm, 10) || 80,
       transporte_por_ciclo: transporteFinal,
