@@ -612,77 +612,6 @@ export default function PartiturasAdmin() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
-            Práctica
-          </h3>
-          <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
-            {cargando ? 'Cargando...' : `${partituras.length} obra${partituras.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <button onClick={() => setMostrarForm(true)}
-          style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          Nuevo MusicXML
-        </button>
-      </div>
-
-      {error && <div style={{ color: '#A32D2D', fontSize: '13px', marginBottom: '16px' }}>{error}</div>}
-
-      {cargando && <div style={{ color: '#888780', fontSize: '13px' }}>Cargando...</div>}
-
-      {!cargando && partituras.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '48px 24px', color: '#888780', fontSize: '14px' }}>
-          Todavía no cargaste ninguna partitura.
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {partituras.map(p => (
-          <div key={p.id} style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '180px' }}>
-              <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{p.titulo}</div>
-              <div style={{ fontSize: '12px', color: '#888780' }}>
-                {p.compositor ? `${p.compositor} · ` : ''}{formatoTiempo(p.duracion_seg)}
-              </div>
-            </div>
-
-            <button onClick={() => togglePublicar(p)} disabled={procesando === p.id}
-              style={{
-                fontSize: '12px', fontWeight: '500', border: 'none', borderRadius: '20px', padding: '5px 14px', cursor: 'pointer',
-                background: p.publicada ? '#E1F5EE' : '#F1EFE8',
-                color: p.publicada ? '#04342C' : '#5F5E5A',
-              }}>
-              {p.publicada ? '✓ Publicada' : 'Sin publicar'}
-            </button>
-
-            <button onClick={() => setEditandoPartitura(p)}
-              style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
-              Editar
-            </button>
-
-            {confirmEliminar === p.id ? (
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => handleEliminar(p.id)} disabled={procesando === p.id}
-                  style={{ fontSize: '12px', color: '#FFFFFF', background: '#A32D2D', border: 'none', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
-                  Confirmar
-                </button>
-                <button onClick={() => setConfirmEliminar(null)}
-                  style={{ fontSize: '12px', color: '#5F5E5A', background: 'none', border: '1px solid #D3D1C7', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
-                  Cancelar
-                </button>
-              </div>
-            ) : (
-              <button onClick={() => setConfirmEliminar(p.id)}
-                style={{ fontSize: '12px', color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer' }}>
-                Eliminar
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '32px 0 14px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
             Ejercicios
           </h3>
           <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
@@ -765,6 +694,77 @@ export default function PartiturasAdmin() {
           </div>
         )
       })}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '32px 0 14px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
+            Práctica
+          </h3>
+          <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
+            {cargando ? 'Cargando...' : `${partituras.length} obra${partituras.length !== 1 ? 's' : ''}`}
+          </p>
+        </div>
+        <button onClick={() => setMostrarForm(true)}
+          style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Nuevo MusicXML
+        </button>
+      </div>
+
+      {error && <div style={{ color: '#A32D2D', fontSize: '13px', marginBottom: '16px' }}>{error}</div>}
+
+      {cargando && <div style={{ color: '#888780', fontSize: '13px' }}>Cargando...</div>}
+
+      {!cargando && partituras.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 24px', color: '#888780', fontSize: '14px' }}>
+          Todavía no cargaste ninguna partitura.
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {partituras.map(p => (
+          <div key={p.id} style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '180px' }}>
+              <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{p.titulo}</div>
+              <div style={{ fontSize: '12px', color: '#888780' }}>
+                {p.compositor ? `${p.compositor} · ` : ''}{formatoTiempo(p.duracion_seg)}
+              </div>
+            </div>
+
+            <button onClick={() => togglePublicar(p)} disabled={procesando === p.id}
+              style={{
+                fontSize: '12px', fontWeight: '500', border: 'none', borderRadius: '20px', padding: '5px 14px', cursor: 'pointer',
+                background: p.publicada ? '#E1F5EE' : '#F1EFE8',
+                color: p.publicada ? '#04342C' : '#5F5E5A',
+              }}>
+              {p.publicada ? '✓ Publicada' : 'Sin publicar'}
+            </button>
+
+            <button onClick={() => setEditandoPartitura(p)}
+              style={{ padding: '4px 10px', fontSize: '12px', borderRadius: '6px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+              Editar
+            </button>
+
+            {confirmEliminar === p.id ? (
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button onClick={() => handleEliminar(p.id)} disabled={procesando === p.id}
+                  style={{ fontSize: '12px', color: '#FFFFFF', background: '#A32D2D', border: 'none', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
+                  Confirmar
+                </button>
+                <button onClick={() => setConfirmEliminar(null)}
+                  style={{ fontSize: '12px', color: '#5F5E5A', background: 'none', border: '1px solid #D3D1C7', padding: '5px 12px', borderRadius: '8px', cursor: 'pointer' }}>
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmEliminar(p.id)}
+                style={{ fontSize: '12px', color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Eliminar
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
 
       {mostrarForm && (
         <ModalNuevaPartitura
