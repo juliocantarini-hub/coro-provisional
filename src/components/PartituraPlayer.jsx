@@ -90,16 +90,9 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   const [miVoz, setMiVoz] = useState(null)
 
   const [micActivo, setMicActivo] = useState(false)
-  const [lectura, setLectura] = useState(null) // { freq, nombreCercano, centsCercano, objetivo, notaObjetivoNombre, notaEquivocada }
+  const [lectura, setLectura] = useState(null) // { freq, nombreCercano, centsCercano, objetivo }
   const [errorMic, setErrorMic] = useState('')
-  const micRefs = useRef({
-    contexto: null, analyser: null, stream: null, intervalo: null, historial: [],
-    alertaSuaveDesde: null, alertaFuerteDesde: null, ultimoAvisoTiempo: 0,
-  })
-  // Sintetizadores para el aviso sonoro de afinación (ver evaluarAlertaAfinacion
-  // más abajo) — se crean una sola vez, lazy, y se reusan en cada lectura del
-  // mic en vez de crear nodos de audio nuevos todo el tiempo.
-  const alertaSynthsRef = useRef(null)
+  const micRefs = useRef({ contexto: null, analyser: null, stream: null, intervalo: null, historial: [] })
   // El intervalo del micrófono se crea una sola vez (al activarlo) y no se vuelve a
   // crear en cada render, así que su callback no puede leer reproduciendo/pausado/
   // tiempoActual/velocidad/miVoz directamente (quedarían "congelados" en el valor que
@@ -176,13 +169,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   }, [partituraParseada])
 
   useEffect(() => {
-    return () => {
-      detener(); detenerMicrofono()
-      if (alertaSynthsRef.current) {
-        alertaSynthsRef.current.suave.dispose()
-        alertaSynthsRef.current.fuerte.dispose()
-      }
-    }
+    return () => { detener(); detenerMicrofono() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -366,41 +353,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
     }
   }
 
-  // ─── Aviso sonoro de afinación ──────────────────────────────────────────
-  // Dos sonidos distintos a propósito: uno suave (un "ping" limpio) para
-  // cuando se sostiene desafinado alrededor de la nota correcta, y uno de
-  // ruido blanco corto — una chicharra — para cuando directamente canta
-  // otra nota. Que sean sonidos distintos, no solo "más fuerte uno que
-  // otro", es lo que permite distinguir de oído "estás cerca, ajustá" de
-  // "esa nota no es" sin tener que mirar la pantalla.
-  function getAlertaSynths() {
-    if (!alertaSynthsRef.current) {
-      alertaSynthsRef.current = {
-        suave: new Tone.Synth({
-          oscillator: { type: 'sine' },
-          envelope: { attack: 0.01, decay: 0.12, sustain: 0, release: 0.1 },
-        }).toDestination(),
-        fuerte: new Tone.NoiseSynth({
-          noise: { type: 'white' },
-          envelope: { attack: 0.005, decay: 0.18, sustain: 0, release: 0.05 },
-        }).toDestination(),
-      }
-    }
-    return alertaSynthsRef.current
-  }
-
-  function sonarAlertaSuave() {
-    const { suave } = getAlertaSynths()
-    suave.volume.value = -12
-    suave.triggerAttackRelease('A5', '16n')
-  }
-
-  function sonarAlertaFuerte() {
-    const { fuerte } = getAlertaSynths()
-    fuerte.volume.value = -6
-    fuerte.triggerAttackRelease('8n')
-  }
-
   // ─── Afinación con micrófono ────────────────────────────────────────────
   async function activarMicrofono() {
     setErrorMic('')
@@ -439,9 +391,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
         // abajo) y arranca en null: hasta la primera calibración no exigimos
         // nada por encima del umbral de silencio fijo de detectarFrecuencia.
         pisoBleed: null,
-        // Hace cuánto (Date.now()) se sostiene cada tipo de desafinación sin
-        // cortarse, y cuándo sonó el último aviso — ver evaluarAlertaAfinacion.
-        alertaSuaveDesde: null, alertaFuerteDesde: null, ultimoAvisoTiempo: 0,
       }
 
       const buffer = new Float32Array(analyser.fftSize)
@@ -617,30 +566,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           ? { nombre: notaObjetivoNombre, cents: centsRespectoObjetivo, tiempo: notaObjetivoTiempo }
           : null
 
-        // Había una nota que cantar y lo detectado ni siquiera entra en el
-        // margen generoso de arriba: no es "un poco" desafinado, directamente
-        // cantó otra nota. Antes esto se perdía en silencio (el afinador
-        // pasaba a mostrar la nota más cercana a lo cantado, como si nada
-        // raro hubiera pasado) — lo marcamos aparte para poder avisarlo.
-        //
-        // Pero antes de avisar nada hace falta más confianza que la que pide
-        // el filtro de volumen de más arriba (umbralRms): ese filtro, con un
-        // margen chico (1.6x el piso de acompañamiento calibrado en los
-        // silencios propios), solo descarta el silencio total — no alcanza
-        // para asegurar que lo que se oye sea una VOZ cantando y no
-        // directamente el acompañamiento sonando un poco más fuerte que
-        // cuando se calibró ese piso (por ejemplo, un pasaje con más
-        // instrumentos o con la propia melodía doblada por el piano). Sin
-        // este chequeo aparte, sin cantar nada, el acompañamiento mismo
-        // colándose por el mic ya alcanzaba para activar la chicharra: el
-        // sistema lo confundía con "cantó una nota equivocada". Para avisar
-        // un error pedimos un margen bastante más grande sobre ese piso,
-        // señal de que hay una voz real por encima del acompañamiento.
-        const MARGEN_CONFIANZA_CANTO = 2.5
-        const hayConfianzaDeCanto = !(sonandoAhora && micRefs.current.pisoBleed != null) ||
-          rms >= micRefs.current.pisoBleed * MARGEN_CONFIANZA_CANTO
-        const notaEquivocada = hayConfianzaDeCanto && objetivoFreq != null && !cantandoElObjetivo
-
         // Un solo cuadro con una lectura de frecuencia (aunque haya pasado el
         // filtro de silencio y de claridad de detectarFrecuencia) todavía
         // puede ser un pico aislado de ruido — una voz cantando se sostiene
@@ -653,41 +578,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           return
         }
 
-        // Aviso sonoro en tiempo real, en dos niveles. Nota equivocada (otra
-        // nota, no solo desafinada) avisa más rápido y con un sonido más
-        // marcado (chicharra) que una desafinación leve pero sostenida cerca
-        // de la nota correcta (un tono suave). En ambos casos exigimos que la
-        // condición se sostenga un ratito (no un solo cuadro de 80ms, que
-        // podría ser una lectura de transición entre notas) y respetamos un
-        // cooldown entre avisos para no saturar de sonido una melodía larga.
-        const UMBRAL_ALERTA_SUAVE_CENTS = 25
-        const SOSTENIDO_ALERTA_SUAVE_MS = 500
-        const SOSTENIDO_ALERTA_FUERTE_MS = 250
-        const COOLDOWN_ALERTA_MS = 1500
-        const ahora = Date.now()
-        const m = micRefs.current
-        if (notaEquivocada) {
-          m.alertaSuaveDesde = null
-          if (m.alertaFuerteDesde == null) m.alertaFuerteDesde = ahora
-          if (ahora - m.alertaFuerteDesde >= SOSTENIDO_ALERTA_FUERTE_MS && ahora - m.ultimoAvisoTiempo >= COOLDOWN_ALERTA_MS) {
-            sonarAlertaFuerte()
-            m.ultimoAvisoTiempo = ahora
-            m.alertaFuerteDesde = null
-          }
-        } else if (hayConfianzaDeCanto && objetivo && Math.abs(objetivo.cents) >= UMBRAL_ALERTA_SUAVE_CENTS) {
-          m.alertaFuerteDesde = null
-          if (m.alertaSuaveDesde == null) m.alertaSuaveDesde = ahora
-          if (ahora - m.alertaSuaveDesde >= SOSTENIDO_ALERTA_SUAVE_MS && ahora - m.ultimoAvisoTiempo >= COOLDOWN_ALERTA_MS) {
-            sonarAlertaSuave()
-            m.ultimoAvisoTiempo = ahora
-            m.alertaSuaveDesde = null
-          }
-        } else {
-          m.alertaSuaveDesde = null
-          m.alertaFuerteDesde = null
-        }
-
-        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo, notaObjetivoNombre, notaEquivocada })
+        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
       }, 80)
 
       setMicActivo(true)
@@ -701,11 +592,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
     if (intervalo) clearInterval(intervalo)
     if (stream) stream.getTracks().forEach(t => t.stop())
     if (contexto && contexto.state !== 'closed') contexto.close()
-    micRefs.current = {
-      contexto: null, analyser: null, stream: null, intervalo: null, historial: [], ultimaNotaObjetivo: undefined,
-      deteccionesSeguidas: 0, pisoBleed: null,
-      alertaSuaveDesde: null, alertaFuerteDesde: null, ultimoAvisoTiempo: 0,
-    }
+    micRefs.current = { contexto: null, analyser: null, stream: null, intervalo: null, historial: [], ultimaNotaObjetivo: undefined, deteccionesSeguidas: 0, pisoBleed: null }
     setMicActivo(false)
     setLectura(null)
   }
@@ -1064,11 +951,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           {micActivo && (
             <div style={{ marginTop: '14px' }}>
               <MedidorAfinacion cents={centsMostrados} />
-              {lectura?.notaEquivocada && (
-                <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '6px', textAlign: 'center' }}>
-                  Tocaba {lectura.notaObjetivoNombre} — sonó {lectura.nombreCercano}
-                </div>
-              )}
               {/* El piano tiene dos momentos distintos acá. Mientras la
                   partitura está REALMENTE sonando (reproduciendo Y no
                   pausado — "reproduciendo" solo se queda en true durante la
