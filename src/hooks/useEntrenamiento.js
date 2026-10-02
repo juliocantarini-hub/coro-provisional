@@ -170,9 +170,11 @@ export function useEjerciciosEntrenamientoAdmin() {
 
 // ─── Admin: CRUD de ejercicios ────────────────────────────────────────────
 export async function crearEjercicioEntrenamiento({ categoria, nombre, instruccionTexto, patronTone, duracionEstimadaSeg, orden }) {
+  const coro = await getCoroActual()
   const { data, error } = await supabase
     .from('ejercicios_entrenamiento')
     .insert([{
+      coro_id: coro?.id,
       categoria,
       nombre,
       instruccion_texto: instruccionTexto?.trim() || null,
