@@ -361,28 +361,19 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
       return
     }
     try {
-      // TÉRMINO MEDIO (Android + precisión): pedir el micrófono sin tocar
-      // nada (audio: true) arregló el bloqueo de audio en Android, pero
-      // trajo de vuelta el problema de precisión que el procesamiento por
-      // defecto del navegador causaba (la razón original por la que
-      // habíamos desactivado las tres opciones de abajo).
-      //
-      // De esas tres, la cancelación de eco (echoCancellation) es la
-      // candidata más probable a disparar en Android el modo de audio "de
-      // llamada" que dejaba bloqueado el sonido del teléfono entero — es la
-      // única pensada específicamente para audio bidireccional en tiempo
-      // real, y Chrome en Android puede forzar un modo especial del
-      // sistema (AudioManager) cuando se activa. La supresión de ruido y el
-      // control automático de ganancia no tienen ese mismo motivo para
-      // tocar el modo de audio del sistema.
-      //
-      // Probamos entonces desactivar SOLO la cancelación de eco, dejando
-      // supresión de ruido y control de ganancia en su comportamiento por
-      // defecto del navegador — a ver si esto alcanza para que no se
-      // bloquee el audio en Android, y a la vez recupera la precisión de
-      // detección. Si no alcanza con ninguna de las dos cosas, volvemos
-      // al estado de antes de hoy.
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false } })
+      // Por defecto el navegador aplica tres cosas al micrófono, pensadas
+      // para llamadas de voz: supresión de ruido, control automático de
+      // ganancia y cancelación de eco. En un momento las habíamos
+      // desactivado las tres a propósito (en la práctica atenuaban tanto la
+      // señal que la propia voz del cantante dejaba de detectarse bien),
+      // pero en Android eso deja bloqueado el audio de TODO el teléfono
+      // después de usar "Practicar afinación" (hasta reiniciarlo). Pedir el
+      // micrófono sin forzar nada, dejando el procesamiento por defecto del
+      // navegador, evita ese bloqueo — confirmado probando en el celular de
+      // Julio — a costa de perder algo de precisión en la detección de la
+      // propia voz. Si se encuentra un término medio que recupere precisión
+      // sin que vuelva el bloqueo, se puede ajustar acá.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const Ctx = window.AudioContext || window.webkitAudioContext
       const contexto = new Ctx()
       const fuente = contexto.createMediaStreamSource(stream)
@@ -585,19 +576,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           return
         }
 
-        // "objetivo" (arriba) solo existe si lo cantado cae dentro del margen
-        // generoso de 70 centésimos de la nota que toca — más allá de eso,
-        // hasta ahora el medidor dejaba de comparar contra esa nota y pasaba
-        // a mostrar qué tan cerca está de la nota más próxima a lo cantado,
-        // que por definición siempre da un número chico: una nota
-        // equivocada se terminaba viendo en verde, como si nada. Acá
-        // guardamos aparte la distancia real a la nota que toca, SIN ese
-        // límite de 70 centésimos, para poder mostrarla siempre que haya una
-        // nota propia sonando — así una nota bien equivocada se ve pegada al
-        // límite del medidor (zona roja), no falsamente centrada.
-        const centsVsObjetivo = objetivoFreq != null ? centsRespectoObjetivo : null
-
-        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo, centsVsObjetivo })
+        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
       }, 80)
 
       setMicActivo(true)
@@ -656,14 +635,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   // sonando ahora mismo en la voz propia, comparamos contra ESA nota (lo que
   // realmente importa al practicar); si no, mostramos qué tan cerca está de
   // la nota más próxima en afinación estándar, como referencia general.
-  // Mostramos siempre la distancia real a la nota que toca el acompañamiento
-  // (centsVsObjetivo), aunque sea grande — así el medidor refleja de verdad
-  // si cantaste la nota correcta (centro/verde), cerca (amarillo) o
-  // directamente otra nota (pegado al límite, en rojo). Solo si no hay
-  // ninguna nota propia sonando en este instante (silencio en tu voz, o no
-  // elegiste voz) caemos a mostrar la nota más cercana como referencia
-  // general, igual que antes.
-  const centsMostrados = lectura?.centsVsObjetivo != null ? lectura.centsVsObjetivo : lectura?.centsCercano
+  const centsMostrados = lectura?.objetivo ? lectura.objetivo.cents : lectura?.centsCercano
 
   // Nota de la voz propia que está sonando en el audio en este instante —
   // la misma cuenta que usa el afinador para saber qué nota "debería" sonar,
