@@ -471,7 +471,15 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
         if (enPausaPropia) {
           const vozPausa = vocesOrdenadas.find(v => v.id === miVozAhora)
           const seguidorPrevio = micRefs.current.seguidor
-          if (vozPausa && (pausaReciente || !seguidorPrevio || seguidorPrevio.vozId !== miVozAhora)) {
+          // Si además de pausar recién, o no tener seguidor todavía, el
+          // punto de la partitura cambió bastante desde la última vez que
+          // armamos el seguidor (por ejemplo, arrastraste la barra de
+          // progreso estando ya en pausa, sin volver a tocar play/pausa —
+          // eso nunca dispara "pausaReciente", que solo mira la transición
+          // sonando→pausado) tenemos que rearmarlo igual, si no se queda
+          // comparando contra la nota de la pausa vieja para siempre.
+          const saltoDePosicion = seguidorPrevio && Math.abs(tiempoAhora - seguidorPrevio.tiempoInicio) > 0.25
+          if (vozPausa && (pausaReciente || !seguidorPrevio || seguidorPrevio.vozId !== miVozAhora || saltoDePosicion)) {
             const instantePausa = tiempoAhora * velocidadAhora
             // Elegimos directamente "la primera nota que todavía no terminó
             // de sonar en el instante de la pausa" — cubre tanto pausar a
@@ -487,7 +495,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
             )
             micRefs.current.seguidor = (indiceInicial === -1)
               ? null // no queda ninguna nota propia más por cantar de acá en adelante
-              : { vozId: miVozAhora, notas: vozPausa.notas, indice: indiceInicial, lograda: false }
+              : { vozId: miVozAhora, notas: vozPausa.notas, indice: indiceInicial, lograda: false, tiempoInicio: tiempoAhora }
           }
         } else {
           micRefs.current.seguidor = null
