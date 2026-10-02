@@ -90,7 +90,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   const [miVoz, setMiVoz] = useState(null)
 
   const [micActivo, setMicActivo] = useState(false)
-  const [lectura, setLectura] = useState(null) // { freq, nombreCercano, centsCercano, objetivo, notaEquivocadaEnPausa, notaObjetivoNombre, centsVsObjetivo }
+  const [lectura, setLectura] = useState(null) // { freq, nombreCercano, centsCercano, objetivo }
   const [errorMic, setErrorMic] = useState('')
   const micRefs = useRef({ contexto: null, analyser: null, stream: null, intervalo: null, historial: [] })
   // El intervalo del micrófono se crea una sola vez (al activarlo) y no se vuelve a
@@ -391,12 +391,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
         // abajo) y arranca en null: hasta la primera calibración no exigimos
         // nada por encima del umbral de silencio fijo de detectarFrecuencia.
         pisoBleed: null,
-        // Seguidor de secuencia para el modo pausa (ver más abajo en el
-        // propio intervalo) y si en el cuadro anterior la partitura estaba
-        // realmente sonando (para detectar el instante exacto en que se pasa
-        // a pausa y rearmar el seguidor desde ahí).
-        seguidor: null,
-        estabaSonando: false,
       }
 
       const buffer = new Float32Array(analyser.fftSize)
@@ -420,14 +414,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
         // NO pausado: solo true mientras la partitura de verdad avanza.
         const { reproduciendo: reproduciendoAhora, pausado: pausadoAhora, tiempoActual: tiempoAhora, velocidad: velocidadAhora, miVoz: miVozAhora } = vivosRef.current
         const sonandoAhora = reproduciendoAhora && !pausadoAhora
-
-        // ¿Se acaba de pausar recién en este cuadro? Lo necesitamos para
-        // decidir, más abajo, cuándo hay que (re)armar el seguidor de
-        // secuencia de pausa desde cero (ver ese bloque).
-        const estabaSonandoAntes = micRefs.current.estabaSonando
-        micRefs.current.estabaSonando = sonandoAhora
-        const pausaReciente = estabaSonandoAntes && !sonandoAhora
-
         let objetivoFreq = null
         let notaObjetivoNombre = null
         let notaObjetivoTiempo = null
@@ -446,71 +432,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
               // "ataqueId" para que pueda distinguir "sigue sonando la misma
               // nota" de "empezó una nota nueva de la misma altura" (do-do-do).
               notaObjetivoTiempo = notaObjetivo.tiempo
-            }
-          }
-        }
-
-        // ─── Seguimiento en pausa ("escuchá, pausá y repetila cantándola") ──
-        // En pausa no hay ningún reloj de la partitura corriendo (por eso el
-        // bloque de arriba no calcula nada: "sonandoAhora" es falso), así que
-        // no podemos preguntar "qué nota toca ahora según el tiempo". En
-        // cambio seguimos la SECUENCIA de notas de la voz propia con un
-        // puntero a "la nota que falta cantar": arranca en la nota que estaba
-        // sonando (o la próxima) en el instante exacto donde se pausó, y solo
-        // avanza cuando el cantante efectivamente logra cantarla y después
-        // cambia de altura — así no depende de ningún reloj ni de que cante
-        // al mismo tempo de la pista, y una nota equivocada se queda marcada
-        // como tal (el puntero no avanza) en vez de dejarse pasar.
-        //
-        // Límite conocido: dos notas IGUALES seguidas en la secuencia (do-do)
-        // no se distinguen entre sí sin detectar el corte de respiración
-        // entre una y otra — acá no lo hacemos, así que un do-do se sigue
-        // tratando como una sola nota sostenida larga. No afecta la detección
-        // de nota equivocada en el resto de los casos (notas distintas).
-        const enPausaPropia = miVozAhora && reproduciendoAhora && pausadoAhora
-        if (enPausaPropia) {
-          const vozPausa = vocesOrdenadas.find(v => v.id === miVozAhora)
-          const seguidorPrevio = micRefs.current.seguidor
-          // Si además de pausar recién, o no tener seguidor todavía, el
-          // punto de la partitura cambió bastante desde la última vez que
-          // armamos el seguidor (por ejemplo, arrastraste la barra de
-          // progreso estando ya en pausa, sin volver a tocar play/pausa —
-          // eso nunca dispara "pausaReciente", que solo mira la transición
-          // sonando→pausado) tenemos que rearmarlo igual, si no se queda
-          // comparando contra la nota de la pausa vieja para siempre.
-          const saltoDePosicion = seguidorPrevio && Math.abs(tiempoAhora - seguidorPrevio.tiempoInicio) > 0.25
-          if (vozPausa && (pausaReciente || !seguidorPrevio || seguidorPrevio.vozId !== miVozAhora || saltoDePosicion)) {
-            const instantePausa = tiempoAhora * velocidadAhora
-            // Elegimos directamente "la primera nota que todavía no terminó
-            // de sonar en el instante de la pausa" — cubre tanto pausar a
-            // mitad de una nota (la retoma) como pausar justo en el borde
-            // entre dos notas (pasa a la siguiente). Un margen chico
-            // (EPSILON_SEG) evita que una nota que terminó un pelín antes de
-            // la pausa, por un redondeo de milisegundos del reloj, se tome
-            // como si todavía estuviera sonando y nos deje un paso atrás de
-            // donde en realidad hay que arrancar.
-            const EPSILON_SEG = 0.03
-            const indiceInicial = vozPausa.notas.findIndex(
-              n => (n.tiempo + n.duracion) > instantePausa + EPSILON_SEG
-            )
-            micRefs.current.seguidor = (indiceInicial === -1)
-              ? null // no queda ninguna nota propia más por cantar de acá en adelante
-              : { vozId: miVozAhora, notas: vozPausa.notas, indice: indiceInicial, lograda: false, tiempoInicio: tiempoAhora }
-          }
-        } else {
-          micRefs.current.seguidor = null
-        }
-
-        const seguidor = enPausaPropia ? micRefs.current.seguidor : null
-        if (seguidor) {
-          const notaEsperada = seguidor.notas[seguidor.indice]
-          if (notaEsperada) {
-            const midiEsperado = notaAMidi(notaEsperada.nota)
-            if (midiEsperado != null) {
-              hayNotaPropia = true
-              objetivoFreq = midiAFrecuencia(midiEsperado)
-              notaObjetivoNombre = notaEsperada.nota
-              notaObjetivoTiempo = notaEsperada.tiempo
             }
           }
         }
@@ -645,19 +566,6 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           ? { nombre: notaObjetivoNombre, cents: centsRespectoObjetivo, tiempo: notaObjetivoTiempo }
           : null
 
-        // DEBUG TEMPORAL — sacar una vez que el seguidor de pausa esté
-        // confirmado funcionando bien. Ayuda a ver, cuadro a cuadro, contra
-        // qué nota está comparando y por qué.
-        if (seguidor) {
-          console.log('[afinacion-pausa]', {
-            indice: seguidor.indice,
-            notaEsperada: notaObjetivoNombre,
-            notaDetectada: cercana.nombre,
-            cents: Math.round(centsRespectoObjetivo),
-            cantandoElObjetivo,
-          })
-        }
-
         // Un solo cuadro con una lectura de frecuencia (aunque haya pasado el
         // filtro de silencio y de claridad de detectarFrecuencia) todavía
         // puede ser un pico aislado de ruido — una voz cantando se sostiene
@@ -670,34 +578,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           return
         }
 
-        // Seguimiento en pausa: si ya habíamos logrado cantar la nota
-        // esperada y ahora se detecta otra cosa, el cantante pasó a la
-        // siguiente — avanzamos el puntero para comparar contra esa de acá
-        // en más. Si todavía no la había logrado, nos quedamos en la misma
-        // (una nota equivocada sigue marcada como tal hasta que la cante
-        // bien, en vez de dejarse pasar).
-        if (seguidor) {
-          if (cantandoElObjetivo) {
-            seguidor.lograda = true
-          } else if (seguidor.lograda) {
-            seguidor.indice += 1
-            seguidor.lograda = false
-          }
-        }
-
-        // Solo en pausa (seguidor existe únicamente ahí): si había una nota
-        // propia esperada y lo cantado no entra en el margen de arriba, no es
-        // "cerca de la nota más próxima que sea" — es la nota que no era. A
-        // diferencia del aviso sonoro de hoy (que revertimos por los falsos
-        // positivos con el acompañamiento colándose), en pausa no hay
-        // acompañamiento sonando con el que confundirse, así que esto no
-        // tiene ese riesgo.
-        const notaEquivocadaEnPausa = !!seguidor && objetivoFreq != null && !cantandoElObjetivo
-
-        setLectura({
-          freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo,
-          notaEquivocadaEnPausa, notaObjetivoNombre, centsVsObjetivo: centsRespectoObjetivo,
-        })
+        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
       }, 80)
 
       setMicActivo(true)
@@ -711,10 +592,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
     if (intervalo) clearInterval(intervalo)
     if (stream) stream.getTracks().forEach(t => t.stop())
     if (contexto && contexto.state !== 'closed') contexto.close()
-    micRefs.current = {
-      contexto: null, analyser: null, stream: null, intervalo: null, historial: [], ultimaNotaObjetivo: undefined,
-      deteccionesSeguidas: 0, pisoBleed: null, seguidor: null, estabaSonando: false,
-    }
+    micRefs.current = { contexto: null, analyser: null, stream: null, intervalo: null, historial: [], ultimaNotaObjetivo: undefined, deteccionesSeguidas: 0, pisoBleed: null }
     setMicActivo(false)
     setLectura(null)
   }
@@ -759,14 +637,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   // sonando ahora mismo en la voz propia, comparamos contra ESA nota (lo que
   // realmente importa al practicar); si no, mostramos qué tan cerca está de
   // la nota más próxima en afinación estándar, como referencia general.
-  // En pausa, si directamente cantaste otra nota (no "cerca" de la que
-  // tocaba, otra distinta), mostramos cuánto te alejaste de la nota que
-  // esperábamos — no de la más próxima a lo que cantaste, que por
-  // definición siempre da un número chico y haría ver todo en verde aunque
-  // te hayas equivocado de nota.
-  const centsMostrados = lectura?.objetivo
-    ? lectura.objetivo.cents
-    : lectura?.notaEquivocadaEnPausa ? lectura.centsVsObjetivo : lectura?.centsCercano
+  const centsMostrados = lectura?.objetivo ? lectura.objetivo.cents : lectura?.centsCercano
 
   // Nota de la voz propia que está sonando en el audio en este instante —
   // la misma cuenta que usa el afinador para saber qué nota "debería" sonar,
