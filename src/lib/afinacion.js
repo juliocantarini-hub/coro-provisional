@@ -69,10 +69,18 @@ export function detectarFrecuencia(buffer, sampleRate) {
   const MAX_SAMPLES = Math.min(SIZE - 1, Math.floor(sampleRate / 60)) // ~60 Hz, voz grave
 
   const correlacion = new Float32Array(MAX_SAMPLES + 1)
+  // Versión "insesgada" de la autocorrelación: a mayor lag se suman menos
+  // muestras (SIZE - lag), así que la suma cruda favorece artificialmente a
+  // los lags cortos. Eso hacía que, con una voz de 2.º armónico fuerte, el
+  // lag de la MITAD del período (una octava arriba) pareciera casi tan
+  // bueno como el real y ganara el chequeo de subarmónicos (C3 → C4).
+  // Compensamos dividiendo por la fracción de ventana realmente usada.
+  const correlacionCruda = new Float32Array(MAX_SAMPLES + 1)
   for (let lag = 0; lag <= MAX_SAMPLES; lag++) {
     let suma = 0
     for (let i = 0; i < SIZE - lag; i++) suma += buffer[i] * buffer[i + lag]
-    correlacion[lag] = suma
+    correlacionCruda[lag] = suma
+    correlacion[lag] = suma * SIZE / (SIZE - lag)
   }
 
   let d = 0
@@ -91,7 +99,7 @@ export function detectarFrecuencia(buffer, sampleRate) {
   // valor relativamente alto; para ruido sin una altura definida da un valor
   // bajo. La descartamos (igual que el silencio) en vez de reportarla como
   // si fuera una frecuencia real.
-  const claridad = correlacion[0] > 0 ? mejorValor / correlacion[0] : 0
+  const claridad = correlacionCruda[0] > 0 ? correlacionCruda[mejorLag] / correlacionCruda[0] : 0
   if (claridad < UMBRAL_CLARIDAD) return null
 
   // El máximo global de la autocorrelación no siempre es el período
@@ -107,7 +115,7 @@ export function detectarFrecuencia(buffer, sampleRate) {
   // lag que tenga una correlación ya casi tan fuerte como ese máximo — si
   // hay uno, es la fundamental real; el máximo global más largo es su
   // armónico reforzado, no una nota distinta.
-  const UMBRAL_SUBARMONICO = 0.9
+  const UMBRAL_SUBARMONICO = 0.93 // sobre la autocorrelación insesgada (ver arriba)
   let lagElegido = mejorLag
   for (let lag = d; lag < mejorLag; lag++) {
     if (correlacion[lag] >= mejorValor * UMBRAL_SUBARMONICO) {
