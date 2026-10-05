@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 //  - Retención (RETENCION_MS): si la lectura se corta un instante (cambio de
 //    nota, respiración), el último tramo queda iluminado un ratito en vez de
 //    apagarse y prenderse de nuevo.
-const ALFA = 0.3
+const ALFA = 0.2
 const MARGEN_CENTS = 4
 const RETENCION_MS = 450
 
@@ -37,7 +37,7 @@ function segmentoConHisteresis(valor, previo, limites) {
   return segmentoDe(valor, limites)
 }
 
-export default function MedidorAfinacion({ cents, bandaVerde = 10, bandaAmarilla = 25 }) {
+export default function MedidorAfinacion({ cents, bandaVerde = 15, bandaAmarilla = 35 }) {
   const [segmentoActivo, setSegmentoActivo] = useState(null)
   const suavizado = useRef(null)
   const segmentoRef = useRef(null)
