@@ -25,8 +25,9 @@ function hoyEnArgentina() {
   return { mes, dia }
 }
 
-async function enviarATodos(suscripciones, titulo, cuerpo) {
-  const payload = JSON.stringify({ title: titulo, body: cuerpo })
+async function enviarATodos(suscripciones, titulo, cuerpo, url) {
+  // "url" es a donde lleva el clic en la notificación (lo lee public/sw.js)
+  const payload = JSON.stringify({ title: titulo, body: cuerpo, url })
   return Promise.allSettled(
     suscripciones.map(s =>
       webpush.sendNotification(
@@ -81,7 +82,8 @@ Deno.serve(async (req) => {
       const r1 = await enviarATodos(
         susResto || [],
         `🎂 ¡Hoy es el cumpleaños de ${persona.nombre}!`,
-        'Mandale un saludo 🎉'
+        'Mandale un saludo 🎉',
+        '/companeros'
       )
 
       // Mensaje personal al cumpleañero
@@ -92,7 +94,8 @@ Deno.serve(async (req) => {
       const r2 = await enviarATodos(
         susPersona || [],
         `🎂 ¡Feliz cumpleaños, ${persona.nombre}!`,
-        'Todo el coro te desea un gran día 🎉'
+        'Todo el coro te desea un gran día 🎉',
+        '/companeros'
       )
 
       enviadas += [...r1, ...r2].filter(r => r.status === 'fulfilled').length
