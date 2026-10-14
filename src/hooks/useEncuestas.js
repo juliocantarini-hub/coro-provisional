@@ -336,11 +336,25 @@ export function useCrearEncuesta() {
   }
 
   async function eliminarEncuesta(encuestaId) {
+    // Obtener aviso_id antes de borrar
+    const { data: encData } = await supabase
+      .from('encuestas')
+      .select('aviso_id')
+      .eq('id', encuestaId)
+      .maybeSingle()
+    const avisoId = encData?.aviso_id
+
     // Orden importa por las FK: primero votos, después opciones, recién ahí la encuesta
     await supabase.from('encuesta_votos').delete().eq('encuesta_id', encuestaId)
     await supabase.from('encuesta_opciones').delete().eq('encuesta_id', encuestaId)
     const { error } = await supabase.from('encuestas').delete().eq('id', encuestaId)
     if (error) throw error
+
+    // Borrar el aviso asociado (si existe)
+    if (avisoId) {
+      await supabase.from('avisos_leidos').delete().eq('aviso_id', avisoId)
+      await supabase.from('avisos').delete().eq('id', avisoId)
+    }
   }
 
   return { crearEncuesta, cerrarEncuesta, reabrirEncuesta, eliminarEncuesta }
