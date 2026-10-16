@@ -592,7 +592,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
   const resumen = {
     notasEsperadas: K,
     notasDetectadas: validas.length,
-    pctVerde: pctVerdeTotal, // entre notas (descontando el corrimiento general)
+    pctVerde: pctVerdeTotal, // entre notas (descontando la afinación general)
     pctVerdeAbsoluto: pctVerdeAbsolutoTotal,
     offsetGlobalCents: offsetGlobal,
     octavaGlobal,
@@ -665,8 +665,8 @@ function redactarMensajes(inf) {
     )
   } else if (Math.abs(r.offsetGlobalCents) >= 25) {
     m.push(
-      `En promedio estuviste ${Math.abs(r.offsetGlobalCents)} cents ${r.offsetGlobalCents < 0 ? 'bajo' : 'alto'} respecto a lo escrito en todo el fragmento. ` +
-        'Si tus intervalos suenan bien entre sí, el problema es la nota de partida más que cada nota. (El puntaje de afinación mide tus notas entre sí, sin contar ese corrimiento.)'
+      `Tu afinación general estuvo ${Math.abs(r.offsetGlobalCents)} cents ${r.offsetGlobalCents < 0 ? 'baja' : 'alta'} respecto a lo escrito en todo el fragmento. ` +
+        'Si tus intervalos suenan bien entre sí, el problema es la nota de partida más que cada nota. (El puntaje de afinación mide tus notas entre sí, sin contar la afinación general.)'
     )
   }
   const verbo = (lista) => (lista.length === 1 ? 'no se oyó' : 'no se oyeron')

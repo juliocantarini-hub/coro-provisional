@@ -162,7 +162,7 @@ export default function InformesAfinacionAdmin() {
                         {ab && (
                           <div style={{ padding: '4px 14px 14px', fontSize: '12px', color: '#3D3D3A' }}>
                             {i.corrimiento_cents != null && Math.abs(i.corrimiento_cents) >= 25 && (
-                              <div style={{ marginBottom: '8px' }}>Corrimiento general: <strong>{i.corrimiento_cents > 0 ? '+' : ''}{i.corrimiento_cents} cents</strong> respecto de lo escrito.</div>
+                              <div style={{ marginBottom: '8px' }}>Afinación general: <strong>{i.corrimiento_cents > 0 ? '+' : ''}{i.corrimiento_cents} cents</strong> respecto de lo escrito.</div>
                             )}
                             {Array.isArray(i.mensajes) && i.mensajes.length > 0 && (
                               <ul style={{ margin: '0 0 10px', paddingLeft: '18px', lineHeight: 1.5 }}>

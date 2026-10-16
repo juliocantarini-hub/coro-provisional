@@ -553,7 +553,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
               <strong> “50 cents alta”</strong> es medio semitono por encima.
               <div style={{ marginTop: '6px' }}>
                 Hasta unos <strong>15 cents</strong> se considera afinada (verde); entre 15 y 35 se nota un poco (amarillo); más de 35 ya suena
-                desafinada (rojo). El <em>corrimiento general</em> es cuánto estuvo más alto o más bajo todo el fragmento, y el
+                desafinada (rojo). La <em>afinación general</em> es cuánto estuvo más alto o más bajo todo el fragmento (por ejemplo, si arrancaste desde una nota de partida corrida), y el
                 <em> vibrato</em> es cuánto oscila la nota hacia arriba y hacia abajo mientras la sostenés.
               </div>
             </div>
