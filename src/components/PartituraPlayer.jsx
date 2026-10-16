@@ -10,6 +10,7 @@ import {
 import PartituraVisual from './PartituraVisual'
 import PianoVisual from './PianoVisual'
 import MedidorAfinacion from './MedidorAfinacion'
+import InformeAfinacionPanel from './InformeAfinacionPanel'
 
 const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5]
 
@@ -115,6 +116,8 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   // arriba y abajo mientras se cantaba. En vez de eso, un signo de ayuda fijo
   // que el cantante abre cuando quiere (no cambia de tamaño solo).
   const [ayudaAfinacionAbierta, setAyudaAfinacionAbierta] = useState(false)
+  // "Grabarme y ver informe": panel para grabar un fragmento y recibir un informe
+  const [informeAbierto, setInformeAbierto] = useState(false)
 
   // Menú flotante de velocidad (se abre con el ícono de hamburguesa, en vez de
   // tener las 5 opciones siempre expuestas en la barra de controles) y, por
@@ -609,6 +612,15 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
 
   // Igual que arriba pero al revés: abrir el piano de "ver las notas" apaga el
   // micrófono si estaba prendido.
+  // Abre el panel "Grabarme y ver informe": antes frena la reproducción y el
+  // micrófono de práctica, para que no compitan con la grabación.
+  function abrirInforme() {
+    if (micActivo) detenerMicrofono()
+    if (reproduciendo) detener()
+    setPianoNotasAbierto(false)
+    setInformeAbierto(true)
+  }
+
   function alternarPianoNotas() {
     if (micActivo) detenerMicrofono()
     setPianoNotasAbierto(v => !v)
@@ -892,6 +904,18 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
               {micActivo ? '🎤 Apagar micrófono' : '🎤 Practicar afinación'}
             </button>
 
+            <button onClick={abrirInforme}
+              title="Grabá un fragmento y recibí un informe de afinación y ritmo"
+              disabled={!vozPropia}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
+                borderRadius: '20px', border: '1px solid #D3D1C7', background: '#FFFFFF',
+                color: '#5F5E5A', fontSize: '13px', fontWeight: '500',
+                cursor: vozPropia ? 'pointer' : 'default', opacity: vozPropia ? 1 : 0.5,
+              }}>
+              📝 Grabarme y ver informe
+            </button>
+
             {/* Ayuda: el texto aparecía antes pegado debajo de estos botones y
                 empujaba el piano/medidor hacia abajo al abrirse (un bloque
                 que cambiaba de alto). Es un menú flotante — mismo patrón que
@@ -945,6 +969,15 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           </div>
 
           {errorMic && <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '8px' }}>{errorMic}</div>}
+
+          {informeAbierto && vozPropia && partituraParseada && (
+            <InformeAfinacionPanel
+              partitura={partituraParseada}
+              voz={vozPropia}
+              titulo={partitura.titulo}
+              onCerrar={() => setInformeAbierto(false)}
+            />
+          )}
 
           {micActivo && (
             <div style={{ marginTop: '14px' }}>

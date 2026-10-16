@@ -1,0 +1,554 @@
+// Informe de afinación a partir de una grabación.
+//
+// Flujo: grabación (Float32Array mono) + notas de la voz del cantante en el
+// fragmento elegido  →  curva de altura (YIN) → alineación con la partitura
+// (Viterbi tipo DTW) → métricas por nota y por compás → resumen.
+//
+// Todo corre en el dispositivo; no usa red ni guarda audio. No depende de
+// React: se puede ejecutar en un Web Worker o en Node (para pruebas).
+//
+// Entrada de notas (solo las que canta la voz, ordenadas por tiempo):
+//   { midi: 62, inicio: 0, duracion: 1, compas: 1, nombre: 'D4' }
+// "inicio" y "duracion" en cualquier unidad consistente (pulsos o segundos):
+// solo se usan de forma relativa, porque el cantante va a su propio tempo.
+
+export const BANDA_VERDE_CENTS = 15
+export const BANDA_AMARILLA_CENTS = 35
+const UMBRAL_NOTA_DISTINTA_CENTS = 75
+
+const fold = (x) => ((x + 6) % 12 + 12) % 12 - 6 // semitonos → [-6, 6)
+
+function mediana(arr) {
+  if (!arr.length) return NaN
+  const a = Float64Array.from(arr).sort()
+  const n = a.length
+  return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2
+}
+
+// ─── 1. Curva de altura (YIN) ───────────────────────────────────────────
+
+function decimar(x, sr, objetivo = 16000) {
+  const f = Math.max(1, Math.round(sr / objetivo))
+  if (f === 1) return { x, sr }
+  const n = Math.floor(x.length / f)
+  const y = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    let s = 0
+    for (let k = 0; k < f; k++) s += x[i * f + k]
+    y[i] = s / f
+  }
+  return { x: y, sr: sr / f }
+}
+
+/**
+ * Devuelve { t, midi, vozeado, rms } con un cuadro cada `hop` segundos.
+ * midi es fraccionario (69 = La4 = 440 Hz); en cuadros sin voz es NaN.
+ */
+export function extraerCurvaF0(muestras, sampleRate, opts = {}) {
+  const { hop = 0.02, fMin = 60, fMax = 1000, umbral = 0.2 } = opts
+  const { x, sr } = decimar(muestras, sampleRate, 16000)
+  const tauMax = Math.floor(sr / fMin)
+  const tauMin = Math.max(2, Math.floor(sr / fMax))
+  const W = Math.floor(sr * 0.04)
+  const paso = Math.max(1, Math.round(hop * sr))
+  const d = new Float32Array(tauMax + 2)
+  const cm = new Float32Array(tauMax + 2)
+
+  const t = [], midi = [], rms = [], aper = []
+  for (let p = 0; p + W + tauMax + 1 < x.length; p += paso) {
+    let e = 0
+    for (let j = 0; j < W; j++) e += x[p + j] * x[p + j]
+    const r = Math.sqrt(e / W)
+    t.push((p + W / 2) / sr)
+    rms.push(r)
+    if (r < 1e-4) { midi.push(NaN); aper.push(1); continue }
+
+    for (let tau = 1; tau <= tauMax; tau++) {
+      let s = 0
+      for (let j = 0; j < W; j++) { const dd = x[p + j] - x[p + j + tau]; s += dd * dd }
+      d[tau] = s
+    }
+    let acum = 0
+    cm[0] = 1
+    for (let tau = 1; tau <= tauMax; tau++) {
+      acum += d[tau]
+      cm[tau] = acum > 0 ? (d[tau] * tau) / acum : 1
+    }
+    let tau = -1
+    for (let k = tauMin; k < tauMax; k++) {
+      if (cm[k] < umbral) {
+        while (k + 1 < tauMax && cm[k + 1] < cm[k]) k++
+        tau = k
+        break
+      }
+    }
+    if (tau < 0) {
+      let mn = Infinity, k0 = -1
+      for (let k = tauMin; k < tauMax; k++) if (cm[k] < mn) { mn = cm[k]; k0 = k }
+      if (mn < 0.35) tau = k0
+    }
+    if (tau <= 0 || tau >= tauMax) { midi.push(NaN); aper.push(1); continue }
+    const c0 = cm[tau - 1], c1 = cm[tau], c2 = cm[tau + 1]
+    const den = c0 - 2 * c1 + c2
+    const tauFino = den !== 0 ? tau + (0.5 * (c0 - c2)) / den : tau
+    const f0 = sr / tauFino
+    midi.push(69 + 12 * Math.log2(f0 / 440))
+    aper.push(cm[tau])
+  }
+
+  // Cuadros con voz: suficiente energía (relativa a la grabación) y periodicidad.
+  const orden = Float64Array.from(rms).sort()
+  const rmsRef = orden.length ? orden[Math.floor(orden.length * 0.95)] : 0
+  const pisoRms = Math.max(0.004, 0.08 * rmsRef)
+  const vozeado = midi.map((m, i) => Number.isFinite(m) && rms[i] >= pisoRms && aper[i] < 0.3)
+
+  corregirOctavas(midi, vozeado)
+  return { t, midi, vozeado, rms }
+}
+
+// Un cuadro aislado una octava (o más) lejos de sus vecinos es un error de
+// detección, no una nota distinta: lo devolvemos a la octava de la vecindad.
+function corregirOctavas(midi, vozeado, ventana = 4) {
+  const copia = midi.slice()
+  for (let i = 0; i < midi.length; i++) {
+    if (!vozeado[i]) continue
+    const vec = []
+    for (let k = Math.max(0, i - ventana); k <= Math.min(midi.length - 1, i + ventana); k++) {
+      if (vozeado[k]) vec.push(copia[k])
+    }
+    if (vec.length < 3) continue
+    const med = mediana(vec)
+    const dif = copia[i] - med
+    if (Math.abs(dif) > 6) midi[i] = copia[i] - 12 * Math.round(dif / 12)
+  }
+}
+
+// ─── 2. Alineación con la partitura ─────────────────────────────────────
+
+const CAP_COSTO = 3 // semitonos: un cuadro muy lejano no pesa más que esto
+const LAMBDA_TIEMPO = 2 // peso del "a-priori" de tiempos proporcionales
+const COSTO_AVANCE = 0.05
+const COSTO_SALTO = 2 // por cada nota que el cantante se saltea
+const COSTO_FIN = 1 // por cada nota sin alcanzar al final
+
+function alinear(frames, notas, esperado, offset, kMax) {
+  const N = frames.t.length
+  const K = notas.length
+  const dp = new Float32Array(N * K)
+  const bp = new Int16Array(N * K)
+  const t0 = frames.t[0]
+  const dur = frames.t[N - 1] - t0 || 1
+
+  for (let i = 0; i < N; i++) {
+    const prog = (frames.t[i] - t0) / dur
+    const base = i * K
+    const prev = (i - 1) * K
+    for (let j = 0; j < K; j++) {
+      let dif = Math.abs(fold(frames.m[i] - notas[j].midi - offset))
+      if (dif > CAP_COSTO) dif = CAP_COSTO
+      const c = dif + LAMBDA_TIEMPO * Math.abs(prog - esperado[j])
+      if (i === 0) {
+        dp[base + j] = c + COSTO_SALTO * j
+        bp[base + j] = -1
+      } else {
+        let mejor = dp[prev + j]
+        let arg = j
+        for (let k = 1; k <= kMax && j - k >= 0; k++) {
+          const v = dp[prev + j - k] + COSTO_AVANCE + (k - 1) * COSTO_SALTO
+          if (v < mejor) { mejor = v; arg = j - k }
+        }
+        dp[base + j] = c + mejor
+        bp[base + j] = arg
+      }
+    }
+  }
+
+  let jf = 0, mejorTotal = Infinity
+  for (let j = 0; j < K; j++) {
+    const v = dp[(N - 1) * K + j] + COSTO_FIN * (K - 1 - j)
+    if (v < mejorTotal) { mejorTotal = v; jf = j }
+  }
+  const asig = new Int16Array(N)
+  let j = jf
+  for (let i = N - 1; i >= 0; i--) {
+    asig[i] = j
+    j = bp[i * K + j]
+  }
+  return { asig, costo: mejorTotal }
+}
+
+function cuadrosVozeados(curva, desdeSeg = 0) {
+  const t = [], m = []
+  for (let i = 0; i < curva.t.length; i++) {
+    if (curva.vozeado[i] && curva.t[i] >= desdeSeg) { t.push(curva.t[i]); m.push(curva.midi[i]) }
+  }
+  return { t, m }
+}
+
+function submuestrear(frames, cada) {
+  const t = [], m = []
+  for (let i = 0; i < frames.t.length; i += cada) { t.push(frames.t[i]); m.push(frames.m[i]) }
+  return { t, m }
+}
+
+function progresoEsperado(notas) {
+  const ini = notas[0].inicio
+  const fin = notas[notas.length - 1].inicio + notas[notas.length - 1].duracion
+  const total = fin - ini || 1
+  return notas.map((n) => (n.inicio + n.duracion / 2 - ini) / total)
+}
+
+/** Busca el desplazamiento global (en semitonos, módulo octava) que mejor encaja. */
+function estimarOffset(frames, notas, esperado) {
+  const g = submuestrear(frames, 5)
+  if (g.t.length < 5) return 0
+  let mejor = 0, mejorCosto = Infinity
+  for (let o = -6; o < 6; o += 0.5) {
+    const { costo } = alinear(g, notas, esperado, o, 4)
+    if (costo < mejorCosto) { mejorCosto = costo; mejor = o }
+  }
+  const centro = mejor
+  for (let o = centro - 0.5; o <= centro + 0.5; o += 0.125) {
+    const { costo } = alinear(g, notas, esperado, fold(o), 4)
+    if (costo < mejorCosto) { mejorCosto = costo; mejor = fold(o) }
+  }
+  return mejor
+}
+
+// ─── 3. Métricas ────────────────────────────────────────────────────────
+
+function suavizar(arr, ventana) {
+  if (ventana <= 1) return arr.slice()
+  const out = new Array(arr.length)
+  const mitad = Math.floor(ventana / 2)
+  for (let i = 0; i < arr.length; i++) {
+    let sum = 0, n = 0
+    for (let k = Math.max(0, i - mitad); k <= Math.min(arr.length - 1, i + mitad); k++) { sum += arr[k]; n++ }
+    out[i] = sum / n
+  }
+  return out
+}
+
+const foldCents = (c) => ((c + 600) % 1200 + 1200) % 1200 - 600
+
+function estadoPorCents(c) {
+  const a = Math.abs(c)
+  return a <= BANDA_VERDE_CENTS ? 'verde' : a <= BANDA_AMARILLA_CENTS ? 'amarillo' : 'rojo'
+}
+
+function pendienteCentsPorSeg(ts, ms) {
+  const n = ts.length
+  if (n < 5) return 0
+  const mt = ts.reduce((a, b) => a + b, 0) / n
+  const mm = ms.reduce((a, b) => a + b, 0) / n
+  let num = 0, den = 0
+  for (let i = 0; i < n; i++) { num += (ts[i] - mt) * (ms[i] - mm); den += (ts[i] - mt) ** 2 }
+  return den > 0 ? (num / den) * 100 : 0
+}
+
+// ─── 4. Ritmo ───────────────────────────────────────────────────────────
+
+// Ajuste robusto (Theil–Sen) de "momento cantado" contra "momento escrito".
+function ajusteLineal(xs, ys) {
+  const pend = []
+  for (let i = 0; i < xs.length; i++) {
+    for (let j = i + 1; j < xs.length; j++) {
+      const dx = xs[j] - xs[i]
+      if (Math.abs(dx) > 0.2) pend.push((ys[j] - ys[i]) / dx)
+    }
+  }
+  const b = Math.max(0.5, Math.min(2, pend.length ? mediana(pend) : 1))
+  const a = mediana(ys.map((y, i) => y - b * xs[i]))
+  return { a, b }
+}
+
+const RITMO_OK_PULSOS = 0.15 // hasta 15% de un pulso: bien
+const RITMO_LEVE_PULSOS = 0.3 // hasta 30%: leve; más: marcado
+
+/**
+ * Compara CUÁNDO entró cada nota con cuándo debía entrar, descontando el tempo
+ * propio del cantante (si cantó todo un poco más lento, no es un error de
+ * cada nota). Una nota sólo se evalúa si su entrada es confiable: viene de un
+ * cambio de altura o de un silencio (con notas repetidas pegadas la frontera
+ * entre una y otra no se puede saber a partir de la altura).
+ * Cada nota puede traer "tramo" (cambios de tempo de la partitura) y
+ * "pulsoSeg" (duración de un pulso en esa zona, en segundos escritos).
+ */
+function analizarRitmo(resultados, notas) {
+  const conFrames = resultados.filter((r) => r.frames >= 5)
+  const salta = (a, b) => Math.abs(notas[a.indice].midi - notas[b.indice].midi) >= 1
+  conFrames.forEach((r, k) => {
+    const prev = conFrames[k - 1]
+    const next = conFrames[k + 1]
+    r.inicioFiable = !prev || salta(r, prev) || r.inicioSeg - prev.finSeg > 0.05
+    r.finFiable = !next || salta(r, next) || next.inicioSeg - r.finSeg > 0.05
+  })
+
+  const fiables = conFrames.filter((r) => r.inicioFiable)
+  if (fiables.length < 4) return { tempoRelativo: null, evaluadas: 0 }
+
+  const global = ajusteLineal(fiables.map((r) => notas[r.indice].inicio), fiables.map((r) => r.inicioSeg))
+  const porTramo = new Map()
+  for (const r of fiables) {
+    const t = notas[r.indice].tramo ?? 0
+    if (!porTramo.has(t)) porTramo.set(t, [])
+    porTramo.get(t).push(r)
+  }
+  const ajustes = new Map()
+  for (const [t, rs] of porTramo) {
+    ajustes.set(t, rs.length >= 5 ? ajusteLineal(rs.map((r) => notas[r.indice].inicio), rs.map((r) => r.inicioSeg)) : global)
+  }
+
+  let evaluadas = 0, ok = 0
+  for (const r of conFrames) {
+    const nota = notas[r.indice]
+    const aj = ajustes.get(nota.tramo ?? 0) || global
+    if (r.inicioFiable) {
+      const esperadoSeg = aj.a + aj.b * nota.inicio
+      const errorSeg = r.inicioSeg - esperadoSeg
+      const pulsos = errorSeg / ((nota.pulsoSeg ?? 0.5) * aj.b)
+      const mag = Math.abs(pulsos)
+      r.ritmo = {
+        errorMs: Math.round(errorSeg * 1000),
+        errorPulsos: Math.round(pulsos * 100) / 100,
+        estado: mag <= RITMO_OK_PULSOS ? 'ok' : mag <= RITMO_LEVE_PULSOS ? 'leve' : 'fuerte',
+        direccion: pulsos > 0 ? 'tarde' : 'temprano',
+      }
+      evaluadas++
+      if (r.ritmo.estado === 'ok') ok++
+    }
+    if (r.inicioFiable && r.finFiable && nota.duracion >= 0.75 * (nota.pulsoSeg ?? 0.5)) {
+      const ratio = (r.finSeg - r.inicioSeg) / (nota.duracion * aj.b)
+      r.duracionRatio = Math.round(ratio * 100) / 100
+      r.duracionEstado = ratio < 0.65 ? 'corta' : ratio > 1.4 ? 'larga' : 'ok'
+    }
+  }
+  return {
+    // b = segundos cantados por segundo escrito → velocidad relativa = 1/b
+    tempoRelativo: Math.round(100 / global.b) / 100,
+    evaluadas,
+    pctOk: evaluadas ? Math.round((ok / evaluadas) * 100) : null,
+  }
+}
+
+/**
+ * Analiza una grabación contra las notas de la voz.
+ * @param {Float32Array} muestras audio mono (-1..1)
+ * @param {number} sampleRate
+ * @param {Array<{midi:number,inicio:number,duracion:number,compas?:number,nombre?:string}>} notas
+ */
+export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
+  const curva = opciones.curva || extraerCurvaF0(muestras, sampleRate)
+  // Lo anterior a "descartarAntesDeSeg" (el conteo con clics) se ignora: el clic
+  // que se cuela en el micrófono no debe tomarse como una nota cantada.
+  const frames = cuadrosVozeados(curva, opciones.descartarAntesDeSeg || 0)
+  const K = notas.length
+  if (K === 0) return { error: 'sin_notas' }
+  if (frames.t.length < 20) return { error: 'sin_voz', mensaje: 'No se detectó voz suficiente en la grabación.' }
+
+  const paso = curva.t.length > 1 ? curva.t[1] - curva.t[0] : 0.02
+  const esperado = progresoEsperado(notas)
+  const offsetGrueso = estimarOffset(frames, notas, esperado)
+  const { asig, costo } = alinear(frames, notas, esperado, offsetGrueso, Math.min(16, K))
+
+  // Frames por nota
+  const porNota = Array.from({ length: K }, () => ({ t: [], m: [] }))
+  for (let i = 0; i < frames.t.length; i++) {
+    const g = porNota[asig[i]]
+    g.t.push(frames.t[i]); g.m.push(frames.m[i])
+  }
+
+  // Octava global (los hombres cantan una octava debajo de la escrita, etc.)
+  const octavas = []
+  for (let j = 0; j < K; j++) {
+    if (porNota[j].m.length >= 5) octavas.push(Math.round(mediana(porNota[j].m.map((v) => v - notas[j].midi)) / 12))
+  }
+  const octavaGlobal = octavas.length ? mediana(octavas) : 0
+
+  const resultados = notas.map((nota, j) => {
+    const g = porNota[j]
+    const base = { indice: j, nombre: nota.nombre ?? null, midi: nota.midi, compas: nota.compas ?? null }
+    if (g.m.length < 5) return { ...base, estado: 'no_detectada', frames: g.m.length }
+    const n = g.m.length
+    const desde = n >= 10 ? Math.floor(n * 0.15) : 0
+    const hasta = n >= 10 ? Math.ceil(n * 0.9) : n
+    const tc = g.t.slice(desde, hasta)
+    const mc = g.m.slice(desde, hasta)
+    const crudo = mediana(mc.map((v) => v - nota.midi))
+    const octava = Math.round(crudo / 12)
+    const devs = mc.map((v) => fold(v - nota.midi) * 100)
+    const dev = mediana(devs)
+    // El vibrato (±20-30 cents a ~5 Hz) no es desafinación: la nota se juzga por
+    // su centro. Suavizamos con una ventana de ~un ciclo de vibrato (≈200 ms)
+    // antes de contar el tiempo en la zona verde, y la estabilidad usa esa
+    // curva suavizada para no castigar el vibrato.
+    const suave = suavizar(devs, Math.max(1, Math.round(0.2 / paso)))
+    const desv = mediana(suave.map((v) => Math.abs(v - dev))) * 1.4826
+    const enVerde = suave.filter((v) => Math.abs(v) <= BANDA_VERDE_CENTS).length / suave.length
+    const duracionSeg = g.t[n - 1] - g.t[0]
+    return {
+      ...base,
+      frames: n,
+      inicioSeg: g.t[0],
+      finSeg: g.t[n - 1],
+      desviacionCents: Math.round(dev),
+      estabilidadCents: Math.round(desv),
+      pctVerde: Math.round(enVerde * 100),
+      pendienteCentsPorSeg: duracionSeg >= 0.5 ? Math.round(pendienteCentsPorSeg(tc, mc)) : 0,
+      octavaDistinta: octava !== octavaGlobal,
+      estado: estadoPorCents(dev),
+    }
+  })
+
+  const validas = resultados.filter((r) => r.frames >= 5)
+  const offsetGlobal = validas.length ? Math.round(mediana(validas.map((r) => r.desviacionCents))) : 0
+  for (const r of validas) {
+    // Relativa al desplazamiento general: si todo el fragmento está corrido,
+    // una nota "distinta" es la que se aparta ADEMÁS de ese corrimiento.
+    r.desviacionRelativaCents = foldCents(r.desviacionCents - offsetGlobal)
+    if (Math.abs(r.desviacionRelativaCents) >= UMBRAL_NOTA_DISTINTA_CENTS) {
+      r.estado = 'nota_distinta'
+      r.estadoRelativo = 'nota_distinta'
+    } else {
+      r.estadoRelativo = estadoPorCents(r.desviacionRelativaCents)
+    }
+  }
+
+  const ritmoResumen = analizarRitmo(resultados, notas)
+
+  // Por compás
+  const compases = new Map()
+  for (const r of validas) {
+    if (r.compas == null) continue
+    if (!compases.has(r.compas)) compases.set(r.compas, [])
+    compases.get(r.compas).push(r)
+  }
+  const porCompas = [...compases.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([compas, rs]) => {
+      const fr = rs.reduce((s, r) => s + r.frames, 0)
+      const verde = rs.reduce((s, r) => s + r.pctVerde * r.frames, 0) / fr
+      const dev = rs.reduce((s, r) => s + r.desviacionCents * r.frames, 0) / fr
+      const conRitmo = rs.filter((r) => r.ritmo)
+      const ritmoOk = conRitmo.filter((r) => r.ritmo.estado === 'ok').length
+      const pctRitmoOk = conRitmo.length ? Math.round((ritmoOk / conRitmo.length) * 100) : null
+      const tardes = conRitmo.filter((r) => r.ritmo.estado !== 'ok' && r.ritmo.direccion === 'tarde').length
+      const tempranos = conRitmo.filter((r) => r.ritmo.estado !== 'ok' && r.ritmo.direccion === 'temprano').length
+      return {
+        compas,
+        notas: rs.length,
+        pctVerde: Math.round(verde),
+        desviacionCents: Math.round(dev),
+        estado: verde >= 70 ? 'verde' : verde >= 40 ? 'amarillo' : 'rojo',
+        pctRitmoOk,
+        estadoRitmo: pctRitmoOk == null ? null : pctRitmoOk >= 75 ? 'verde' : pctRitmoOk >= 50 ? 'amarillo' : 'rojo',
+        ritmoTendencia: tardes > tempranos ? 'tarde' : tempranos > tardes ? 'temprano' : null,
+      }
+    })
+
+  const totalFrames = validas.reduce((s, r) => s + r.frames, 0)
+  const pctVerdeTotal = totalFrames ? Math.round(validas.reduce((s, r) => s + r.pctVerde * r.frames, 0) / totalFrames) : 0
+  const costoPorCuadro = costo / frames.t.length
+  const cobertura = validas.length / K
+  const confianza = Math.max(0, Math.min(1, (1 - costoPorCuadro / 1.5) * (0.5 + 0.5 * cobertura)))
+
+  const resumen = {
+    notasEsperadas: K,
+    notasDetectadas: validas.length,
+    pctVerde: pctVerdeTotal,
+    offsetGlobalCents: offsetGlobal,
+    octavaGlobal,
+    notasDistintas: resultados.filter((r) => r.estado === 'nota_distinta').map((r) => r.indice),
+    notasNoEncontradas: resultados.filter((r) => r.estado === 'no_detectada').map((r) => r.indice),
+    compasesNoEncontrados: [...new Set(resultados.filter((r) => r.estado === 'no_detectada' && r.compas != null).map((r) => r.compas))],
+    confianza: Math.round(confianza * 100) / 100,
+    alineacionDudosa: confianza < 0.45,
+    ritmo: ritmoResumen,
+  }
+  const informe = { resumen, notas: resultados, compases: porCompas, tendencias: calcularTendencias(validas, notas) }
+  informe.mensajes = redactarMensajes(informe)
+  return informe
+}
+
+function calcularTendencias(validas, notas) {
+  const t = {}
+  const rel = (r) => r.desviacionRelativaCents
+  const prom = (rs) => (rs.length ? Math.round(rs.reduce((s, r) => s + rel(r), 0) / rs.length) : null)
+
+  const ascendentes = [], descendentes = [], finales = [], largas = []
+  validas.forEach((r) => {
+    const i = r.indice
+    if (i > 0) {
+      const salto = notas[i].midi - notas[i - 1].midi
+      if (salto >= 3) ascendentes.push(r)
+      if (salto <= -3) descendentes.push(r)
+    }
+    const sig = validas.find((v) => v.indice > i)
+    if (!sig || sig.inicioSeg - r.finSeg > 0.35) finales.push(r)
+    if (r.finSeg - r.inicioSeg >= 0.8) largas.push(r)
+  })
+  t.saltosAscendentes = { n: ascendentes.length, cents: prom(ascendentes) }
+  t.saltosDescendentes = { n: descendentes.length, cents: prom(descendentes) }
+  t.finalesDeFrase = { n: finales.length, cents: prom(finales) }
+  const pendientes = largas.map((r) => r.pendienteCentsPorSeg).filter((v) => Number.isFinite(v))
+  t.notasLargas = { n: largas.length, pendienteCentsPorSeg: pendientes.length ? Math.round(mediana(pendientes)) : null }
+  return t
+}
+
+function redactarMensajes(inf) {
+  const m = []
+  const r = inf.resumen
+  if (r.alineacionDudosa) {
+    m.push('No pude seguir la partitura con seguridad (hubo mucho que no coincidía con lo escrito). Probá de nuevo o con un fragmento más corto.')
+  }
+  if (Math.abs(r.offsetGlobalCents) >= UMBRAL_NOTA_DISTINTA_CENTS) {
+    const st = r.offsetGlobalCents / 100
+    m.push(
+      `Todo el fragmento sonó aproximadamente ${Math.abs(st).toFixed(1).replace('.0', '')} semitono(s) ${st < 0 ? 'más grave' : 'más agudo'} que lo escrito: ` +
+        'parece que arrancaste en otra nota. Escuchá la nota de partida y volvé a grabar.'
+    )
+  } else if (Math.abs(r.offsetGlobalCents) >= 25) {
+    m.push(
+      `En promedio estuviste ${Math.abs(r.offsetGlobalCents)} cents ${r.offsetGlobalCents < 0 ? 'bajo' : 'alto'} respecto a lo escrito en todo el fragmento. ` +
+        'Si tus intervalos suenan bien entre sí, el problema es la nota de partida más que cada nota.'
+    )
+  }
+  if (r.compasesNoEncontrados.length) {
+    m.push(
+      r.compasesNoEncontrados.length === 1
+        ? `No encontré las notas del compás ${r.compasesNoEncontrados[0]}: ¿te las salteaste o cantaste otra cosa?`
+        : `No encontré las notas de los compases ${r.compasesNoEncontrados.join(', ')}: ¿te las salteaste o cantaste otra cosa?`
+    )
+  } else if (r.notasNoEncontradas.length) {
+    m.push(`No encontré ${r.notasNoEncontradas.length} nota(s): se cantaron muy cortas, muy bajitas, o distintas de lo escrito.`)
+  }
+  if (r.notasDistintas.length) {
+    m.push(`${r.notasDistintas.length} nota(s) parecen distintas de las escritas (más de ${UMBRAL_NOTA_DISTINTA_CENTS} cents de diferencia).`)
+  }
+  const t = inf.tendencias
+  if (t.saltosAscendentes.n >= 2 && t.saltosAscendentes.cents != null && t.saltosAscendentes.cents <= -15) {
+    m.push('Los saltos hacia arriba te quedan bajos: probá preparar la nota de llegada antes de cantarla.')
+  }
+  if (t.finalesDeFrase.n >= 2 && t.finalesDeFrase.cents != null && t.finalesDeFrase.cents <= -15) {
+    m.push('Tendés a bajar al final de las frases: sostené el apoyo hasta cortar la nota.')
+  }
+  if (t.notasLargas.n >= 2 && t.notasLargas.pendienteCentsPorSeg != null && t.notasLargas.pendienteCentsPorSeg <= -15) {
+    m.push('En las notas largas la afinación se va cayendo con el tiempo.')
+  }
+  const rit = r.ritmo
+  if (rit && rit.tempoRelativo != null && (rit.tempoRelativo < 0.88 || rit.tempoRelativo > 1.12)) {
+    m.push(`Cantaste al ${Math.round(rit.tempoRelativo * 100)}% del tempo escrito (${rit.tempoRelativo < 1 ? 'más lento' : 'más rápido'}). Si eso es a propósito para estudiar, está bien.`)
+  }
+  const malRitmo = inf.compases.filter((c) => c.estadoRitmo === 'rojo')
+  if (malRitmo.length) {
+    const lista = malRitmo.slice(0, 4).map((c) => c.compas).join(', ')
+    const dir = malRitmo.filter((c) => c.ritmoTendencia === 'tarde').length >= malRitmo.length / 2 ? 'tarde' : 'temprano'
+    m.push(`Ritmo: en ${malRitmo.length === 1 ? 'el compás' : 'los compases'} ${lista} entrás ${dir === 'tarde' ? 'tarde' : 'antes de tiempo'} respecto al pulso. Probá marcar el pulso con el pie.`)
+  }
+  const cortas = inf.notas.filter((n) => n.duracionEstado === 'corta')
+  if (cortas.length >= 2) {
+    m.push(`Cortaste antes de tiempo ${cortas.length} notas largas (por ejemplo en el compás ${cortas[0].compas ?? '?'}): sostenelas todo su valor.`)
+  }
+  if (!m.length) m.push('Buen resultado: no aparecen tendencias claras de desafinación en este fragmento.')
+  return m
+}
