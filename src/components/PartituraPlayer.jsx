@@ -579,7 +579,13 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           return
         }
 
-        setLectura({ freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo })
+        // Si hay nota que cantar pero lo detectado NO es esa nota (otra altura, grave o aguda),
+        // guardamos cuánto se aleja del objetivo: el medidor lo muestra como "fuera" (rojo) en
+        // vez de decir "afinado" respecto de la nota más cercana, que podía ser cualquiera.
+        setLectura({
+          freq, nombreCercano: cercana.nombre, centsCercano: cercana.cents, objetivo,
+          fueraDelObjetivoCents: objetivoFreq && !cantandoElObjetivo ? centsRespectoObjetivo : null,
+        })
       }, 80)
 
       setMicActivo(true)
@@ -647,7 +653,15 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   // sonando ahora mismo en la voz propia, comparamos contra ESA nota (lo que
   // realmente importa al practicar); si no, mostramos qué tan cerca está de
   // la nota más próxima en afinación estándar, como referencia general.
-  const centsMostrados = lectura?.objetivo ? lectura.objetivo.cents : lectura?.centsCercano
+  //
+  // Ojo: si hay una nota para cantar y se está cantando OTRA, no se muestra la desviación
+  // respecto de la nota más cercana (daría verde con cualquier nota bien afinada): se muestra
+  // en el extremo rojo, hacia el lado (grave o agudo) donde está lo que se canta.
+  const centsMostrados = lectura?.objetivo
+    ? lectura.objetivo.cents
+    : lectura?.fueraDelObjetivoCents != null
+      ? (lectura.fueraDelObjetivoCents >= 0 ? 50 : -50)
+      : lectura?.centsCercano
 
   // Nota de la voz propia que está sonando en el audio en este instante —
   // la misma cuenta que usa el afinador para saber qué nota "debería" sonar,

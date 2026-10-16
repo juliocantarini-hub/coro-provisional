@@ -304,6 +304,7 @@ function ajusteLineal(xs, ys) {
 
 const RITMO_OK_PULSOS = 0.15 // hasta 15% de un pulso: bien
 const RITMO_LEVE_PULSOS = 0.3 // hasta 30%: leve; más: marcado
+const RITMO_COBERTURA_MIN = 0.5 // si se pueden medir menos de la mitad de las notas escritas, el ritmo no es concluyente
 
 /**
  * Compara CUÁNDO entró cada nota con cuándo debía entrar, descontando el tempo
@@ -325,7 +326,7 @@ function analizarRitmo(resultados, notas) {
   })
 
   const fiables = conFrames.filter((r) => r.inicioFiable)
-  if (fiables.length < 4) return { tempoRelativo: null, evaluadas: 0 }
+  if (fiables.length < 4) return { tempoRelativo: null, evaluadas: 0, pctOk: null, concluyente: false, motivo: 'pocas_entradas' }
 
   const global = ajusteLineal(fiables.map((r) => notas[r.indice].inicio), fiables.map((r) => r.inicioSeg))
   const porTramo = new Map()
@@ -363,11 +364,35 @@ function analizarRitmo(resultados, notas) {
       r.duracionEstado = ratio < 0.65 ? 'corta' : ratio > 1.4 ? 'larga' : 'ok'
     }
   }
+  // ¿Se puede confiar en este ritmo? Con notas repetidas en la misma altura cantadas ligadas
+  // (sin consonantes que las separen) el motor no tiene cómo saber a cuál nota escrita
+  // corresponde cada sonido: solo se pueden medir las entradas que vienen después de un
+  // silencio o de un cambio de altura. Si son pocas respecto de las notas escritas, el resultado
+  // sería un número engañoso (típicamente un 0% injusto), así que se declara "no concluyente".
+  const esperadas = notas.length
+  const cobertura = esperadas ? evaluadas / esperadas : 0
+  if (cobertura < RITMO_COBERTURA_MIN) {
+    const repetidas = notas.filter((n, i) => i > 0 && n.midi === notas[i - 1].midi).length
+    const muchasRepetidas = esperadas > 1 && repetidas / (esperadas - 1) >= 0.4
+    for (const r of conFrames) {
+      delete r.ritmo
+      delete r.duracionRatio
+      delete r.duracionEstado
+    }
+    return {
+      tempoRelativo: null,
+      evaluadas,
+      pctOk: null,
+      concluyente: false,
+      motivo: muchasRepetidas ? 'notas_repetidas' : 'pocas_entradas',
+    }
+  }
   return {
     // b = segundos cantados por segundo escrito → velocidad relativa = 1/b
     tempoRelativo: Math.round(100 / global.b) / 100,
     evaluadas,
     pctOk: evaluadas ? Math.round((ok / evaluadas) * 100) : null,
+    concluyente: true,
   }
 }
 
@@ -511,8 +536,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     compases.get(r.compas).push(r)
   }
   const porCompas = [...compases.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([compas, rs]) => {
+    .map(([compas, rs]) => { // ya en el orden de la partitura (no se ordena: los compases pueden ser texto)
       const fr = rs.reduce((s, r) => s + r.frames, 0)
       const verde = rs.reduce((s, r) => s + r.pctVerde * r.frames, 0) / fr
       const dev = rs.reduce((s, r) => s + (r.desviacionRelativaCents ?? r.desviacionCents) * r.frames, 0) / fr
@@ -578,7 +602,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     // medir dentro de un compás que sí se cantó (típico: una nota muy corta pegada a otras).
     compasesNoEncontrados: compasesDe(medios).filter((c) => !validas.some((v) => v.compas === c)),
     notasSinMedir: medios.filter((x) => x.compas != null && validas.some((v) => v.compas === x.compas)).map((x) => ({ compas: x.compas, nombre: x.nombre })),
-    compasesSinCantarAlFinal: compasesDe(finales).filter((c) => ultimoDetectado < 0 || c > (resultados[ultimoDetectado].compas ?? -Infinity)),
+    compasesSinCantarAlFinal: compasesDe(finales).filter((c) => ultimoDetectado < 0 || c !== resultados[ultimoDetectado].compas), // las notas finales sin cantar están en compases iguales o posteriores: no se comparan como texto
     compasesSinCantarAlInicio: compasesDe(iniciales),
     ultimoCompasCantado: ultimoDetectado >= 0 ? (resultados[ultimoDetectado].compas ?? null) : null,
     confianza: Math.round(confianza * 100) / 100,
@@ -689,6 +713,13 @@ function redactarMensajes(inf) {
     m.push('En las notas largas la afinación se va cayendo con el tiempo.')
   }
   const rit = r.ritmo
+  if (rit && rit.concluyente === false) {
+    m.push(
+      rit.motivo === 'notas_repetidas'
+        ? 'No pude medir tu ritmo con confianza en este fragmento: tiene muchas notas repetidas en la misma altura y, cantadas ligadas, no se distingue dónde entra cada una. Para el ritmo probá un tramo con cambios de nota, o marcá bien cada sílaba. (La afinación sí se midió.)'
+        : 'No pude medir tu ritmo con confianza en este fragmento: se distinguieron muy pocas entradas de nota. Probá con un tramo más largo o cantando con las consonantes bien marcadas. (La afinación sí se midió.)'
+    )
+  }
   if (rit && rit.tempoRelativo != null && (rit.tempoRelativo < 0.88 || rit.tempoRelativo > 1.12)) {
     m.push(`Cantaste al ${Math.round(rit.tempoRelativo * 100)}% del tempo escrito (${rit.tempoRelativo < 1 ? 'más lento' : 'más rápido'}). Si eso es a propósito para estudiar, está bien.`)
   }

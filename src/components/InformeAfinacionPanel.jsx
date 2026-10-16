@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarCompases, notasParaInforme, rangoEnSegundos } from '../lib/informeNotas'
 import { iniciarGrabacion } from '../lib/grabadora'
-import { tocarNotaDePartida, contar } from '../lib/guiaInforme'
+import { tocarNotaDePartida, tocarPrimerCompas, contar, prepararPianoDeGuia } from '../lib/guiaInforme'
 import { midiANombre } from '../lib/afinacion'
 import { armarResumenParaCoaching, pedirCoaching } from '../lib/coaching'
 import { armarDiagnostico, guardarInformeParaDirector } from '../lib/informeGuardado'
@@ -21,14 +21,17 @@ const MAX_SEG_FRAGMENTO = 90
 const SEG_SUGERIDOS = 30
 const COMPASES_SUGERIDOS = 8
 
+// Los números de compás vienen como texto ("10", "5a"…): se comparan SIEMPRE por
+// posición en la lista, nunca como texto ("10" < "2") ni como número.
 function hastaSugerido(partitura, lista, desde) {
+  const i0 = lista.indexOf(desde)
+  if (i0 < 0) return desde
   let mejor = desde
   let contados = 0
-  for (const n of lista) {
-    if (n < desde) continue
+  for (let i = i0; i < lista.length; i++) {
     if (contados >= COMPASES_SUGERIDOS) break
-    const r = rangoEnSegundos(partitura, desde, n)
-    if (r && r.duracion <= SEG_SUGERIDOS) mejor = n
+    const r = rangoEnSegundos(partitura, desde, lista[i])
+    if (r && r.duracion <= SEG_SUGERIDOS) mejor = lista[i]
     else break
     contados++
   }
@@ -105,6 +108,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const [error, setError] = useState('')
   const [compasAbierto, setCompasAbierto] = useState(null)
   const [coaching, setCoaching] = useState({ estado: 'idle', texto: '', mensaje: '' }) // idle | cargando | listo | error
+  const [faseGuia, setFaseGuia] = useState('nota') // durante la etapa 'nota': 'nota' (nota de partida) | 'compas' (primer compás en piano)
   const [ancla, setAncla] = useState(false) // true: ya se eligió el compás inicial y falta el final
 
   // Letra (o notas, si no hay letra) de cada compás, para ubicarse al elegir
@@ -136,10 +140,15 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     [partitura, voz, desde, hasta],
   )
   const muyLargo = rango && rango.duracion > MAX_SEG_FRAGMENTO
+  const idxDesde = lista.indexOf(desde)
+  const idxHasta = lista.indexOf(hasta)
 
-  useEffect(() => () => {
-    cancelado.current = true
-    grabadoraRef.current?.cancelar()
+  useEffect(() => {
+    prepararPianoDeGuia() // baja las muestras de piano mientras elegís el fragmento
+    return () => {
+      cancelado.current = true
+      grabadoraRef.current?.cancelar()
+    }
   }, [])
 
   // Cronómetro y nivel mientras se graba
@@ -162,7 +171,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
 
   // Primer toque: compás donde empezás. Segundo toque: compás donde terminás.
   function tocarCompas(n) {
-    if (!ancla || n < desde) {
+    if (!ancla || lista.indexOf(n) < lista.indexOf(desde)) {
       setDesde(n)
       setHasta(n)
       setAncla(true)
@@ -177,11 +186,20 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     cancelado.current = false
     notasRef.current = notas
     try {
+      setFaseGuia('nota')
       setEtapa('nota')
       const g = await iniciarGrabacion() // pide el permiso del micrófono ya mismo
       grabadoraRef.current = g
       marcaRef.current.inicioMs = performance.now()
       await tocarNotaDePartida(notas[0].midi)
+      if (cancelado.current) return
+      // Después de la nota de partida, suena en piano el primer compás elegido (la melodía de tu voz)
+      const compasInicial = notas[0].compas
+      const delCompas = notas.filter((n) => n.compas === compasInicial)
+      const siguiente = notas.find((n) => n.compas !== compasInicial)
+      const durCompas = siguiente ? siguiente.inicio : (rango?.duracion ?? delCompas[delCompas.length - 1].inicio + delCompas[delCompas.length - 1].duracion)
+      setFaseGuia('compas')
+      await tocarPrimerCompas(delCompas, durCompas)
       if (cancelado.current) return
       setEtapa('conteo')
       const pulso = Math.max(0.4, Math.min(1.5, notas[0].pulsoSeg))
@@ -284,7 +302,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     cuerpo = (
       <>
         <p style={{ fontSize: '13px', color: '#5F5E5A', lineHeight: 1.5, margin: '0 0 14px' }}>
-          Elegí el fragmento que vas a cantar. Primero escuchás tu nota de partida, después
+          Elegí el fragmento que vas a cantar. Primero escuchás tu nota de partida y el primer compás en piano, después
           4 clics, y cantás desde el compás elegido. Al terminar te mostramos dónde corregir
           afinación y ritmo. <strong>Usá auriculares</strong> para que los clics no se cuelen en la grabación.
         </p>
@@ -292,11 +310,11 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           {ancla ? 'Ahora tocá el compás donde terminás' : 'Tocá el compás donde empezás y después el compás donde terminás'}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
-          {lista.map((n) => {
-            const dentro = n >= desde && n <= hasta
-            const extremo = n === desde || n === hasta
+          {lista.map((n, idx) => {
+            const dentro = idx >= idxDesde && idx <= idxHasta
+            const extremo = idx === idxDesde || idx === idxHasta
             return (
-              <button key={n} onClick={() => tocarCompas(n)} title={letrasPorCompas[n] || ''}
+              <button key={`${idx}-${n}`} onClick={() => tocarCompas(n)} title={letrasPorCompas[n] || ''}
                 style={{
                   minWidth: '38px', height: '34px', padding: '0 6px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: extremo ? 700 : 500,
                   border: extremo ? '2px solid #1D7A5F' : '1px solid #D3D1C7',
@@ -337,8 +355,10 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         </div>
         {etapa === 'nota' && (
           <>
-            <div style={{ fontSize: '40px', fontWeight: 700, color: '#1D7A5F' }}>{nombre}</div>
-            <div style={{ fontSize: '14px', color: '#3D3D3A' }}>Esta es tu nota de partida. Escuchala…</div>
+            <div style={{ fontSize: '40px', fontWeight: 700, color: '#1D7A5F' }}>{faseGuia === 'compas' ? `Compás ${desde}` : nombre}</div>
+            <div style={{ fontSize: '14px', color: '#3D3D3A' }}>
+              {faseGuia === 'compas' ? 'Escuchá cómo va el primer compás (en piano)…' : 'Esta es tu nota de partida. Escuchala…'}
+            </div>
           </>
         )}
         {etapa === 'conteo' && (
@@ -397,7 +417,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         {!dudosa && (
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
             {tile(estadoAf, 'Afinación', `${r.pctVerde}%`, Math.abs(r.offsetGlobalCents) >= 25 ? 'entre tus notas, en la zona verde' : 'del tiempo en la zona verde')}
-            {tile(estadoRi, 'Ritmo', rit?.pctOk == null ? '–' : `${rit.pctOk}%`, 'de las entradas en tiempo')}
+            {tile(estadoRi, 'Ritmo', rit?.pctOk == null ? '–' : `${rit.pctOk}%`, rit?.concluyente === false ? 'no concluyente en este fragmento' : 'de las entradas en tiempo')}
           </div>
         )}
 

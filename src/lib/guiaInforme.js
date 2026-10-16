@@ -2,7 +2,9 @@
 // cantante arranque en el tono correcto) y después, ya grabando, 4 clics al
 // tempo de la partitura. Usa su propio AudioContext, separado del reproductor.
 
-import { midiAFrecuencia } from './afinacion'
+import * as Tone from 'tone'
+import { midiAFrecuencia, midiANombre } from './afinacion'
+import { getPianoSampler } from './pianoSampler'
 
 function crearContexto() {
   const Contexto = window.AudioContext || window.webkitAudioContext
@@ -11,8 +13,59 @@ function crearContexto() {
 
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/** Toca la nota de partida (~1.6 s) y espera a que termine. */
+/** Empieza a bajar las muestras de piano (llamar al abrir el panel, así están listas al grabar). */
+export function prepararPianoDeGuia() {
+  try { getPianoSampler().listo.catch(() => {}) } catch { /* sin piano: se usará el tono simple */ }
+}
+
+// Nota de partida con el sonido de piano del reproductor. Devuelve false si no se pudo
+// (sin conexión para bajar las muestras, audio bloqueado…): entonces se usa el tono simple.
+async function tocarNotaConPiano(midi) {
+  try {
+    const { sampler, listo } = getPianoSampler()
+    await Promise.race([listo, esperar(5000).then(() => { throw new Error('piano no cargó') })])
+    await Tone.start()
+    if (Tone.getContext().state !== 'running') return false
+    sampler.triggerAttackRelease(midiANombre(midi), 1.6, undefined, 0.8)
+    await esperar(2000)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Toca la nota de partida (~2 s, piano) y espera a que termine. */
 export async function tocarNotaDePartida(midi) {
+  if (await tocarNotaConPiano(midi)) return
+  await tocarNotaSimple(midi)
+}
+
+/**
+ * Toca en piano la melodía del primer compás elegido (con su ritmo) y espera a que termine.
+ * "notasDelCompas": notas con { midi, inicio, duracion } en segundos relativos al inicio del
+ * fragmento (el primer compás arranca en 0; puede haber silencio antes de la primera nota); "duracionSeg": lo que
+ * dura el compás. Si el piano no está disponible, no suena nada y sigue de largo.
+ */
+export async function tocarPrimerCompas(notasDelCompas, duracionSeg) {
+  try {
+    if (!notasDelCompas.length) return
+    const { sampler, listo } = getPianoSampler()
+    await Promise.race([listo, esperar(5000).then(() => { throw new Error('piano no cargó') })])
+    await Tone.start()
+    if (Tone.getContext().state !== 'running') return
+    const base = 0 // el compás empieza en 0: si arranca con silencio, ese silencio se respeta
+    const t0 = Tone.now() + 0.1
+    for (const n of notasDelCompas) {
+      sampler.triggerAttackRelease(midiANombre(n.midi), Math.max(0.15, n.duracion * 0.95), t0 + (n.inicio - base), 0.8)
+    }
+    await esperar(Math.max(0.5, duracionSeg - base) * 1000 + 500)
+  } catch {
+    /* sin piano: se sigue con el conteo */
+  }
+}
+
+/** Respaldo: tono simple (seno + 2.º armónico) de ~1.6 s. */
+async function tocarNotaSimple(midi) {
   const ctx = crearContexto()
   if (ctx.state === 'suspended') await ctx.resume()
   const t0 = ctx.currentTime + 0.05

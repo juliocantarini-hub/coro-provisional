@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import JSZip from 'jszip'
 import { parsearMusicXML, parsearPatronVocalizacion } from '../../lib/musicxml'
 import {
@@ -592,6 +593,7 @@ function ModalEditarEjercicio({ ejercicio, onCerrar, onGuardada }) {
 }
 
 export default function PartiturasAdmin() {
+  const navigate = useNavigate()
   const { partituras, cargando, error, recargar } = usePartiturasAdmin()
   const [mostrarForm, setMostrarForm] = useState(false)
   const [procesando, setProcesando] = useState(null)
@@ -640,9 +642,15 @@ export default function PartiturasAdmin() {
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 20px' }}>
-        Entrenamiento
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 20px', flexWrap: 'wrap', gap: '10px' }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: 0 }}>
+          Entrenamiento
+        </h2>
+        <button onClick={() => navigate('/admin/informes-afinacion')}
+          style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
+          🎤 Informes de afinación de los cantantes →
+        </button>
+      </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
