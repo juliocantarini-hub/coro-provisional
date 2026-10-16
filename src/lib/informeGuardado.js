@@ -7,6 +7,7 @@ export function armarDiagnostico({ titulo, vozNombre, desde, hasta, informe, ent
   const r2 = (v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v)
   return {
     version: 1,
+    conGuiaDePiano: !!entrada.conGuia,
     obra: titulo,
     voz: vozNombre,
     compases: [desde, hasta],

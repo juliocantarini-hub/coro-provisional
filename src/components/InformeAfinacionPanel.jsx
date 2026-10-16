@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarCompases, notasParaInforme, rangoEnSegundos } from '../lib/informeNotas'
 import { iniciarGrabacion } from '../lib/grabadora'
-import { tocarNotaDePartida, tocarPrimerCompas, contar, prepararPianoDeGuia } from '../lib/guiaInforme'
+import { tocarNotaDePartida, tocarPrimerCompas, iniciarGuiaPiano, contar, prepararPianoDeGuia } from '../lib/guiaInforme'
 import { midiANombre } from '../lib/afinacion'
 import { armarResumenParaCoaching, pedirCoaching } from '../lib/coaching'
 import { armarDiagnostico, guardarInformeParaDirector } from '../lib/informeGuardado'
@@ -109,6 +109,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const [compasAbierto, setCompasAbierto] = useState(null)
   const [coaching, setCoaching] = useState({ estado: 'idle', texto: '', mensaje: '' }) // idle | cargando | listo | error
   const [faseGuia, setFaseGuia] = useState('nota') // durante la etapa 'nota': 'nota' (nota de partida) | 'compas' (primer compás en piano)
+  const [conGuia, setConGuia] = useState(false) // opcional: escuchar la propia parte en piano mientras se canta (solo con auriculares)
   const [ancla, setAncla] = useState(false) // true: ya se eligió el compás inicial y falta el final
 
   // Letra (o notas, si no hay letra) de cada compás, para ubicarse al elegir
@@ -126,6 +127,8 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   }, [partitura, voz])
 
   const grabadoraRef = useRef(null)
+  const guiaRef = useRef(null) // guía de piano que suena durante la grabación
+  const conGuiaRef = useRef(false) // esta toma se hizo con guía sonando
   const cancelado = useRef(false)
   const marcaRef = useRef({ inicioMs: 0, yaMs: 0 })
   const notasRef = useRef([])
@@ -147,6 +150,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     prepararPianoDeGuia() // baja las muestras de piano mientras elegís el fragmento
     return () => {
       cancelado.current = true
+      guiaRef.current?.detener()
       grabadoraRef.current?.cancelar()
     }
   }, [])
@@ -213,7 +217,13 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       marcaRef.current.yaMs = performance.now()
       setSegundos(0)
       setEtapa('grabando')
+      conGuiaRef.current = false
+      if (conGuia) {
+        guiaRef.current = iniciarGuiaPiano(notasRef.current)
+        conGuiaRef.current = !!guiaRef.current
+      }
     } catch (e) {
+      guiaRef.current?.detener()
       grabadoraRef.current?.cancelar()
       grabadoraRef.current = null
       setError(
@@ -231,17 +241,23 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     grabadoraRef.current = null
     const yaSeg = Math.max(0, (marcaRef.current.yaMs - marcaRef.current.inicioMs) / 1000)
     const descartar = Math.max(0, yaSeg - 0.15)
+    guiaRef.current?.detener()
+    guiaRef.current = null
     const { muestras, sampleRate } = g.detener()
     setEtapa('analizando')
     try {
       const opcionesAnalisis = { descartarAntesDeSeg: descartar, inicioCantoSeg: yaSeg }
-      diagRef.current = { sampleRate, opciones: opcionesAnalisis, notas: notasRef.current }
+      diagRef.current = { sampleRate, opciones: opcionesAnalisis, notas: notasRef.current, conGuia: conGuiaRef.current }
       const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, opcionesAnalisis)
       if (cancelado.current) return
       if (inf.error) {
         setError(inf.mensaje || 'No pudimos analizar la grabación.')
         setEtapa('error')
         return
+      }
+      if (conGuiaRef.current) {
+        // Que quede dicho (para el cantante, la IA y el director): con la guía sonando la afinación no refleja cómo se canta de memoria
+        inf.mensajes = [...(inf.mensajes || []), 'Esta toma se hizo con la guía de piano sonando, así que es normal que la afinación salga mejor. Probá también sin guía para ver cómo la cantás de memoria.']
       }
       setInforme(inf)
       guardarInformeParaDirector({ perfil, titulo, vozNombre: voz?.nombre, desde, hasta, informe: inf, entrada: diagRef.current }) // resumen en números para el director (sin audio)
@@ -277,6 +293,8 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
 
   function cerrar() {
     cancelado.current = true
+    guiaRef.current?.detener()
+    guiaRef.current = null
     grabadoraRef.current?.cancelar()
     grabadoraRef.current = null
     onCerrar()
@@ -343,6 +361,13 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
             : 'Elegí un rango válido.'}
           {notas.length > 0 && <> · primera nota: <strong>{midiANombre(notas[0].midi)}</strong></>}
         </div>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#3D3D3A', margin: '0 0 12px', cursor: 'pointer', lineHeight: 1.45 }}>
+          <input type="checkbox" checked={conGuia} onChange={(e) => setConGuia(e.target.checked)} style={{ marginTop: '2px' }} />
+          <span>
+            <strong>Escuchar mi parte en piano mientras canto</strong> — solo con auriculares. Ayuda a no perderte,
+            pero la afinación sale mejor que de memoria; el informe lo aclara.
+          </span>
+        </label>
         <button style={{ ...boton(true), opacity: notas.length && !muyLargo ? 1 : 0.5 }} disabled={!notas.length || muyLargo} onClick={empezar}>
           🎤 Empezar
         </button>
@@ -383,7 +408,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         </div>
         {etapa === 'grabando'
           ? <button style={boton(true)} onClick={terminar}>⏹ Terminé</button>
-          : <button style={boton(false)} onClick={() => { cancelado.current = true; grabadoraRef.current?.cancelar(); grabadoraRef.current = null; setEtapa('config') }}>Cancelar</button>}
+          : <button style={boton(false)} onClick={() => { cancelado.current = true; guiaRef.current?.detener(); guiaRef.current = null; grabadoraRef.current?.cancelar(); grabadoraRef.current = null; setEtapa('config') }}>Cancelar</button>}
       </div>
     )
   } else if (etapa === 'analizando') {

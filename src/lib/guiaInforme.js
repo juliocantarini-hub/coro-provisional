@@ -66,6 +66,34 @@ export async function tocarPrimerCompas(notasDelCompas, duracionSeg) {
   }
 }
 
+/**
+ * Guía opcional MIENTRAS se graba: toca en piano la melodía de la voz del cantante, nota por
+ * nota, al ritmo escrito, a partir de este mismo instante (el momento en que entra la voz).
+ * Solo tiene sentido con auriculares: sin ellos el piano se colaría en la grabación.
+ * "notas": { midi, inicio, duracion } en segundos desde el inicio del fragmento.
+ * Devuelve { detener() } o null si el piano no está disponible (no se toca nada).
+ */
+export function iniciarGuiaPiano(notas) {
+  try {
+    const { sampler } = getPianoSampler()
+    if (!sampler?.loaded) return null
+    const timers = []
+    for (const n of notas) {
+      timers.push(setTimeout(() => {
+        try { sampler.triggerAttackRelease(midiANombre(n.midi), Math.max(0.15, n.duracion * 0.95), undefined, 0.55) } catch { /* ya detenido */ }
+      }, Math.max(0, n.inicio * 1000)))
+    }
+    return {
+      detener() {
+        timers.forEach(clearTimeout)
+        try { sampler.releaseAll() } catch { /* nada sonando */ }
+      },
+    }
+  } catch {
+    return null
+  }
+}
+
 /** Respaldo: tono simple (seno + 2.º armónico) de ~1.6 s. */
 async function tocarNotaSimple(midi) {
   const ctx = crearContexto()
