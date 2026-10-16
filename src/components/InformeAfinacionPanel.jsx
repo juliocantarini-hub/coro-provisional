@@ -4,6 +4,8 @@ import { iniciarGrabacion } from '../lib/grabadora'
 import { tocarNotaDePartida, contar } from '../lib/guiaInforme'
 import { midiANombre } from '../lib/afinacion'
 import { armarResumenParaCoaching, pedirCoaching } from '../lib/coaching'
+import { armarDiagnostico, guardarInformeParaDirector } from '../lib/informeGuardado'
+import { useAuth } from '../hooks/useAuth'
 
 // Grabar un fragmento de la obra y recibir un informe de afinación y ritmo,
 // comparando con la melodía de la propia voz del cantante (la partitura ya
@@ -91,6 +93,7 @@ function textoRitmo(r) {
 }
 
 export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar }) {
+  const { perfil } = useAuth()
   const lista = useMemo(() => listarCompases(partitura), [partitura])
   const [desde, setDesde] = useState(lista[0])
   const [hasta, setHasta] = useState(() => (lista.length ? hastaSugerido(partitura, lista, lista[0]) : undefined))
@@ -218,6 +221,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         return
       }
       setInforme(inf)
+      guardarInformeParaDirector({ perfil, titulo, vozNombre: voz?.nombre, desde, hasta, informe: inf, entrada: diagRef.current }) // resumen en números para el director (sin audio)
       setCompasAbierto(null)
       setEtapa('informe')
     } catch (e) {
@@ -237,17 +241,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
 
   async function copiarDiagnostico() {
     if (!informe || !diagRef.current) return
-    const d = diagRef.current
-    const r2 = (v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v)
-    const payload = {
-      version: 1,
-      obra: titulo, voz: voz?.nombre, compases: [desde, hasta],
-      sampleRate: d.sampleRate, opciones: d.opciones,
-      notasEntrada: d.notas.map((n) => ({ midi: n.midi, inicio: r2(n.inicio), duracion: r2(n.duracion), compas: n.compas, nombre: n.nombre, pulsoSeg: r2(n.pulsoSeg), tramo: n.tramo })),
-      curva: informe.curvaCompacta,
-      resumen: informe.resumen,
-      notasResultado: informe.notas.map((n) => ({ i: n.indice, nombre: n.nombre, compas: n.compas, estado: n.estado, frames: n.frames, ini: r2(n.inicioSeg), fin: r2(n.finSeg), dev: n.desviacionCents, pctVerde: n.pctVerde, ritmoMs: n.ritmo?.errorMs })),
-    }
+    const payload = armarDiagnostico({ titulo, vozNombre: voz?.nombre, desde, hasta, informe, entrada: diagRef.current })
     const texto = JSON.stringify(payload)
     setDiagTexto(texto)
     try {
@@ -330,7 +324,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           🎤 Empezar
         </button>
         <p style={{ fontSize: '11px', color: '#8A8878', margin: '14px 0 0' }}>
-          Tu grabación no se guarda: se analiza en tu dispositivo y se descarta al terminar.
+          Tu grabación no se guarda: se analiza en tu dispositivo y se descarta al terminar. Tu director recibe un resumen en números del informe (nunca tu audio).
         </p>
       </>
     )
@@ -500,7 +494,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           </div>
         )}
         <p style={{ fontSize: '11px', color: '#8A8878', margin: '12px 0 0' }}>
-          Es una medición aproximada hecha con el micrófono de tu dispositivo. Tu grabación se descartó al terminar el análisis.
+          Es una medición aproximada hecha con el micrófono de tu dispositivo. Tu grabación se descartó al terminar el análisis; tu director recibe un resumen en números (nunca tu audio).
         </p>
       </>
     )

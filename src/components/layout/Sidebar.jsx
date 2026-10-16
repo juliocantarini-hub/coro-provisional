@@ -25,6 +25,7 @@ const NAV_ADMIN = [
   { ruta: '/admin/asistencia',   label: 'Asistencia', icono: 'asistencia' },
   { ruta: '/admin/estudio',      label: 'Estudio',    icono: 'estudio' },
   { ruta: '/admin/entrenamiento', label: 'Entrenamiento', icono: 'entrenamiento' },
+  { ruta: '/admin/informes-afinacion', label: 'Informes de afinación', icono: 'entrenamiento' },
   { ruta: '/admin/estadistica',  label: 'Estadística', icono: 'estadistica' },
   { ruta: '/admin/avisos',       label: 'Avisos',     icono: 'campana' },
   { ruta: '/admin/encuestas',    label: 'Encuestas',  icono: 'encuestas' },
