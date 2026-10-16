@@ -531,7 +531,10 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     octavaGlobal,
     notasDistintas: resultados.filter((r) => r.estado === 'nota_distinta').map((r) => r.indice),
     notasNoEncontradas: resultados.filter((r) => r.estado === 'no_detectada').map((r) => r.indice),
-    compasesNoEncontrados: compasesDe(medios),
+    // Compás entero sin datos (se salteó o cantó otra cosa) vs. notas sueltas que no se pudieron
+    // medir dentro de un compás que sí se cantó (típico: una nota muy corta pegada a otras).
+    compasesNoEncontrados: compasesDe(medios).filter((c) => !validas.some((v) => v.compas === c)),
+    notasSinMedir: medios.filter((x) => x.compas != null && validas.some((v) => v.compas === x.compas)).map((x) => ({ compas: x.compas, nombre: x.nombre })),
     compasesSinCantarAlFinal: compasesDe(finales).filter((c) => ultimoDetectado < 0 || c > (resultados[ultimoDetectado].compas ?? -Infinity)),
     compasesSinCantarAlInicio: compasesDe(iniciales),
     ultimoCompasCantado: ultimoDetectado >= 0 ? (resultados[ultimoDetectado].compas ?? null) : null,
@@ -616,8 +619,10 @@ function redactarMensajes(inf) {
         ? `No encontré las notas del compás ${r.compasesNoEncontrados[0]}: ¿te las salteaste o cantaste otra cosa?`
         : `No encontré las notas de los compases ${r.compasesNoEncontrados.join(', ')}: ¿te las salteaste o cantaste otra cosa?`
     )
-  } else if (r.notasNoEncontradas.length && !r.compasesSinCantarAlFinal.length && !r.compasesSinCantarAlInicio.length) {
-    m.push(`No encontré ${r.notasNoEncontradas.length} nota(s): se cantaron muy cortas, muy bajitas, o distintas de lo escrito.`)
+  }
+  if (r.notasSinMedir.length) {
+    const lista = r.notasSinMedir.slice(0, 4).map((x) => `${x.nombre ?? 'una nota'} (compás ${x.compas})`).join(', ')
+    m.push(`No pude medir ${r.notasSinMedir.length === 1 ? 'esta nota' : 'estas notas'}: ${lista}. Suele pasar con notas muy cortas pegadas a otras, o si se saltearon.`)
   }
   if (r.notasDistintas.length) {
     m.push(`${r.notasDistintas.length} nota(s) parecen distintas de las escritas (más de ${UMBRAL_NOTA_DISTINTA_CENTS} cents de diferencia).`)
