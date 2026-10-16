@@ -15,15 +15,19 @@ const COLOR = {
   neutro: { fuerte: '#B9B7AC', suave: '#EFEEE7', texto: '#5F5E5A' },
 }
 const MAX_SEG_FRAGMENTO = 90
-const SEG_SUGERIDOS = 45
+const SEG_SUGERIDOS = 30
+const COMPASES_SUGERIDOS = 8
 
 function hastaSugerido(partitura, lista, desde) {
   let mejor = desde
+  let contados = 0
   for (const n of lista) {
     if (n < desde) continue
+    if (contados >= COMPASES_SUGERIDOS) break
     const r = rangoEnSegundos(partitura, desde, n)
     if (r && r.duracion <= SEG_SUGERIDOS) mejor = n
     else break
+    contados++
   }
   return mejor
 }
@@ -96,6 +100,21 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const [informe, setInforme] = useState(null)
   const [error, setError] = useState('')
   const [compasAbierto, setCompasAbierto] = useState(null)
+  const [ancla, setAncla] = useState(false) // true: ya se eligió el compás inicial y falta el final
+
+  // Letra (o notas, si no hay letra) de cada compás, para ubicarse al elegir
+  const letrasPorCompas = useMemo(() => {
+    const out = {}
+    const medidas = partitura?.medidas || []
+    const notasVoz = voz?.notas || []
+    medidas.forEach((m, i) => {
+      const fin = medidas[i + 1] ? medidas[i + 1].tiempo : Infinity
+      const dentro = notasVoz.filter((n) => n.nota && n.tiempo >= m.tiempo - 1e-6 && n.tiempo < fin - 1e-6)
+      const letras = dentro.map((n) => n.letra).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+      out[m.numero] = letras || dentro.map((n) => n.nota).join(' ')
+    })
+    return out
+  }, [partitura, voz])
 
   const grabadoraRef = useRef(null)
   const cancelado = useRef(false)
@@ -131,10 +150,16 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa, rango])
 
-  function cambiarDesde(v) {
-    const n = Number(v)
-    setDesde(n)
-    setHasta(hastaSugerido(partitura, lista, n))
+  // Primer toque: compás donde empezás. Segundo toque: compás donde terminás.
+  function tocarCompas(n) {
+    if (!ancla || n < desde) {
+      setDesde(n)
+      setHasta(n)
+      setAncla(true)
+    } else {
+      setHasta(n)
+      setAncla(false)
+    }
   }
 
   async function empezar() {
@@ -171,11 +196,12 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     const g = grabadoraRef.current
     if (!g) return
     grabadoraRef.current = null
-    const descartar = Math.max(0, (marcaRef.current.yaMs - marcaRef.current.inicioMs) / 1000 - 0.15)
+    const yaSeg = Math.max(0, (marcaRef.current.yaMs - marcaRef.current.inicioMs) / 1000)
+    const descartar = Math.max(0, yaSeg - 0.15)
     const { muestras, sampleRate } = g.detener()
     setEtapa('analizando')
     try {
-      const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, { descartarAntesDeSeg: descartar })
+      const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, { descartarAntesDeSeg: descartar, inicioCantoSeg: yaSeg })
       if (cancelado.current) return
       if (inf.error) {
         setError(inf.mensaje || 'No pudimos analizar la grabación.')
@@ -214,20 +240,32 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           4 clics, y cantás desde el compás elegido. Al terminar te mostramos dónde corregir
           afinación y ritmo. <strong>Usá auriculares</strong> para que los clics no se cuelen en la grabación.
         </p>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>
-          <label style={{ fontSize: '13px', color: '#3D3D3A' }}>
-            Desde el compás{' '}
-            <select value={desde} onChange={(e) => cambiarDesde(e.target.value)} style={{ fontSize: '14px', padding: '4px 6px' }}>
-              {lista.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-          <label style={{ fontSize: '13px', color: '#3D3D3A' }}>
-            hasta el{' '}
-            <select value={hasta} onChange={(e) => setHasta(Number(e.target.value))} style={{ fontSize: '14px', padding: '4px 6px' }}>
-              {lista.filter((n) => n >= desde).map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1A1A18', marginBottom: '6px' }}>
+          {ancla ? 'Ahora tocá el compás donde terminás' : 'Tocá el compás donde empezás y después el compás donde terminás'}
         </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+          {lista.map((n) => {
+            const dentro = n >= desde && n <= hasta
+            const extremo = n === desde || n === hasta
+            return (
+              <button key={n} onClick={() => tocarCompas(n)} title={letrasPorCompas[n] || ''}
+                style={{
+                  minWidth: '38px', height: '34px', padding: '0 6px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: extremo ? 700 : 500,
+                  border: extremo ? '2px solid #1D7A5F' : '1px solid #D3D1C7',
+                  background: extremo ? '#1D7A5F' : dentro ? '#C9EBDD' : '#FFFFFF',
+                  color: extremo ? '#FFFFFF' : '#3D3D3A',
+                }}>
+                {n}
+              </button>
+            )
+          })}
+        </div>
+        {desde != null && hasta != null && (
+          <div style={{ fontSize: '12px', color: '#3D3D3A', background: '#F7F6F1', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px', lineHeight: 1.5 }}>
+            <div><strong>Empezás en el compás {desde}:</strong> {letrasPorCompas[desde] ? `“${letrasPorCompas[desde]}”` : '—'}</div>
+            <div><strong>Terminás en el compás {hasta}:</strong> {letrasPorCompas[hasta] ? `“${letrasPorCompas[hasta]}”` : '—'}</div>
+          </div>
+        )}
         <div style={{ fontSize: '12px', color: muyLargo ? '#A32D2D' : '#8A8878', marginBottom: '16px' }}>
           {rango
             ? `${notas.length} notas · aprox. ${Math.round(rango.duracion)} s al tempo escrito${muyLargo ? ` — elegí un tramo de hasta ${MAX_SEG_FRAGMENTO} s` : ''}`
@@ -289,6 +327,8 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     const rit = r.ritmo
     const estadoAf = r.pctVerde >= 70 ? 'verde' : r.pctVerde >= 40 ? 'amarillo' : 'rojo'
     const estadoRi = rit?.pctOk == null ? 'neutro' : rit.pctOk >= 75 ? 'verde' : rit.pctOk >= 50 ? 'amarillo' : 'rojo'
+    const dudosa = r.alineacionDudosa
+    const diag = r.diagnostico
     const notasDe = (compas) => informe.notas.filter((n) => n.compas === compas)
     const tile = (estado, titulo2, valor, sub) => (
       <div style={{ flex: 1, minWidth: '130px', background: COLOR[estado].suave, border: `1px solid ${COLOR[estado].fuerte}`, borderRadius: '12px', padding: '12px 14px' }}>
@@ -299,23 +339,27 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     )
     cuerpo = (
       <>
-        {r.alineacionDudosa && (
-          <div style={{ background: COLOR.amarillo.suave, border: `1px solid ${COLOR.amarillo.fuerte}`, borderRadius: '10px', padding: '8px 12px', fontSize: '12px', color: COLOR.amarillo.texto, marginBottom: '12px' }}>
-            Esta lectura puede no ser confiable: no pudimos seguir bien la partitura.
+        {dudosa && (
+          <div style={{ background: COLOR.amarillo.suave, border: `1px solid ${COLOR.amarillo.fuerte}`, borderRadius: '10px', padding: '10px 12px', fontSize: '13px', color: COLOR.amarillo.texto, marginBottom: '12px', lineHeight: 1.5 }}>
+            <strong>No pudimos seguir tu grabación con la partitura</strong>, así que no te mostramos puntajes (serían engañosos).
+            {diag && <> Se grabaron {diag.segundosGrabados} s y se oyó voz durante {diag.segundosConVoz} s.</>}
+            {' '}Probá de nuevo cantando todo el fragmento elegido, sin cortar, a un volumen cómodo y cerca del micrófono; si es largo, elegí menos compases.
           </div>
         )}
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
-          {tile(estadoAf, 'Afinación', `${r.pctVerde}%`, 'del tiempo en la zona verde')}
-          {tile(estadoRi, 'Ritmo', rit?.pctOk == null ? '–' : `${rit.pctOk}%`, 'de las entradas en tiempo')}
-        </div>
+        {!dudosa && (
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            {tile(estadoAf, 'Afinación', `${r.pctVerde}%`, 'del tiempo en la zona verde')}
+            {tile(estadoRi, 'Ritmo', rit?.pctOk == null ? '–' : `${rit.pctOk}%`, 'de las entradas en tiempo')}
+          </div>
+        )}
 
-        <div style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A18', margin: '4px 0 6px' }}>Para trabajar</div>
-        <ul style={{ margin: '0 0 14px', paddingLeft: '18px', fontSize: '13px', color: '#3D3D3A', lineHeight: 1.5 }}>
+        {!dudosa && <div style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A18', margin: '4px 0 6px' }}>Para trabajar</div>}
+        {!dudosa && <ul style={{ margin: '0 0 14px', paddingLeft: '18px', fontSize: '13px', color: '#3D3D3A', lineHeight: 1.5 }}>
           {informe.mensajes.map((m, i) => <li key={i} style={{ marginBottom: '4px' }}>{m}</li>)}
-        </ul>
+        </ul>}
 
-        <div style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A18', margin: '4px 0 6px' }}>Por compás <span style={{ fontWeight: 400, color: '#8A8878' }}>(arriba afinación, abajo ritmo — tocá uno para ver el detalle)</span></div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+        {!dudosa && <div style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A18', margin: '4px 0 6px' }}>Por compás <span style={{ fontWeight: 400, color: '#8A8878' }}>(arriba afinación, abajo ritmo — tocá uno para ver el detalle)</span></div>}
+        {!dudosa && <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
           {informe.compases.map((c) => {
             const abierto = compasAbierto === c.compas
             return (
@@ -330,9 +374,9 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
               </button>
             )
           })}
-        </div>
+        </div>}
 
-        {compasAbierto != null && (
+        {!dudosa && compasAbierto != null && (
           <div style={{ background: '#F7F6F1', border: '1px solid #E8E6DF', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Compás {compasAbierto}</div>
             {notasDe(compasAbierto).map((n) => (
@@ -340,6 +384,8 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
                 <strong style={{ width: '34px' }}>{n.nombre}</strong>
                 {n.estado === 'no_detectada' ? (
                   <Chip estado="neutro">no la encontré</Chip>
+                ) : n.estado === 'no_separable' ? (
+                  <Chip estado="neutro">nota repetida (se mide junto a la anterior)</Chip>
                 ) : (
                   <>
                     <Chip estado={n.estado === 'nota_distinta' ? 'rojo' : n.estado}>

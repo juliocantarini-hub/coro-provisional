@@ -126,27 +126,31 @@ function corregirOctavas(midi, vozeado, ventana = 4) {
 // ─── 2. Alineación con la partitura ─────────────────────────────────────
 
 const CAP_COSTO = 3 // semitonos: un cuadro muy lejano no pesa más que esto
-const LAMBDA_TIEMPO = 2 // peso del "a-priori" de tiempos proporcionales
 const COSTO_AVANCE = 0.05
 const COSTO_SALTO = 2 // por cada nota que el cantante se saltea
 const COSTO_FIN = 1 // por cada nota sin alcanzar al final
 
-function alinear(frames, notas, esperado, offset, kMax) {
+/**
+ * Alinea los cuadros con voz a la secuencia de notas (Viterbi tipo DTW).
+ * "tExp[j]" es cuándo se espera la nota j (en segundos de la grabación) y
+ * "escala" cuánto tiempo (s) equivale a "un error de bulto" (≈ un compás): sirve
+ * de a-priori para desempatar notas repetidas; "lambda" es su peso. La primera
+ * pasada usa un peso chico (casi todo lo decide la altura); la segunda, con
+ * los tiempos ya ajustados al tempo real del cantante, uno mayor.
+ */
+function alinear(frames, notas, tExp, escala, lambda, offset, kMax) {
   const N = frames.t.length
   const K = notas.length
   const dp = new Float32Array(N * K)
   const bp = new Int16Array(N * K)
-  const t0 = frames.t[0]
-  const dur = frames.t[N - 1] - t0 || 1
 
   for (let i = 0; i < N; i++) {
-    const prog = (frames.t[i] - t0) / dur
     const base = i * K
     const prev = (i - 1) * K
     for (let j = 0; j < K; j++) {
       let dif = Math.abs(fold(frames.m[i] - notas[j].midi - offset))
       if (dif > CAP_COSTO) dif = CAP_COSTO
-      const c = dif + LAMBDA_TIEMPO * Math.abs(prog - esperado[j])
+      const c = dif + lambda * Math.min(Math.abs(frames.t[i] - tExp[j]) / escala, 2)
       if (i === 0) {
         dp[base + j] = c + COSTO_SALTO * j
         bp[base + j] = -1
@@ -191,25 +195,38 @@ function submuestrear(frames, cada) {
   return { t, m }
 }
 
-function progresoEsperado(notas) {
-  const ini = notas[0].inicio
-  const fin = notas[notas.length - 1].inicio + notas[notas.length - 1].duracion
-  const total = fin - ini || 1
-  return notas.map((n) => (n.inicio + n.duracion / 2 - ini) / total)
+// Ajuste de tiempos a partir de una primera alineación: cuándo entró cada nota
+// realmente contra cuándo estaba escrita. Sirve para la segunda pasada.
+function ajusteDesdeAsignacion(frames, asig, notas) {
+  const primero = new Map()
+  const cuenta = new Map()
+  for (let i = 0; i < frames.t.length; i++) {
+    const j = asig[i]
+    cuenta.set(j, (cuenta.get(j) || 0) + 1)
+    if (!primero.has(j)) primero.set(j, frames.t[i])
+  }
+  const xs = [], ys = []
+  for (const [j, c] of cuenta) {
+    // Solo entradas confiables: con una nota repetida pegada a la anterior, la
+    // frontera entre ambas no sale de la altura y ensuciaría el ajuste.
+    const repetida = j > 0 && Math.abs(notas[j].midi - notas[j - 1].midi) < 1
+    if (c >= 5 && !repetida) { xs.push(notas[j].inicio); ys.push(primero.get(j)) }
+  }
+  return xs.length >= 4 ? ajusteLineal(xs, ys) : null
 }
 
 /** Busca el desplazamiento global (en semitonos, módulo octava) que mejor encaja. */
-function estimarOffset(frames, notas, esperado) {
+function estimarOffset(frames, notas, tExp, escala) {
   const g = submuestrear(frames, 5)
   if (g.t.length < 5) return 0
   let mejor = 0, mejorCosto = Infinity
   for (let o = -6; o < 6; o += 0.5) {
-    const { costo } = alinear(g, notas, esperado, o, 4)
+    const { costo } = alinear(g, notas, tExp, escala, 0.4, o, 4)
     if (costo < mejorCosto) { mejorCosto = costo; mejor = o }
   }
   const centro = mejor
   for (let o = centro - 0.5; o <= centro + 0.5; o += 0.125) {
-    const { costo } = alinear(g, notas, esperado, fold(o), 4)
+    const { costo } = alinear(g, notas, tExp, escala, 0.4, fold(o), 4)
     if (costo < mejorCosto) { mejorCosto = costo; mejor = fold(o) }
   }
   return mejor
@@ -347,9 +364,21 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
   if (frames.t.length < 20) return { error: 'sin_voz', mensaje: 'No se detectó voz suficiente en la grabación.' }
 
   const paso = curva.t.length > 1 ? curva.t[1] - curva.t[0] : 0.02
-  const esperado = progresoEsperado(notas)
-  const offsetGrueso = estimarOffset(frames, notas, esperado)
-  const { asig, costo } = alinear(frames, notas, esperado, offsetGrueso, Math.min(16, K))
+  // Primera pasada: se asume que el cantante entra cuando termina el conteo
+  // ("inicioCantoSeg") y sigue el tempo escrito; con peso chico, casi todo lo
+  // decide la altura. Eso aguanta tomas incompletas o a otro tempo.
+  const yaSeg = opciones.inicioCantoSeg ?? frames.t[0]
+  const escala = Math.max(1, 4 * mediana(notas.map((n) => n.pulsoSeg ?? 0.5)))
+  const tExp0 = notas.map((n) => yaSeg + n.inicio)
+  const kMax = Math.min(16, K)
+  const offsetGrueso = estimarOffset(frames, notas, tExp0, escala)
+  let asig = alinear(frames, notas, tExp0, escala, 0.4, offsetGrueso, kMax).asig
+  // Segunda pasada: con los tiempos ajustados al tempo real de esta toma.
+  const ajuste1 = ajusteDesdeAsignacion(frames, asig, notas)
+  if (ajuste1) {
+    const tExp1 = notas.map((n) => ajuste1.a + ajuste1.b * n.inicio)
+    asig = alinear(frames, notas, tExp1, escala, 1.5, offsetGrueso, kMax).asig
+  }
 
   // Frames por nota
   const porNota = Array.from({ length: K }, () => ({ t: [], m: [] }))
@@ -400,6 +429,18 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     }
   })
 
+  // Una nota repetida pegada a otra igual (do-do) a veces queda "sin datos" porque
+  // la frontera entre ambas no se puede separar por la altura: no es un error del
+  // cantante, así que no se informa como nota no encontrada.
+  for (const r of resultados) {
+    if (r.estado !== 'no_detectada') continue
+    const vecinoIgual = [r.indice - 1, r.indice + 1].some((k) => {
+      const v = resultados[k]
+      return v && v.frames >= 5 && Math.abs(notas[k].midi - notas[r.indice].midi) < 1
+    })
+    if (vecinoIgual) r.estado = 'no_separable'
+  }
+
   const validas = resultados.filter((r) => r.frames >= 5)
   const offsetGlobal = validas.length ? Math.round(mediana(validas.map((r) => r.desviacionCents))) : 0
   for (const r of validas) {
@@ -448,9 +489,25 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
 
   const totalFrames = validas.reduce((s, r) => s + r.frames, 0)
   const pctVerdeTotal = totalFrames ? Math.round(validas.reduce((s, r) => s + r.pctVerde * r.frames, 0) / totalFrames) : 0
-  const costoPorCuadro = costo / frames.t.length
+  let costoAltura = 0
+  for (let i = 0; i < frames.t.length; i++) {
+    costoAltura += Math.min(Math.abs(fold(frames.m[i] - notas[asig[i]].midi - offsetGrueso)), CAP_COSTO)
+  }
+  const costoPorCuadro = costoAltura / frames.t.length
   const cobertura = validas.length / K
   const confianza = Math.max(0, Math.min(1, (1 - costoPorCuadro / 1.5) * (0.5 + 0.5 * cobertura)))
+
+  // Notas sin encontrar: las del medio (se las salteó o cantó otra cosa), las del
+  // final (dejó de cantar antes) y las del principio (entró más tarde).
+  const hayVoz = (r) => r.frames >= 5
+  const idxDetectadas = resultados.filter(hayVoz).map((r) => r.indice)
+  const primerDetectado = idxDetectadas.length ? Math.min(...idxDetectadas) : -1
+  const ultimoDetectado = idxDetectadas.length ? Math.max(...idxDetectadas) : -1
+  const sinEncontrar = resultados.filter((r) => r.estado === 'no_detectada')
+  const finales = sinEncontrar.filter((r) => r.indice > ultimoDetectado)
+  const iniciales = sinEncontrar.filter((r) => r.indice < primerDetectado)
+  const medios = sinEncontrar.filter((r) => r.indice > primerDetectado && r.indice < ultimoDetectado)
+  const compasesDe = (rs) => [...new Set(rs.filter((r) => r.compas != null).map((r) => r.compas))]
 
   const resumen = {
     notasEsperadas: K,
@@ -460,10 +517,17 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     octavaGlobal,
     notasDistintas: resultados.filter((r) => r.estado === 'nota_distinta').map((r) => r.indice),
     notasNoEncontradas: resultados.filter((r) => r.estado === 'no_detectada').map((r) => r.indice),
-    compasesNoEncontrados: [...new Set(resultados.filter((r) => r.estado === 'no_detectada' && r.compas != null).map((r) => r.compas))],
+    compasesNoEncontrados: compasesDe(medios),
+    compasesSinCantarAlFinal: compasesDe(finales).filter((c) => ultimoDetectado < 0 || c > (resultados[ultimoDetectado].compas ?? -Infinity)),
+    compasesSinCantarAlInicio: compasesDe(iniciales),
+    ultimoCompasCantado: ultimoDetectado >= 0 ? (resultados[ultimoDetectado].compas ?? null) : null,
     confianza: Math.round(confianza * 100) / 100,
     alineacionDudosa: confianza < 0.45,
     ritmo: ritmoResumen,
+    diagnostico: {
+      segundosGrabados: Math.round((curva.t[curva.t.length - 1] || 0) * 10) / 10,
+      segundosConVoz: Math.round(frames.t.length * (curva.t.length > 1 ? curva.t[1] - curva.t[0] : 0.02) * 10) / 10,
+    },
   }
   const informe = { resumen, notas: resultados, compases: porCompas, tendencias: calcularTendencias(validas, notas) }
   informe.mensajes = redactarMensajes(informe)
@@ -513,13 +577,25 @@ function redactarMensajes(inf) {
         'Si tus intervalos suenan bien entre sí, el problema es la nota de partida más que cada nota.'
     )
   }
+  const verbo = (lista) => (lista.length === 1 ? 'no se oyó' : 'no se oyeron')
+  const rangoTxt = (lista) => (lista.length === 1 ? `el compás ${lista[0]}` : `los compases ${lista[0]} a ${lista[lista.length - 1]}`)
+  if (r.compasesSinCantarAlFinal.length) {
+    m.push(
+      r.ultimoCompasCantado != null
+        ? `Dejaste de cantar en el compás ${r.ultimoCompasCantado}: ${verbo(r.compasesSinCantarAlFinal)} ${rangoTxt(r.compasesSinCantarAlFinal)}. Si querés practicar un tramo más corto, elegilo antes de grabar.`
+        : `${verbo(r.compasesSinCantarAlFinal)} ${rangoTxt(r.compasesSinCantarAlFinal)}.`
+    )
+  }
+  if (r.compasesSinCantarAlInicio.length) {
+    m.push(`No se oyó el comienzo (${rangoTxt(r.compasesSinCantarAlInicio)}): ¿entraste más tarde que el conteo?`)
+  }
   if (r.compasesNoEncontrados.length) {
     m.push(
       r.compasesNoEncontrados.length === 1
         ? `No encontré las notas del compás ${r.compasesNoEncontrados[0]}: ¿te las salteaste o cantaste otra cosa?`
         : `No encontré las notas de los compases ${r.compasesNoEncontrados.join(', ')}: ¿te las salteaste o cantaste otra cosa?`
     )
-  } else if (r.notasNoEncontradas.length) {
+  } else if (r.notasNoEncontradas.length && !r.compasesSinCantarAlFinal.length && !r.compasesSinCantarAlInicio.length) {
     m.push(`No encontré ${r.notasNoEncontradas.length} nota(s): se cantaron muy cortas, muy bajitas, o distintas de lo escrito.`)
   }
   if (r.notasDistintas.length) {
