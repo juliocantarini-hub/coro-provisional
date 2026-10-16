@@ -518,6 +518,22 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
             )}
           </div>
         )}
+        {!dudosa && (
+          <details style={{ margin: '12px 0 0', fontSize: '12px', color: '#3D3D3A', background: '#F7F6F1', borderRadius: '8px', padding: '8px 10px' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>¿Qué son los “cents”?</summary>
+            <div style={{ marginTop: '6px', lineHeight: 1.55 }}>
+              Los <strong>cents</strong> (centésimas de semitono) son la unidad con la que se mide qué tan desafinada está una nota.
+              Un semitono (la distancia entre dos teclas vecinas del piano, por ejemplo de Do a Do#) tiene 100 cents.
+              Por ejemplo, <strong>“25 cents bajo”</strong> es que cantaste un cuarto de semitono por debajo de lo escrito, y
+              <strong> “50 cents alta”</strong> es medio semitono por encima.
+              <div style={{ marginTop: '6px' }}>
+                Hasta unos <strong>15 cents</strong> se considera afinada (verde); entre 15 y 35 se nota un poco (amarillo); más de 35 ya suena
+                desafinada (rojo). El <em>corrimiento general</em> es cuánto estuvo más alto o más bajo todo el fragmento, y el
+                <em> vibrato</em> es cuánto oscila la nota hacia arriba y hacia abajo mientras la sostenés.
+              </div>
+            </div>
+          </details>
+        )}
         <p style={{ fontSize: '11px', color: '#8A8878', margin: '12px 0 0' }}>
           Es una medición aproximada hecha con el micrófono de tu dispositivo. Tu grabación se descartó al terminar el análisis.
         </p>
