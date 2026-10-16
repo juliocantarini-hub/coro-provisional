@@ -44,23 +44,25 @@ export async function tocarNotaDePartida(midi) {
  * Toca en piano la melodía del primer compás elegido (con su ritmo) y espera a que termine.
  * "notasDelCompas": notas con { midi, inicio, duracion } en segundos relativos al inicio del
  * fragmento (el primer compás arranca en 0; puede haber silencio antes de la primera nota); "duracionSeg": lo que
- * dura el compás. Si el piano no está disponible, no suena nada y sigue de largo.
+ * dura el compás. Devuelve true si sonó; false si el piano no estaba disponible (el que llama puede
+ * usar entonces la nota de partida suelta como respaldo).
  */
 export async function tocarPrimerCompas(notasDelCompas, duracionSeg) {
   try {
-    if (!notasDelCompas.length) return
+    if (!notasDelCompas.length) return false
     const { sampler, listo } = getPianoSampler()
     await Promise.race([listo, esperar(5000).then(() => { throw new Error('piano no cargó') })])
     await Tone.start()
-    if (Tone.getContext().state !== 'running') return
+    if (Tone.getContext().state !== 'running') return false
     const base = 0 // el compás empieza en 0: si arranca con silencio, ese silencio se respeta
     const t0 = Tone.now() + 0.1
     for (const n of notasDelCompas) {
       sampler.triggerAttackRelease(midiANombre(n.midi), Math.max(0.15, n.duracion * 0.95), t0 + (n.inicio - base), 0.8)
     }
     await esperar(Math.max(0.5, duracionSeg - base) * 1000 + 500)
+    return true
   } catch {
-    /* sin piano: se sigue con el conteo */
+    return false
   }
 }
 

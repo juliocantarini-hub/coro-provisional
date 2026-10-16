@@ -186,21 +186,26 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     cancelado.current = false
     notasRef.current = notas
     try {
-      setFaseGuia('nota')
+      setFaseGuia('compas')
       setEtapa('nota')
       const g = await iniciarGrabacion() // pide el permiso del micrófono ya mismo
       grabadoraRef.current = g
       marcaRef.current.inicioMs = performance.now()
-      await tocarNotaDePartida(notas[0].midi)
-      if (cancelado.current) return
-      // Después de la nota de partida, suena en piano el primer compás elegido (la melodía de tu voz)
+      // Referencia: el primer compás elegido en piano (la melodía de tu voz, con su ritmo).
+      // Solo si el piano no está disponible se toca la nota de partida suelta como respaldo.
       const compasInicial = notas[0].compas
       const delCompas = notas.filter((n) => n.compas === compasInicial)
       const siguiente = notas.find((n) => n.compas !== compasInicial)
-      const durCompas = siguiente ? siguiente.inicio : (rango?.duracion ?? delCompas[delCompas.length - 1].inicio + delCompas[delCompas.length - 1].duracion)
+      const ultima = delCompas[delCompas.length - 1]
+      const durCompas = siguiente ? siguiente.inicio : (rango?.duracion ?? ultima.inicio + ultima.duracion)
       setFaseGuia('compas')
-      await tocarPrimerCompas(delCompas, durCompas)
+      const sono = await tocarPrimerCompas(delCompas, durCompas)
       if (cancelado.current) return
+      if (!sono) {
+        setFaseGuia('nota')
+        await tocarNotaDePartida(notas[0].midi)
+        if (cancelado.current) return
+      }
       setEtapa('conteo')
       const pulso = Math.max(0.4, Math.min(1.5, notas[0].pulsoSeg))
       await contar(pulso, (n) => !cancelado.current && setConteo(n))
@@ -302,7 +307,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     cuerpo = (
       <>
         <p style={{ fontSize: '13px', color: '#5F5E5A', lineHeight: 1.5, margin: '0 0 14px' }}>
-          Elegí el fragmento que vas a cantar. Primero escuchás tu nota de partida y el primer compás en piano, después
+          Elegí el fragmento que vas a cantar. Primero escuchás el primer compás en piano, después
           4 clics, y cantás desde el compás elegido. Al terminar te mostramos dónde corregir
           afinación y ritmo. <strong>Usá auriculares</strong> para que los clics no se cuelen en la grabación.
         </p>
@@ -336,7 +341,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           {rango
             ? `${notas.length} notas · aprox. ${Math.round(rango.duracion)} s al tempo escrito${muyLargo ? ` — elegí un tramo de hasta ${MAX_SEG_FRAGMENTO} s` : ''}`
             : 'Elegí un rango válido.'}
-          {notas.length > 0 && <> · nota de partida: <strong>{midiANombre(notas[0].midi)}</strong></>}
+          {notas.length > 0 && <> · primera nota: <strong>{midiANombre(notas[0].midi)}</strong></>}
         </div>
         <button style={{ ...boton(true), opacity: notas.length && !muyLargo ? 1 : 0.5 }} disabled={!notas.length || muyLargo} onClick={empezar}>
           🎤 Empezar
