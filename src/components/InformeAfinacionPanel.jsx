@@ -324,7 +324,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           🎤 Empezar
         </button>
         <p style={{ fontSize: '11px', color: '#8A8878', margin: '14px 0 0' }}>
-          Tu grabación no se guarda: se analiza en tu dispositivo y se descarta al terminar. Tu director recibe un resumen en números del informe (nunca tu audio).
+          Tu grabación no se guarda: se analiza en tu dispositivo y se descarta al terminar.
         </p>
       </>
     )
@@ -494,7 +494,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           </div>
         )}
         <p style={{ fontSize: '11px', color: '#8A8878', margin: '12px 0 0' }}>
-          Es una medición aproximada hecha con el micrófono de tu dispositivo. Tu grabación se descartó al terminar el análisis; tu director recibe un resumen en números (nunca tu audio).
+          Es una medición aproximada hecha con el micrófono de tu dispositivo. Tu grabación se descartó al terminar el análisis.
         </p>
       </>
     )
