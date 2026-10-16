@@ -151,20 +151,20 @@ async function tocarNotaSimple(midi) {
 }
 
 /**
- * Cuenta 4 clics separados por "pulsoSeg" segundos. Llama a alPulso(1..4) en
- * cada uno y devuelve (cuando termina el 4.º pulso) cuántos segundos duró el
- * conteo completo, para ignorar ese tramo en el análisis.
+ * Conteo previo de UN COMPÁS entero: "clics" clics (uno por pulso del compás, el primero acentuado)
+ * separados por "pulsoSeg" segundos. Llama a alPulso(1..clics) en cada uno y espera un pulso más
+ * (hasta el "ya": el pulso donde entra la voz). Devuelve cuántos segundos duró el conteo completo.
  */
-export async function contar(pulsoSeg, alPulso) {
+export async function contar(pulsoSeg, alPulso, clics = 4) {
   const ctx = crearContexto()
   if (ctx.state === 'suspended') await ctx.resume()
   const inicio = ctx.currentTime + 0.1
-  for (let i = 0; i < 4; i++) clicSuave(ctx, inicio + i * pulsoSeg, { acento: i === 0, volumen: 0.35 })
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < clics; i++) clicSuave(ctx, inicio + i * pulsoSeg, { acento: i === 0, volumen: 0.35 })
+  for (let i = 0; i < clics; i++) {
     await esperar(i === 0 ? 100 : pulsoSeg * 1000)
     alPulso(i + 1)
   }
   await esperar(pulsoSeg * 1000) // hasta el "ya": el pulso donde entra la voz
   try { await ctx.close() } catch { /* ya cerrado */ }
-  return 0.1 + 4 * pulsoSeg
+  return 0.1 + clics * pulsoSeg
 }

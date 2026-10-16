@@ -78,3 +78,36 @@ export function notasParaInforme(partitura, vozId, desdeCompas, hastaCompas) {
   }
   return { notas, rango, pulsoInicialSeg: notas.length ? notas[0].pulsoSeg : pulsoDe(rango.desde) }
 }
+
+/**
+ * Pulsos para el metrónomo y el conteo, respetando el compás de la partitura:
+ * en compases simples (4/4, 3/4, 2/2…) un clic por pulso; en compases compuestos (6/8, 9/8, 12/8)
+ * un clic cada 3 corcheas (el pulso "con puntillo"), no uno por corchea. El primer pulso de cada
+ * compás va acentuado. "t" en segundos escritos desde el inicio del fragmento.
+ * Devuelve { clics, clicsPrimerCompas, pulsoSeg } (pulsoSeg = separación entre los dos primeros clics).
+ */
+export function pulsosMetronomo(partitura, desdeCompas, hastaCompas) {
+  const rango = rangoEnSegundos(partitura, desdeCompas, hastaCompas)
+  if (!rango) return { clics: [], clicsPrimerCompas: 0, pulsoSeg: null }
+  const medidas = partitura.medidas || []
+  const tiempos = partitura.tiempos || []
+  const clics = []
+  let clicsPrimerCompas = 0
+  let primero = true
+  for (let i = 0; i < medidas.length; i++) {
+    const m = medidas[i]
+    if (m.tiempo < rango.desde - EPS || m.tiempo >= rango.hasta - EPS) continue
+    const fin = medidas[i + 1] ? medidas[i + 1].tiempo : partitura.duracionTotal
+    const delCompas = tiempos.filter((p) => p.tiempo >= m.tiempo - EPS && p.tiempo < fin - EPS)
+    const compuesto = m.beatType === 8 && m.beats >= 6 && m.beats % 3 === 0
+    const paso = compuesto ? 3 : 1
+    let n = 0
+    delCompas.forEach((p, k) => {
+      if (k % paso !== 0) return
+      clics.push({ t: p.tiempo - rango.desde, acento: k === 0 })
+      n++
+    })
+    if (primero) { clicsPrimerCompas = n; primero = false }
+  }
+  return { clics, clicsPrimerCompas, pulsoSeg: clics.length > 1 ? clics[1].t - clics[0].t : null }
+}

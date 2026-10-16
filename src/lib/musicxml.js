@@ -48,6 +48,7 @@ function extraerEventosCrudos(parteEl) {
   const medidas = Array.from(parteEl.getElementsByTagName('measure'))
   let divisions = 1
   let beatType = 4               // "denominador" del compás (4 = negra, 8 = corchea, etc.)
+  let beats = 4                  // "numerador" del compás (4 en 4/4, 6 en 6/8, etc.)
   let tickAbsoluto = 0
   const eventosPorVoz = {}       // vozId -> [eventos]
   const notaAbiertaPorVoz = {}   // vozId -> evento (para fusionar ligaduras)
@@ -72,6 +73,8 @@ function extraerEventosCrudos(parteEl) {
         const timeEl = hijo.getElementsByTagName('time')[0]
         const bt = timeEl && textoDe(timeEl, 'beat-type')
         if (bt) beatType = parseFloat(bt) || beatType
+        const nb = timeEl && textoDe(timeEl, 'beats')
+        if (nb) beats = parseFloat(nb) || beats
       } else if (tag === 'direction') {
         const sonido = hijo.getElementsByTagName('sound')[0]
         const tempo = sonido && sonido.getAttribute('tempo')
@@ -129,6 +132,8 @@ function extraerEventosCrudos(parteEl) {
       tiemposTick.push({ tickInicio: medidaInicioTick + i * ticksPorTiempo })
     }
 
+    medidasTick[medidasTick.length - 1].beats = beats
+    medidasTick[medidasTick.length - 1].beatType = beatType
     tickAbsoluto = medidaInicioTick + cursorMax
   }
 
@@ -224,6 +229,8 @@ export function parsearMusicXML(xmlTexto) {
     numero: m.numero,
     tiempo: tickASegundos(m.tickInicio),
     tickInicio: m.tickInicio,
+    beats: m.beats,
+    beatType: m.beatType,
   }))
 
   // Tiempo de inicio de cada PULSO (tiempo del compás), en segundos — esto es lo

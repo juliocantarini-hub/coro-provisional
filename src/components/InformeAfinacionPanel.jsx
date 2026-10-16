@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { listarCompases, notasParaInforme, rangoEnSegundos } from '../lib/informeNotas'
+import { listarCompases, notasParaInforme, rangoEnSegundos, pulsosMetronomo } from '../lib/informeNotas'
 import { iniciarGrabacion } from '../lib/grabadora'
 import { tocarNotaDePartida, tocarPrimerCompas, iniciarGuiaPiano, iniciarMetronomo, contar, prepararPianoDeGuia } from '../lib/guiaInforme'
 import { midiANombre } from '../lib/afinacion'
@@ -18,7 +18,7 @@ const COLOR = {
   neutro: { fuerte: '#B9B7AC', suave: '#EFEEE7', texto: '#5F5E5A' },
 }
 const MAX_SEG_FRAGMENTO = 90
-const SEG_ENTRE_CLICS = 1 // los 4 clics previos van de a 1 segundo, sin importar el tempo de la obra
+const VELOCIDADES = [1, 0.8, 0.7, 0.6] // fracción del tempo escrito (para estudiar más despacio)
 const SEG_SUGERIDOS = 30
 const COMPASES_SUGERIDOS = 8
 
@@ -112,6 +112,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const [faseGuia, setFaseGuia] = useState('nota') // durante la etapa 'nota': 'nota' (nota de partida) | 'compas' (primer compás en piano)
   const [conGuia, setConGuia] = useState(false) // opcional: escuchar la propia parte en piano mientras se canta (solo con auriculares)
   const [conMetronomo, setConMetronomo] = useState(false) // opcional: metrónomo mientras se canta (solo con auriculares)
+  const [velocidad, setVelocidad] = useState(1) // 1 = tempo escrito; 0.7 = al 70%
   const [ancla, setAncla] = useState(false) // true: ya se eligió el compás inicial y falta el final
 
   // Letra (o notas, si no hay letra) de cada compás, para ubicarse al elegir
@@ -142,10 +143,17 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const [diagEstado, setDiagEstado] = useState('') // '' | 'copiado' | 'manual'
   const [diagTexto, setDiagTexto] = useState('')
 
-  const { notas, rango } = useMemo(
-    () => (voz && desde != null && hasta != null ? notasParaInforme(partitura, voz.id, desde, hasta) : { notas: [], rango: null }),
-    [partitura, voz, desde, hasta],
-  )
+  const { notas, rango } = useMemo(() => {
+    if (!(voz && desde != null && hasta != null)) return { notas: [], rango: null }
+    const r = notasParaInforme(partitura, voz.id, desde, hasta)
+    if (velocidad === 1 || !r.rango) return r
+    // Se canta más despacio: todo (clics, guía, y lo que espera el análisis) se estira. "tramo" queda igual (es el tempo escrito).
+    return {
+      ...r,
+      notas: r.notas.map((n) => ({ ...n, inicio: n.inicio / velocidad, duracion: n.duracion / velocidad, pulsoSeg: n.pulsoSeg / velocidad })),
+      rango: { ...r.rango, duracion: r.rango.duracion / velocidad },
+    }
+  }, [partitura, voz, desde, hasta, velocidad])
   const muyLargo = rango && rango.duracion > MAX_SEG_FRAGMENTO
   const idxDesde = lista.indexOf(desde)
   const idxHasta = lista.indexOf(hasta)
@@ -216,7 +224,12 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         if (cancelado.current) return
       }
       setEtapa('conteo')
-      await contar(SEG_ENTRE_CLICS, (n) => !cancelado.current && setConteo(n))
+      // Conteo: UN compás entero de clics (un clic por pulso del compás), al pulso del tempo elegido
+      // (en 6/8 y similares, un clic por pulso con puntillo, no uno por corchea)
+      const pm = pulsosMetronomo(partitura, desde, hasta)
+      const clicsConteo = Math.max(2, Math.min(8, pm.clicsPrimerCompas || 4))
+      const pulso = Math.max(0.35, Math.min(2.5, pm.pulsoSeg != null ? pm.pulsoSeg / velocidad : notas[0].pulsoSeg))
+      await contar(pulso, (n) => !cancelado.current && setConteo(n), clicsConteo)
       if (cancelado.current) return
       marcaRef.current.yaMs = performance.now()
       setSegundos(0)
@@ -228,11 +241,8 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         conGuiaRef.current = !!guiaRef.current
       }
       if (conMetronomo && rango) {
-        // Pulsos de la partitura dentro del fragmento (siguen los cambios de tempo); acento en el primer pulso de cada compás
-        const inicioCompases = (partitura.medidas || []).map((m) => m.tiempo)
-        const clics = (partitura.tiempos || [])
-          .filter((p) => p.tiempo >= rango.desde - 1e-6 && p.tiempo < rango.hasta - 1e-6)
-          .map((p) => ({ t: p.tiempo - rango.desde, acento: inicioCompases.some((c) => Math.abs(c - p.tiempo) < 1e-3) }))
+        // Pulsos del compás de la partitura dentro del fragmento (siguen los cambios de tempo); acento en el primer pulso de cada compás
+        const clics = pulsosMetronomo(partitura, desde, hasta).clics.map((c) => ({ t: c.t / velocidad, acento: c.acento }))
         if (clics.length) {
           metronomoRef.current = await iniciarMetronomo(clics)
           conMetronomoRef.current = true
@@ -266,7 +276,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     setEtapa('analizando')
     try {
       const opcionesAnalisis = { descartarAntesDeSeg: descartar, inicioCantoSeg: yaSeg }
-      diagRef.current = { sampleRate, opciones: opcionesAnalisis, notas: notasRef.current, conGuia: conGuiaRef.current, conMetronomo: conMetronomoRef.current }
+      diagRef.current = { sampleRate, opciones: opcionesAnalisis, notas: notasRef.current, conGuia: conGuiaRef.current, conMetronomo: conMetronomoRef.current, velocidad }
       const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, opcionesAnalisis)
       if (cancelado.current) return
       if (inf.error) {
@@ -277,6 +287,9 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       if (conGuiaRef.current) {
         // Que quede dicho (para el cantante, la IA y el director): con la guía sonando la afinación no refleja cómo se canta de memoria
         inf.mensajes = [...(inf.mensajes || []), 'Esta toma se hizo con la guía de piano sonando, así que es normal que la afinación salga mejor. Probá también sin guía para ver cómo la cantás de memoria.']
+      }
+      if (velocidad !== 1) {
+        inf.mensajes = [...(inf.mensajes || []), `Esta toma se hizo al ${Math.round(velocidad * 100)}% del tempo escrito: es normal para estudiar. Cuando la tengas segura, probá al 100%.`]
       }
       if (conMetronomoRef.current) {
         inf.mensajes = [...(inf.mensajes || []), 'Esta toma se hizo con metrónomo: seguiste el pulso escrito, así que el ritmo sale más parejo que de memoria. Probá también sin metrónomo.']
@@ -328,7 +341,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     if (!informe || coaching.estado === 'cargando') return
     setCoaching({ estado: 'cargando', texto: '', mensaje: '' })
     try {
-      const resumen = armarResumenParaCoaching(informe, { titulo, vozNombre: voz?.nombre, desde, hasta, pulsoSeg: notas[0]?.pulsoSeg })
+      const resumen = armarResumenParaCoaching(informe, { titulo, vozNombre: voz?.nombre, desde, hasta, pulsoSeg: notas[0] ? notas[0].pulsoSeg * velocidad : undefined })
       const texto = await pedirCoaching(resumen)
       if (!cancelado.current) setCoaching({ estado: 'listo', texto, mensaje: '' })
     } catch (e) {
@@ -350,7 +363,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       <>
         <p style={{ fontSize: '13px', color: '#5F5E5A', lineHeight: 1.5, margin: '0 0 14px' }}>
           Elegí el fragmento que vas a cantar. Primero escuchás el primer compás en piano, después
-          4 clics, y cantás desde el compás elegido. Al terminar te mostramos dónde corregir
+          un compás de clics, y cantás desde el compás elegido. Al terminar te mostramos dónde corregir
           afinación y ritmo. <strong>Usá auriculares</strong> para que los clics no se cuelen en la grabación.
         </p>
         <div style={{ fontSize: '13px', fontWeight: 600, color: '#1A1A18', marginBottom: '6px' }}>
@@ -381,9 +394,19 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         )}
         <div style={{ fontSize: '12px', color: muyLargo ? '#A32D2D' : '#8A8878', marginBottom: '16px' }}>
           {rango
-            ? `${notas.length} notas · aprox. ${Math.round(rango.duracion)} s al tempo escrito${muyLargo ? ` — elegí un tramo de hasta ${MAX_SEG_FRAGMENTO} s` : ''}`
+            ? `${notas.length} notas · aprox. ${Math.round(rango.duracion)} s ${velocidad === 1 ? 'al tempo escrito' : `al ${Math.round(velocidad * 100)}% del tempo`}${muyLargo ? ` — elegí un tramo de hasta ${MAX_SEG_FRAGMENTO} s` : ''}`
             : 'Elegí un rango válido.'}
           {notas.length > 0 && <> · primera nota: <strong>{midiANombre(notas[0].midi)}</strong></>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', margin: '0 0 12px', fontSize: '12px', color: '#3D3D3A' }}>
+          <strong>Velocidad:</strong>
+          {VELOCIDADES.map((v) => (
+            <button key={v} type="button" onClick={() => setVelocidad(v)}
+              style={{ padding: '4px 10px', borderRadius: '14px', fontSize: '12px', cursor: 'pointer', fontWeight: velocidad === v ? 700 : 500,
+                border: velocidad === v ? '2px solid #1D7A5F' : '1px solid #D3D1C7', background: velocidad === v ? '#C9EBDD' : '#FFFFFF', color: '#3D3D3A' }}>
+              {Math.round(v * 100)}%{v === 1 ? ' (escrito)' : ''}
+            </button>
+          ))}
         </div>
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#3D3D3A', margin: '0 0 12px', cursor: 'pointer', lineHeight: 1.45 }}>
           <input type="checkbox" checked={conGuia} onChange={(e) => setConGuia(e.target.checked)} style={{ marginTop: '2px' }} />
