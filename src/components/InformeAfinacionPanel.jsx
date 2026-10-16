@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarCompases, notasParaInforme, rangoEnSegundos, pulsosMetronomo } from '../lib/informeNotas'
 import { iniciarGrabacion } from '../lib/grabadora'
-import { tocarNotaDePartida, tocarPrimerCompas, iniciarGuiaPiano, iniciarMetronomo, contar, prepararPianoDeGuia } from '../lib/guiaInforme'
+import { tocarNotaDePartida, tocarPrimerCompas, iniciarGuiaPiano, contar, prepararPianoDeGuia } from '../lib/guiaInforme'
 import { midiANombre } from '../lib/afinacion'
 import { armarResumenParaCoaching, pedirCoaching } from '../lib/coaching'
 import { armarDiagnostico, guardarInformeParaDirector } from '../lib/informeGuardado'
@@ -18,6 +18,7 @@ const COLOR = {
   neutro: { fuerte: '#B9B7AC', suave: '#EFEEE7', texto: '#5F5E5A' },
 }
 const MAX_SEG_FRAGMENTO = 90
+const SEG_ENTRE_CLICS = 1.3 // conteo previo: segundos entre clic y clic (fijo, más lento que el tempo de la obra)
 const SEG_SUGERIDOS = 30
 const COMPASES_SUGERIDOS = 8
 
@@ -110,7 +111,6 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const [coaching, setCoaching] = useState({ estado: 'idle', texto: '', mensaje: '' }) // idle | cargando | listo | error
   const [faseGuia, setFaseGuia] = useState('nota') // durante la etapa 'nota': 'nota' (nota de partida) | 'compas' (primer compás en piano)
   const [conGuia, setConGuia] = useState(false) // opcional: escuchar la propia parte en piano mientras se canta (solo con auriculares)
-  const [conMetronomo, setConMetronomo] = useState(false) // opcional: metrónomo mientras se canta (solo con auriculares)
   const [ancla, setAncla] = useState(false) // true: ya se eligió el compás inicial y falta el final
 
   // Letra (o notas, si no hay letra) de cada compás, para ubicarse al elegir
@@ -130,8 +130,6 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const grabadoraRef = useRef(null)
   const guiaRef = useRef(null) // guía de piano que suena durante la grabación
   const conGuiaRef = useRef(false) // esta toma se hizo con guía sonando
-  const metronomoRef = useRef(null)
-  const conMetronomoRef = useRef(false)
   const cancelado = useRef(false)
   const marcaRef = useRef({ inicioMs: 0, yaMs: 0 })
   const notasRef = useRef([])
@@ -154,7 +152,6 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     return () => {
       cancelado.current = true
       guiaRef.current?.detener()
-      metronomoRef.current?.detener()
       grabadoraRef.current?.cancelar()
     }
   }, [])
@@ -216,32 +213,22 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       }
       setEtapa('conteo')
       // Conteo: UN compás entero de clics (un clic por pulso del compás), al pulso del tempo elegido
-      // Un clic por cada tiempo del compás
+      // Conteo de un compás entero (un clic por tiempo), a un ritmo lento y fijo en segundos
       const pm = pulsosMetronomo(partitura, desde, hasta)
       const clicsConteo = Math.max(2, Math.min(8, pm.clicsPrimerCompas || 4))
-      const pulso = Math.max(0.35, Math.min(2.5, pm.pulsoSeg != null ? pm.pulsoSeg : notas[0].pulsoSeg))
+      const pulso = SEG_ENTRE_CLICS
       await contar(pulso, (n) => !cancelado.current && setConteo(n), clicsConteo)
       if (cancelado.current) return
       marcaRef.current.yaMs = performance.now()
       setSegundos(0)
       setEtapa('grabando')
       conGuiaRef.current = false
-      conMetronomoRef.current = false
       if (conGuia) {
         guiaRef.current = iniciarGuiaPiano(notasRef.current)
         conGuiaRef.current = !!guiaRef.current
       }
-      if (conMetronomo && rango) {
-        // Pulsos del compás de la partitura dentro del fragmento (siguen los cambios de tempo); acento en el primer pulso de cada compás
-        const clics = pulsosMetronomo(partitura, desde, hasta).clics.map((c) => ({ t: c.t, acento: c.acento }))
-        if (clics.length) {
-          metronomoRef.current = await iniciarMetronomo(clics)
-          conMetronomoRef.current = true
-        }
-      }
     } catch (e) {
       guiaRef.current?.detener()
-      metronomoRef.current?.detener()
       grabadoraRef.current?.cancelar()
       grabadoraRef.current = null
       setError(
@@ -261,13 +248,11 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     const descartar = Math.max(0, yaSeg - 0.15)
     guiaRef.current?.detener()
     guiaRef.current = null
-    metronomoRef.current?.detener()
-    metronomoRef.current = null
     const { muestras, sampleRate } = g.detener()
     setEtapa('analizando')
     try {
       const opcionesAnalisis = { descartarAntesDeSeg: descartar, inicioCantoSeg: yaSeg }
-      diagRef.current = { sampleRate, opciones: opcionesAnalisis, notas: notasRef.current, conGuia: conGuiaRef.current, conMetronomo: conMetronomoRef.current }
+      diagRef.current = { sampleRate, opciones: opcionesAnalisis, notas: notasRef.current, conGuia: conGuiaRef.current }
       const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, opcionesAnalisis)
       if (cancelado.current) return
       if (inf.error) {
@@ -278,9 +263,6 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       if (conGuiaRef.current) {
         // Que quede dicho (para el cantante, la IA y el director): con la guía sonando la afinación no refleja cómo se canta de memoria
         inf.mensajes = [...(inf.mensajes || []), 'Esta toma se hizo con la guía de piano sonando, así que es normal que la afinación salga mejor. Probá también sin guía para ver cómo la cantás de memoria.']
-      }
-      if (conMetronomoRef.current) {
-        inf.mensajes = [...(inf.mensajes || []), 'Esta toma se hizo con metrónomo: seguiste el pulso escrito, así que el ritmo sale más parejo que de memoria. Probá también sin metrónomo.']
       }
       setInforme(inf)
       guardarInformeParaDirector({ perfil, titulo, vozNombre: voz?.nombre, desde, hasta, informe: inf, entrada: diagRef.current }) // resumen en números para el director (sin audio)
@@ -318,8 +300,6 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     cancelado.current = true
     guiaRef.current?.detener()
     guiaRef.current = null
-    metronomoRef.current?.detener()
-    metronomoRef.current = null
     grabadoraRef.current?.cancelar()
     grabadoraRef.current = null
     onCerrar()
@@ -393,13 +373,6 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
             pero la afinación sale mejor que de memoria; el informe lo aclara.
           </span>
         </label>
-        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#3D3D3A', margin: '0 0 12px', cursor: 'pointer', lineHeight: 1.45 }}>
-          <input type="checkbox" checked={conMetronomo} onChange={(e) => setConMetronomo(e.target.checked)} style={{ marginTop: '2px' }} />
-          <span>
-            <strong>Metrónomo mientras canto</strong> — solo con auriculares. Marca un clic por cada tiempo del compás (con los cambios de tempo de la partitura);
-            el ritmo sale más parejo que de memoria y el informe lo aclara.
-          </span>
-        </label>
         <button style={{ ...boton(true), opacity: notas.length && !muyLargo ? 1 : 0.5 }} disabled={!notas.length || muyLargo} onClick={empezar}>
           🎤 Empezar
         </button>
@@ -440,7 +413,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         </div>
         {etapa === 'grabando'
           ? <button style={boton(true)} onClick={terminar}>⏹ Terminé</button>
-          : <button style={boton(false)} onClick={() => { cancelado.current = true; guiaRef.current?.detener(); guiaRef.current = null; metronomoRef.current?.detener(); metronomoRef.current = null; grabadoraRef.current?.cancelar(); grabadoraRef.current = null; setEtapa('config') }}>Cancelar</button>}
+          : <button style={boton(false)} onClick={() => { cancelado.current = true; guiaRef.current?.detener(); guiaRef.current = null; grabadoraRef.current?.cancelar(); grabadoraRef.current = null; setEtapa('config') }}>Cancelar</button>}
       </div>
     )
   } else if (etapa === 'analizando') {

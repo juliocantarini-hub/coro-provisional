@@ -8,7 +8,6 @@ export function armarDiagnostico({ titulo, vozNombre, desde, hasta, informe, ent
   return {
     version: 1,
     conGuiaDePiano: !!entrada.conGuia,
-    conMetronomo: !!entrada.conMetronomo,
     obra: titulo,
     voz: vozNombre,
     compases: [desde, hasta],

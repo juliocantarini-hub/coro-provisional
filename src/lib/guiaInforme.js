@@ -14,7 +14,7 @@ function crearContexto() {
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // Clic suave y redondo (tipo "toc" de madera): seno grave, ataque de 10 ms y caída de ~0.15 s.
-// Antes era un "tic" muy corto y agudo. "fuerte" = primer pulso / conteo; "suave" = metrónomo.
+// Antes era un "tic" muy corto y agudo. "acento" = primer clic del conteo.
 function clicSuave(ctx, t, { acento = false, volumen = 0.3 } = {}) {
   const osc = ctx.createOscillator()
   const g = ctx.createGain()
@@ -106,22 +106,6 @@ export function iniciarGuiaPiano(notas) {
     }
   } catch {
     return null
-  }
-}
-
-/**
- * Metrónomo opcional MIENTRAS se graba (solo con auriculares). "clics": [{ t, acento }] con t en
- * segundos desde el momento en que entra la voz (los pulsos de la partitura, con sus cambios
- * de tempo). Se programan con el reloj de audio, así que no se desfasan. Más suave que el conteo.
- * Devuelve { detener() }.
- */
-export async function iniciarMetronomo(clics) {
-  const ctx = crearContexto()
-  if (ctx.state === 'suspended') await ctx.resume()
-  const base = ctx.currentTime + 0.05
-  for (const c of clics) clicSuave(ctx, base + c.t, { acento: c.acento, volumen: c.acento ? 0.2 : 0.14 })
-  return {
-    detener() { try { ctx.close() } catch { /* ya cerrado */ } },
   }
 }
 
