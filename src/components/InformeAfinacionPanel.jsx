@@ -477,6 +477,8 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
                     </Chip>
                     {n.ritmo && <Chip estado={n.ritmo.estado === 'ok' ? 'verde' : n.ritmo.estado === 'leve' ? 'amarillo' : 'rojo'}>{textoRitmo(n.ritmo)}</Chip>}
                     {n.duracionEstado && n.duracionEstado !== 'ok' && <Chip estado="amarillo">{n.duracionEstado === 'corta' ? 'la cortaste' : 'la alargaste'}</Chip>}
+                    {n.pocaEvidencia && <Chip estado="neutro">pocos datos</Chip>}
+                    {n.vibratoAmplio && <Chip estado="amarillo">vibrato amplio (±{n.vibratoCents})</Chip>}
                   </>
                 )}
               </div>

@@ -23,7 +23,7 @@ export function armarResumenParaCoaching(informe, { titulo, vozNombre, desde, ha
   const notasProblema = informe.notas
     .filter((n) => n.estado !== 'no_detectada' && n.estado !== 'no_separable')
     .map((n) => ({ n, s: severidad(n) }))
-    .filter((x) => x.s >= 30)
+    .filter((x) => x.s >= 30 && !x.n.pocaEvidencia)
     .sort((a, b) => b.s - a.s)
     .slice(0, MAX_NOTAS_PROBLEMA)
     .map(({ n }) => {
@@ -61,6 +61,7 @@ export function armarResumenParaCoaching(informe, { titulo, vozNombre, desde, ha
       return o
     }),
     notasProblema,
+    vibratoAmplio: r.vibrato && r.vibrato.amplias ? { notas: r.vibrato.amplias, ampCents: r.vibrato.ampCents, vecesPorSegundo: r.vibrato.hz } : undefined,
     tendencias: {
       saltosHaciaArriba: t.saltosAscendentes,
       saltosHaciaAbajo: t.saltosDescendentes,

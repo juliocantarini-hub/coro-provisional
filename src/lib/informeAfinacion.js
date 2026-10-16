@@ -246,6 +246,29 @@ function suavizar(arr, ventana) {
   return out
 }
 
+// Vibrato de una nota larga: amplitud (cents, ±) y frecuencia (Hz), una vez quitada la
+// deriva lenta con una recta. Devuelve null si la nota es corta (< ~40 cuadros útiles).
+function medirVibrato(devs, paso) {
+  const n = devs.length
+  if (n < 40) return null
+  let sx = 0, sy = 0, sxx = 0, sxy = 0
+  devs.forEach((y, x) => { sx += x; sy += y; sxx += x * x; sxy += x * y })
+  const m = (n * sxy - sx * sy) / (n * sxx - sx * sx)
+  const c = (sy - m * sx) / n
+  const det = devs.map((y, x) => y - (m * x + c))
+  const orden = [...det].sort((a, b) => a - b)
+  const q = (f) => orden[Math.min(n - 1, Math.max(0, Math.round(f * (n - 1))))]
+  const amp = (q(0.9) - q(0.1)) / 2
+  const hist = Math.max(6, 0.3 * amp)
+  let signo = 0, cruces = 0
+  for (const v of det) {
+    const s = v > hist ? 1 : v < -hist ? -1 : 0
+    if (s !== 0 && signo !== 0 && s !== signo) cruces++
+    if (s !== 0) signo = s
+  }
+  return { ampCents: Math.round(amp), hz: Math.round((cruces / 2 / (n * paso)) * 10) / 10, cruces }
+}
+
 const foldCents = (c) => ((c + 600) % 1200 + 1200) % 1200 - 600
 
 function estadoPorCents(c) {
@@ -416,6 +439,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     const desv = mediana(suave.map((v) => Math.abs(v - dev))) * 1.4826
     const enVerde = suave.filter((v) => Math.abs(v) <= BANDA_VERDE_CENTS).length / suave.length
     suavesPorNota[j] = suave
+    const vib = medirVibrato(devs, paso)
     const duracionSeg = g.t[n - 1] - g.t[0]
     return {
       ...base,
@@ -428,6 +452,9 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
       pendienteCentsPorSeg: duracionSeg >= 0.5 ? Math.round(pendienteCentsPorSeg(tc, mc)) : 0,
       octavaDistinta: octava !== octavaGlobal,
       estado: estadoPorCents(dev),
+      vibratoCents: vib ? vib.ampCents : null,
+      vibratoHz: vib ? vib.hz : null,
+      vibratoAmplio: !!vib && vib.ampCents >= 30 && vib.hz >= 2.5 && vib.hz <= 8 && vib.cruces >= 4,
     }
   })
 
@@ -464,6 +491,13 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     } else {
       r.estadoRelativo = estadoPorCents(r.desviacionRelativaCents)
       r.estado = r.estadoRelativo
+    }
+    // Una nota con muy pocos cuadros de voz (típico de una nota corta en una subida o bajada)
+    // no alcanza para marcarla en rojo: se baja a amarillo y se avisa que hay poca evidencia.
+    if (r.frames < 8 && (r.estado === 'rojo' || r.estado === 'nota_distinta')) {
+      r.estado = 'amarillo'
+      r.estadoRelativo = 'amarillo'
+      r.pocaEvidencia = true
     }
   }
 
@@ -522,6 +556,15 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
   const medios = sinEncontrar.filter((r) => r.indice > primerDetectado && r.indice < ultimoDetectado)
   const compasesDe = (rs) => [...new Set(rs.filter((r) => r.compas != null).map((r) => r.compas))]
 
+  const conVib = validas.filter((x) => x.vibratoCents != null)
+  const vibAmplios = conVib.filter((x) => x.vibratoAmplio)
+  const vibrato = {
+    largas: conVib.length,
+    amplias: vibAmplios.length,
+    ampCents: vibAmplios.length ? Math.round(mediana(vibAmplios.map((x) => x.vibratoCents))) : null,
+    hz: vibAmplios.length ? Math.round(mediana(vibAmplios.map((x) => x.vibratoHz)) * 10) / 10 : null,
+  }
+
   const resumen = {
     notasEsperadas: K,
     notasDetectadas: validas.length,
@@ -541,6 +584,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     confianza: Math.round(confianza * 100) / 100,
     alineacionDudosa: confianza < 0.45,
     ritmo: ritmoResumen,
+    vibrato,
     diagnostico: {
       segundosGrabados: Math.round((curva.t[curva.t.length - 1] || 0) * 10) / 10,
       segundosConVoz: Math.round(frames.t.length * (curva.t.length > 1 ? curva.t[1] - curva.t[0] : 0.02) * 10) / 10,
@@ -626,6 +670,13 @@ function redactarMensajes(inf) {
   }
   if (r.notasDistintas.length) {
     m.push(`${r.notasDistintas.length} nota(s) parecen distintas de las escritas (más de ${UMBRAL_NOTA_DISTINTA_CENTS} cents de diferencia).`)
+  }
+  const vb = r.vibrato
+  if (vb && vb.amplias >= 1 && vb.amplias >= 0.4 * vb.largas) {
+    m.push(
+      `En las notas largas tu vibrato es amplio (oscila unos ±${vb.ampCents} cents, unas ${Math.round(vb.hz)} veces por segundo). ` +
+        'En coro suele pedirse más angosto o casi recto para que las voces se fundan: probá sostener notas largas con menos oscilación y apoyo parejo.'
+    )
   }
   const t = inf.tendencias
   if (t.saltosAscendentes.n >= 2 && t.saltosAscendentes.cents != null && t.saltosAscendentes.cents <= -15) {
