@@ -18,7 +18,6 @@ const COLOR = {
   neutro: { fuerte: '#B9B7AC', suave: '#EFEEE7', texto: '#5F5E5A' },
 }
 const MAX_SEG_FRAGMENTO = 90
-const SEG_ENTRE_CLICS = 1.3 // conteo previo: segundos entre clic y clic (fijo, más lento que el tempo de la obra)
 const SEG_SUGERIDOS = 30
 const COMPASES_SUGERIDOS = 8
 
@@ -213,10 +212,10 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       }
       setEtapa('conteo')
       // Conteo: UN compás entero de clics (un clic por pulso del compás), al pulso del tempo elegido
-      // Conteo de un compás entero (un clic por tiempo), a un ritmo lento y fijo en segundos
+      // Conteo de un compás entero (un clic por tiempo del compás), al tempo de la obra
       const pm = pulsosMetronomo(partitura, desde, hasta)
       const clicsConteo = Math.max(2, Math.min(8, pm.clicsPrimerCompas || 4))
-      const pulso = SEG_ENTRE_CLICS
+      const pulso = Math.max(0.35, Math.min(2.5, pm.pulsoSeg != null ? pm.pulsoSeg : notas[0].pulsoSeg))
       await contar(pulso, (n) => !cancelado.current && setConteo(n), clicsConteo)
       if (cancelado.current) return
       marcaRef.current.yaMs = performance.now()
