@@ -52,7 +52,14 @@ export function armarResumenParaCoaching(informe, { titulo, vozNombre, desde, ha
     notasDistintas: r.notasDistintas?.length || 0,
     compasesSinCantarAlInicio: r.compasesSinCantarAlInicio || [],
     compasesSinCantarAlFinal: r.compasesSinCantarAlFinal || [],
-    compases: informe.compases.map((c) => ({ c: c.compas, afinacion: c.estado || null, ritmo: c.estadoRitmo || null, tendenciaRitmo: c.ritmoTendencia || null })),
+    // Solo se incluyen los datos que existen: un compás sin dato de ritmo (p. ej. el de la última
+    // nota, que no se puede medir) no se manda como null para que no parezca un problema.
+    compases: informe.compases.map((c) => {
+      const o = { c: c.compas, afinacion: c.estado }
+      if (c.estadoRitmo) o.ritmo = c.estadoRitmo
+      if (c.ritmoTendencia) o.tendenciaRitmo = c.ritmoTendencia
+      return o
+    }),
     notasProblema,
     tendencias: {
       saltosHaciaArriba: t.saltosAscendentes,
