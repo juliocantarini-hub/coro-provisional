@@ -18,6 +18,7 @@ const COLOR = {
   neutro: { fuerte: '#B9B7AC', suave: '#EFEEE7', texto: '#5F5E5A' },
 }
 const MAX_SEG_FRAGMENTO = 90
+const SEG_ENTRE_CLICS = 1 // los 4 clics previos van de a 1 segundo, sin importar el tempo de la obra
 const SEG_SUGERIDOS = 30
 const COMPASES_SUGERIDOS = 8
 
@@ -215,8 +216,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         if (cancelado.current) return
       }
       setEtapa('conteo')
-      const pulso = Math.max(0.4, Math.min(1.5, notas[0].pulsoSeg))
-      await contar(pulso, (n) => !cancelado.current && setConteo(n))
+      await contar(SEG_ENTRE_CLICS, (n) => !cancelado.current && setConteo(n))
       if (cancelado.current) return
       marcaRef.current.yaMs = performance.now()
       setSegundos(0)
