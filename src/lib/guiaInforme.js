@@ -13,6 +13,21 @@ function crearContexto() {
 
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// Clic suave y redondo (tipo "toc" de madera): seno grave, ataque de 10 ms y caída de ~0.15 s.
+// Antes era un "tic" muy corto y agudo. "fuerte" = primer pulso / conteo; "suave" = metrónomo.
+function clicSuave(ctx, t, { acento = false, volumen = 0.3 } = {}) {
+  const osc = ctx.createOscillator()
+  const g = ctx.createGain()
+  osc.type = 'sine'
+  osc.frequency.value = acento ? 880 : 660
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(volumen, t + 0.01)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
+  osc.connect(g).connect(ctx.destination)
+  osc.start(t)
+  osc.stop(t + 0.2)
+}
+
 /** Empieza a bajar las muestras de piano (llamar al abrir el panel, así están listas al grabar). */
 export function prepararPianoDeGuia() {
   try { getPianoSampler().listo.catch(() => {}) } catch { /* sin piano: se usará el tono simple */ }
@@ -94,6 +109,22 @@ export function iniciarGuiaPiano(notas) {
   }
 }
 
+/**
+ * Metrónomo opcional MIENTRAS se graba (solo con auriculares). "clics": [{ t, acento }] con t en
+ * segundos desde el momento en que entra la voz (los pulsos de la partitura, con sus cambios
+ * de tempo). Se programan con el reloj de audio, así que no se desfasan. Más suave que el conteo.
+ * Devuelve { detener() }.
+ */
+export async function iniciarMetronomo(clics) {
+  const ctx = crearContexto()
+  if (ctx.state === 'suspended') await ctx.resume()
+  const base = ctx.currentTime + 0.05
+  for (const c of clics) clicSuave(ctx, base + c.t, { acento: c.acento, volumen: c.acento ? 0.2 : 0.14 })
+  return {
+    detener() { try { ctx.close() } catch { /* ya cerrado */ } },
+  }
+}
+
 /** Respaldo: tono simple (seno + 2.º armónico) de ~1.6 s. */
 async function tocarNotaSimple(midi) {
   const ctx = crearContexto()
@@ -128,18 +159,7 @@ export async function contar(pulsoSeg, alPulso) {
   const ctx = crearContexto()
   if (ctx.state === 'suspended') await ctx.resume()
   const inicio = ctx.currentTime + 0.1
-  for (let i = 0; i < 4; i++) {
-    const t = inicio + i * pulsoSeg
-    const osc = ctx.createOscillator()
-    const g = ctx.createGain()
-    osc.frequency.value = i === 0 ? 1500 : 1000
-    g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(0.35, t + 0.004)
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06)
-    osc.connect(g).connect(ctx.destination)
-    osc.start(t)
-    osc.stop(t + 0.08)
-  }
+  for (let i = 0; i < 4; i++) clicSuave(ctx, inicio + i * pulsoSeg, { acento: i === 0, volumen: 0.35 })
   for (let i = 0; i < 4; i++) {
     await esperar(i === 0 ? 100 : pulsoSeg * 1000)
     alPulso(i + 1)
