@@ -2,8 +2,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Consejos de práctica a partir del informe de afinación/ritmo ("Grabarme y ver informe").
 // Recibe SOLO un resumen en números (nunca audio) y devuelve un texto breve de coaching.
-// Secrets necesarios: ANTHROPIC_API_KEY  (opcional: ANTHROPIC_MODEL)
+// Secrets: OPENAI_API_KEY (opcional OPENAI_MODEL, por defecto gpt-4o-mini)
+//       o  ANTHROPIC_API_KEY (opcional ANTHROPIC_MODEL). Si están las dos, usa OpenAI.
 
+const OPENAI_KEY = Deno.env.get('OPENAI_API_KEY')
+const OPENAI_MODELO = Deno.env.get('OPENAI_MODEL') || 'gpt-4o-mini'
 const API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 const MODELO = Deno.env.get('ANTHROPIC_MODEL') || 'claude-haiku-4-5'
 const LIMITE_POR_DIA = 15
@@ -35,7 +38,7 @@ Si el resultado es muy bueno, decilo y proponé un desafío (más tempo, de memo
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'metodo' }, 405)
-  if (!API_KEY) return json({ error: 'config', mensaje: 'Los consejos con IA todavía no están habilitados.' }, 503)
+  if (!OPENAI_KEY && !API_KEY) return json({ error: 'config', mensaje: 'Los consejos con IA todavía no están habilitados.' }, 503)
 
   try {
     // 1) Quién llama: solo personas con sesión iniciada
@@ -69,24 +72,45 @@ Deno.serve(async (req) => {
     await supabase.from('coaching_informe_uso').insert({ perfil_id: userId, coro_id: perfil.coro_id })
 
     // 4) Pedir los consejos
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: MODELO,
-        max_tokens: 600,
-        temperature: 0.4,
-        system: SISTEMA,
-        messages: [{ role: 'user', content: `Resumen del informe (JSON):\n${texto}` }],
-      }),
-      signal: AbortSignal.timeout(25000),
-    })
-    if (!resp.ok) {
-      console.error('Anthropic', resp.status, await resp.text())
-      return json({ error: 'ia', mensaje: 'No pudimos generar los consejos ahora. Probá de nuevo en un rato.' }, 502)
+    const usuario = `Resumen del informe (JSON):\n${texto}`
+    let salida = ''
+    if (OPENAI_KEY) {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
+        body: JSON.stringify({
+          model: OPENAI_MODELO,
+          max_completion_tokens: 600,
+          messages: [{ role: 'system', content: SISTEMA }, { role: 'user', content: usuario }],
+        }),
+        signal: AbortSignal.timeout(25000),
+      })
+      if (!resp.ok) {
+        console.error('OpenAI', resp.status, await resp.text())
+        return json({ error: 'ia', mensaje: 'No pudimos generar los consejos ahora. Probá de nuevo en un rato.' }, 502)
+      }
+      const data = await resp.json()
+      salida = (data.choices?.[0]?.message?.content || '').trim()
+    } else {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': API_KEY!, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: MODELO,
+          max_tokens: 600,
+          temperature: 0.4,
+          system: SISTEMA,
+          messages: [{ role: 'user', content: usuario }],
+        }),
+        signal: AbortSignal.timeout(25000),
+      })
+      if (!resp.ok) {
+        console.error('Anthropic', resp.status, await resp.text())
+        return json({ error: 'ia', mensaje: 'No pudimos generar los consejos ahora. Probá de nuevo en un rato.' }, 502)
+      }
+      const data = await resp.json()
+      salida = (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim()
     }
-    const data = await resp.json()
-    const salida = (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim()
     if (!salida) return json({ error: 'ia', mensaje: 'No pudimos generar los consejos ahora.' }, 502)
     return json({ texto: salida })
   } catch (e) {
