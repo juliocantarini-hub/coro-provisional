@@ -3,6 +3,7 @@ import { listarCompases, notasParaInforme, rangoEnSegundos } from '../lib/inform
 import { iniciarGrabacion } from '../lib/grabadora'
 import { tocarNotaDePartida, contar } from '../lib/guiaInforme'
 import { midiANombre } from '../lib/afinacion'
+import { armarResumenParaCoaching, pedirCoaching } from '../lib/coaching'
 
 // Grabar un fragmento de la obra y recibir un informe de afinación y ritmo,
 // comparando con la melodía de la propia voz del cantante (la partitura ya
@@ -100,6 +101,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const [informe, setInforme] = useState(null)
   const [error, setError] = useState('')
   const [compasAbierto, setCompasAbierto] = useState(null)
+  const [coaching, setCoaching] = useState({ estado: 'idle', texto: '', mensaje: '' }) // idle | cargando | listo | error
   const [ancla, setAncla] = useState(false) // true: ya se eligió el compás inicial y falta el final
 
   // Letra (o notas, si no hay letra) de cada compás, para ubicarse al elegir
@@ -224,7 +226,20 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     onCerrar()
   }
 
+  async function pedirConsejos() {
+    if (!informe || coaching.estado === 'cargando') return
+    setCoaching({ estado: 'cargando', texto: '', mensaje: '' })
+    try {
+      const resumen = armarResumenParaCoaching(informe, { titulo, vozNombre: voz?.nombre, desde, hasta, pulsoSeg: notas[0]?.pulsoSeg })
+      const texto = await pedirCoaching(resumen)
+      if (!cancelado.current) setCoaching({ estado: 'listo', texto, mensaje: '' })
+    } catch (e) {
+      if (!cancelado.current) setCoaching({ estado: 'error', texto: '', mensaje: e.message || 'No pudimos generar los consejos ahora.' })
+    }
+  }
+
   function repetir() {
+    setCoaching({ estado: 'idle', texto: '', mensaje: '' })
     setInforme(null)
     setEtapa('config')
   }
@@ -357,6 +372,33 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         {!dudosa && <ul style={{ margin: '0 0 14px', paddingLeft: '18px', fontSize: '13px', color: '#3D3D3A', lineHeight: 1.5 }}>
           {informe.mensajes.map((m, i) => <li key={i} style={{ marginBottom: '4px' }}>{m}</li>)}
         </ul>}
+
+        {!dudosa && (
+          <div style={{ background: '#F4F1FA', border: '1px solid #D9D0EE', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#2E2457', marginBottom: '4px' }}>Consejos de práctica</div>
+            {coaching.estado === 'idle' && (
+              <>
+                <div style={{ fontSize: '12px', color: '#4A4270', lineHeight: 1.5, marginBottom: '8px' }}>
+                  Una IA lee los números de tu informe y te sugiere qué trabajar primero. Solo se envía el resumen en números; tu audio nunca sale del dispositivo.
+                </div>
+                <button style={boton(false)} onClick={pedirConsejos}>✨ Pedir consejos</button>
+              </>
+            )}
+            {coaching.estado === 'cargando' && <div style={{ fontSize: '13px', color: '#4A4270' }}>Preparando tus consejos…</div>}
+            {coaching.estado === 'listo' && (
+              <>
+                <div style={{ fontSize: '13px', color: '#2E2457', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{coaching.texto}</div>
+                <div style={{ fontSize: '11px', color: '#7A7396', marginTop: '8px' }}>Generado por IA a partir de tu informe; puede equivocarse. Tomalo como una guía.</div>
+              </>
+            )}
+            {coaching.estado === 'error' && (
+              <>
+                <div style={{ fontSize: '12px', color: '#A32D2D', marginBottom: '8px' }}>{coaching.mensaje}</div>
+                <button style={boton(false)} onClick={pedirConsejos}>Reintentar</button>
+              </>
+            )}
+          </div>
+        )}
 
         {!dudosa && <div style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A18', margin: '4px 0 6px' }}>Por compás <span style={{ fontWeight: 400, color: '#8A8878' }}>(arriba afinación, abajo ritmo — tocá uno para ver el detalle)</span></div>}
         {!dudosa && <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
