@@ -4,6 +4,7 @@ import { iniciarGrabacion } from '../lib/grabadora'
 import { tocarNotaDePartida, contar } from '../lib/guiaInforme'
 import { midiANombre } from '../lib/afinacion'
 import { armarResumenParaCoaching, pedirCoaching } from '../lib/coaching'
+import { useAuth } from '../hooks/useAuth'
 
 // Grabar un fragmento de la obra y recibir un informe de afinación y ritmo,
 // comparando con la melodía de la propia voz del cantante (la partitura ya
@@ -91,6 +92,8 @@ function textoRitmo(r) {
 }
 
 export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar }) {
+  const { perfil } = useAuth()
+  const esDirector = perfil?.rol === 'director' || perfil?.rol === 'admin'
   const lista = useMemo(() => listarCompases(partitura), [partitura])
   const [desde, setDesde] = useState(lista[0])
   const [hasta, setHasta] = useState(() => (lista.length ? hastaSugerido(partitura, lista, lista[0]) : undefined))
@@ -485,7 +488,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           <button style={boton(true)} onClick={repetir}>🎤 Grabar de nuevo</button>
           <button style={boton(false)} onClick={cerrar}>Cerrar</button>
         </div>
-        {diagVisible && (
+        {(diagVisible || esDirector) && (
           <div style={{ marginTop: '12px', padding: '10px 12px', border: '1px dashed #B9B7AC', borderRadius: '10px', background: '#FAFAF6' }}>
             <div style={{ fontSize: '12px', color: '#5F5E5A', marginBottom: '6px' }}>
               Diagnóstico: copia números de la toma (altura por tiempo y resultados). <strong>No incluye tu audio.</strong>
