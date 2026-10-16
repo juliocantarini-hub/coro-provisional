@@ -394,6 +394,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
   }
   const octavaGlobal = octavas.length ? mediana(octavas) : 0
 
+  const suavesPorNota = []
   const resultados = notas.map((nota, j) => {
     const g = porNota[j]
     const base = { indice: j, nombre: nota.nombre ?? null, midi: nota.midi, compas: nota.compas ?? null }
@@ -414,6 +415,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     const suave = suavizar(devs, Math.max(1, Math.round(0.2 / paso)))
     const desv = mediana(suave.map((v) => Math.abs(v - dev))) * 1.4826
     const enVerde = suave.filter((v) => Math.abs(v) <= BANDA_VERDE_CENTS).length / suave.length
+    suavesPorNota[j] = suave
     const duracionSeg = g.t[n - 1] - g.t[0]
     return {
       ...base,
@@ -447,11 +449,21 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     // Relativa al desplazamiento general: si todo el fragmento está corrido,
     // una nota "distinta" es la que se aparta ADEMÁS de ese corrimiento.
     r.desviacionRelativaCents = foldCents(r.desviacionCents - offsetGlobal)
+    // La afinación se juzga ENTRE NOTAS (los intervalos), descontando el corrimiento
+    // general de todo el fragmento (que suele venir de la nota de partida). El valor
+    // absoluto se conserva aparte.
+    r.pctVerdeAbsoluto = r.pctVerde
+    const suaveRel = suavesPorNota[r.indice] || []
+    if (suaveRel.length) {
+      r.pctVerde = Math.round((suaveRel.filter((v) => Math.abs(foldCents(v - offsetGlobal)) <= BANDA_VERDE_CENTS).length / suaveRel.length) * 100)
+    }
+    r.estadoAbsoluto = r.estado
     if (Math.abs(r.desviacionRelativaCents) >= UMBRAL_NOTA_DISTINTA_CENTS) {
       r.estado = 'nota_distinta'
       r.estadoRelativo = 'nota_distinta'
     } else {
       r.estadoRelativo = estadoPorCents(r.desviacionRelativaCents)
+      r.estado = r.estadoRelativo
     }
   }
 
@@ -469,7 +481,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     .map(([compas, rs]) => {
       const fr = rs.reduce((s, r) => s + r.frames, 0)
       const verde = rs.reduce((s, r) => s + r.pctVerde * r.frames, 0) / fr
-      const dev = rs.reduce((s, r) => s + r.desviacionCents * r.frames, 0) / fr
+      const dev = rs.reduce((s, r) => s + (r.desviacionRelativaCents ?? r.desviacionCents) * r.frames, 0) / fr
       const conRitmo = rs.filter((r) => r.ritmo)
       const ritmoOk = conRitmo.filter((r) => r.ritmo.estado === 'ok').length
       const pctRitmoOk = conRitmo.length ? Math.round((ritmoOk / conRitmo.length) * 100) : null
@@ -488,6 +500,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     })
 
   const totalFrames = validas.reduce((s, r) => s + r.frames, 0)
+  const pctVerdeAbsolutoTotal = totalFrames ? Math.round(validas.reduce((s, r) => s + (r.pctVerdeAbsoluto ?? r.pctVerde) * r.frames, 0) / totalFrames) : 0
   const pctVerdeTotal = totalFrames ? Math.round(validas.reduce((s, r) => s + r.pctVerde * r.frames, 0) / totalFrames) : 0
   let costoAltura = 0
   for (let i = 0; i < frames.t.length; i++) {
@@ -512,7 +525,8 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
   const resumen = {
     notasEsperadas: K,
     notasDetectadas: validas.length,
-    pctVerde: pctVerdeTotal,
+    pctVerde: pctVerdeTotal, // entre notas (descontando el corrimiento general)
+    pctVerdeAbsoluto: pctVerdeAbsolutoTotal,
     offsetGlobalCents: offsetGlobal,
     octavaGlobal,
     notasDistintas: resultados.filter((r) => r.estado === 'nota_distinta').map((r) => r.indice),
@@ -574,7 +588,7 @@ function redactarMensajes(inf) {
   } else if (Math.abs(r.offsetGlobalCents) >= 25) {
     m.push(
       `En promedio estuviste ${Math.abs(r.offsetGlobalCents)} cents ${r.offsetGlobalCents < 0 ? 'bajo' : 'alto'} respecto a lo escrito en todo el fragmento. ` +
-        'Si tus intervalos suenan bien entre sí, el problema es la nota de partida más que cada nota.'
+        'Si tus intervalos suenan bien entre sí, el problema es la nota de partida más que cada nota. (El puntaje de afinación mide tus notas entre sí, sin contar ese corrimiento.)'
     )
   }
   const verbo = (lista) => (lista.length === 1 ? 'no se oyó' : 'no se oyeron')

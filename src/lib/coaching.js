@@ -43,10 +43,10 @@ export function armarResumenParaCoaching(informe, { titulo, vozNombre, desde, ha
     compasDesde: desde,
     compasHasta: hasta,
     bpmEscrito: pulsoSeg ? Math.round(60 / pulsoSeg) : null,
-    pctAfinacionVerde: r.pctVerde,
+    pctAfinacionEntreNotas: r.pctVerde, // ya descuenta el corrimiento general
     pctRitmoEnTiempo: rit.pctOk ?? null,
     tempoCantadoPct: rit.tempoRelativo != null ? Math.round(rit.tempoRelativo * 100) : null,
-    desvioPromedioCents: r.offsetGlobalCents,
+    corrimientoGeneralCents: r.offsetGlobalCents, // todo el fragmento más alto (+) o más bajo (−) que lo escrito; NO está incluido en los cents de cada nota
     notasEsperadas: r.notasEsperadas,
     notasDetectadas: r.notasDetectadas,
     notasDistintas: r.notasDistintas?.length || 0,

@@ -363,7 +363,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         )}
         {!dudosa && (
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
-            {tile(estadoAf, 'Afinación', `${r.pctVerde}%`, 'del tiempo en la zona verde')}
+            {tile(estadoAf, 'Afinación', `${r.pctVerde}%`, Math.abs(r.offsetGlobalCents) >= 25 ? 'entre tus notas, en la zona verde' : 'del tiempo en la zona verde')}
             {tile(estadoRi, 'Ritmo', rit?.pctOk == null ? '–' : `${rit.pctOk}%`, 'de las entradas en tiempo')}
           </div>
         )}
@@ -431,7 +431,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
                 ) : (
                   <>
                     <Chip estado={n.estado === 'nota_distinta' ? 'rojo' : n.estado}>
-                      {n.estado === 'nota_distinta' ? 'nota distinta' : textoCents(n.desviacionCents)}
+                      {n.estado === 'nota_distinta' ? 'nota distinta' : textoCents(n.desviacionRelativaCents ?? n.desviacionCents)}
                     </Chip>
                     {n.ritmo && <Chip estado={n.ritmo.estado === 'ok' ? 'verde' : n.ritmo.estado === 'leve' ? 'amarillo' : 'rojo'}>{textoRitmo(n.ritmo)}</Chip>}
                     {n.duracionEstado && n.duracionEstado !== 'ok' && <Chip estado="amarillo">{n.duracionEstado === 'corta' ? 'la cortaste' : 'la alargaste'}</Chip>}
