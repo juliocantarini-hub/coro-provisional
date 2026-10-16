@@ -545,6 +545,13 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
   }
   const informe = { resumen, notas: resultados, compases: porCompas, tendencias: calcularTendencias(validas, notas) }
   informe.mensajes = redactarMensajes(informe)
+  // Curva de altura compacta (SIN audio): solo para el botón oculto de diagnóstico.
+  informe.curvaCompacta = {
+    t0: Math.round((curva.t[0] || 0) * 1000) / 1000,
+    hop: Math.round(paso * 1000) / 1000,
+    midi: curva.midi.map((v, i) => (curva.vozeado[i] && Number.isFinite(v) ? Math.round(v * 100) / 100 : null)),
+    rms: curva.rms ? Array.from(curva.rms, (v) => Math.round(v * 1000) / 1000) : null,
+  }
   return informe
 }
 

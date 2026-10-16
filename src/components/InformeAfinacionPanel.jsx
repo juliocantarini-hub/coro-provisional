@@ -122,6 +122,11 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const cancelado = useRef(false)
   const marcaRef = useRef({ inicioMs: 0, yaMs: 0 })
   const notasRef = useRef([])
+  const diagRef = useRef(null) // datos de entrada del último análisis (para el diagnóstico oculto)
+  const tapsTitulo = useRef({ n: 0, t: 0 })
+  const [diagVisible, setDiagVisible] = useState(false)
+  const [diagEstado, setDiagEstado] = useState('') // '' | 'copiado' | 'manual'
+  const [diagTexto, setDiagTexto] = useState('')
 
   const { notas, rango } = useMemo(
     () => (voz && desde != null && hasta != null ? notasParaInforme(partitura, voz.id, desde, hasta) : { notas: [], rango: null }),
@@ -203,7 +208,9 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     const { muestras, sampleRate } = g.detener()
     setEtapa('analizando')
     try {
-      const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, { descartarAntesDeSeg: descartar, inicioCantoSeg: yaSeg })
+      const opcionesAnalisis = { descartarAntesDeSeg: descartar, inicioCantoSeg: yaSeg }
+      diagRef.current = { sampleRate, opciones: opcionesAnalisis, notas: notasRef.current }
+      const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, opcionesAnalisis)
       if (cancelado.current) return
       if (inf.error) {
         setError(inf.mensaje || 'No pudimos analizar la grabación.')
@@ -216,6 +223,38 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     } catch (e) {
       setError('Ocurrió un error al analizar la grabación. Probá de nuevo.')
       setEtapa('error')
+    }
+  }
+
+  // Toca 3 veces el título para habilitar el botón de diagnóstico (copia números, nunca audio)
+  function tocarTitulo() {
+    const ahora = Date.now()
+    const t = tapsTitulo.current
+    t.n = ahora - t.t < 1500 ? t.n + 1 : 1
+    t.t = ahora
+    if (t.n >= 3) { t.n = 0; setDiagVisible(true) }
+  }
+
+  async function copiarDiagnostico() {
+    if (!informe || !diagRef.current) return
+    const d = diagRef.current
+    const r2 = (v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v)
+    const payload = {
+      version: 1,
+      obra: titulo, voz: voz?.nombre, compases: [desde, hasta],
+      sampleRate: d.sampleRate, opciones: d.opciones,
+      notasEntrada: d.notas.map((n) => ({ midi: n.midi, inicio: r2(n.inicio), duracion: r2(n.duracion), compas: n.compas, nombre: n.nombre, pulsoSeg: r2(n.pulsoSeg), tramo: n.tramo })),
+      curva: informe.curvaCompacta,
+      resumen: informe.resumen,
+      notasResultado: informe.notas.map((n) => ({ i: n.indice, nombre: n.nombre, compas: n.compas, estado: n.estado, frames: n.frames, ini: r2(n.inicioSeg), fin: r2(n.finSeg), dev: n.desviacionCents, pctVerde: n.pctVerde, ritmoMs: n.ritmo?.errorMs })),
+    }
+    const texto = JSON.stringify(payload)
+    setDiagTexto(texto)
+    try {
+      await navigator.clipboard.writeText(texto)
+      setDiagEstado('copiado')
+    } catch {
+      setDiagEstado('manual') // el navegador no dejó copiar: se muestra el texto para copiarlo a mano
     }
   }
 
@@ -446,6 +485,18 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           <button style={boton(true)} onClick={repetir}>🎤 Grabar de nuevo</button>
           <button style={boton(false)} onClick={cerrar}>Cerrar</button>
         </div>
+        {diagVisible && (
+          <div style={{ marginTop: '12px', padding: '10px 12px', border: '1px dashed #B9B7AC', borderRadius: '10px', background: '#FAFAF6' }}>
+            <div style={{ fontSize: '12px', color: '#5F5E5A', marginBottom: '6px' }}>
+              Diagnóstico: copia números de la toma (altura por tiempo y resultados). <strong>No incluye tu audio.</strong>
+            </div>
+            <button style={boton(false)} onClick={copiarDiagnostico}>📋 Copiar datos de diagnóstico</button>
+            {diagEstado === 'copiado' && <span style={{ fontSize: '12px', color: '#1D7A5F', marginLeft: '10px' }}>¡Copiado! Pegalo en el chat.</span>}
+            {diagEstado === 'manual' && (
+              <textarea readOnly value={diagTexto} onFocus={(e) => e.target.select()} style={{ width: '100%', height: '90px', marginTop: '8px', fontSize: '11px' }} />
+            )}
+          </div>
+        )}
         <p style={{ fontSize: '11px', color: '#8A8878', margin: '12px 0 0' }}>
           Es una medición aproximada hecha con el micrófono de tu dispositivo. Tu grabación se descartó al terminar el análisis.
         </p>
@@ -458,7 +509,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', padding: '18px 18px 20px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
           <div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: '#1A1A18' }}>Grabarme y ver informe</div>
+            <div onClick={tocarTitulo} style={{ fontSize: '16px', fontWeight: 700, color: '#1A1A18' }}>Grabarme y ver informe</div>
             <div style={{ fontSize: '12px', color: '#8A8878' }}>{[titulo, voz?.nombre].filter(Boolean).join(' · ')}</div>
           </div>
           <button onClick={cerrar} aria-label="Cerrar" style={{ border: 'none', background: 'transparent', fontSize: '22px', cursor: 'pointer', color: '#5F5E5A', lineHeight: 1 }}>×</button>
