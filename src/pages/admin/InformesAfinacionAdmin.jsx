@@ -43,6 +43,7 @@ export default function InformesAfinacionAdmin() {
   const [abiertoPersona, setAbiertoPersona] = useState(null)
   const [abiertoInforme, setAbiertoInforme] = useState(null)
   const [copiado, setCopiado] = useState(null)
+  const [reseteando, setReseteando] = useState(false)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -92,6 +93,24 @@ export default function InformesAfinacionAdmin() {
     if (!err) setInformes((prev) => prev.filter((i) => i.id !== id))
   }
 
+  // Resetear: borra TODOS los informes guardados del coro (por ejemplo para empezar de cero después de cambiar los márgenes).
+  async function resetear() {
+    if (!informes.length) return
+    const ok = window.confirm(`¿Borrar los ${informes.length} informe${informes.length !== 1 ? 's' : ''} de todos los cantantes?\n\nEsto no se puede deshacer. Los cantantes no pierden nada: ellos no guardan historial.`)
+    if (!ok) return
+    setReseteando(true)
+    setError('')
+    const coro = await getCoroActual()
+    if (!coro) { setReseteando(false); return }
+    const { error: err } = await supabase.from('informes_afinacion').delete().eq('coro_id', coro.id)
+    setReseteando(false)
+    if (err) { setError('No se pudieron borrar los informes: ' + err.message); return }
+    setInformes([])
+    setPersonas({})
+    setAbiertoPersona(null)
+    setAbiertoInforme(null)
+  }
+
   async function copiarDiagnostico(id) {
     const { data } = await supabase.from('informes_afinacion').select('diagnostico').eq('id', id).single()
     const texto = JSON.stringify(data?.diagnostico ?? null)
@@ -112,7 +131,13 @@ export default function InformesAfinacionAdmin() {
             {' · '}Se guarda un resumen en números; nunca el audio. Los cantantes no ven este historial.
           </p>
         </div>
-        <button onClick={cargar} style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: 500 }}>↻ Actualizar</button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={cargar} style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: 500 }}>↻ Actualizar</button>
+          <button onClick={resetear} disabled={reseteando || !informes.length}
+            style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #E8B4AE', background: 'none', cursor: informes.length ? 'pointer' : 'default', color: '#A32D2D', fontWeight: 500, opacity: informes.length ? 1 : 0.5 }}>
+            {reseteando ? 'Borrando…' : 'Resetear informes'}
+          </button>
+        </div>
       </div>
 
       <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar cantante o cuerda..."
