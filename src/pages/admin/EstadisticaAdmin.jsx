@@ -17,7 +17,8 @@ const ORDENES = [
   { valor: 'nombre',    label: 'Nombre' },
 ]
 
-const COLUMNAS = '1.5fr 80px 90px 90px 160px 1.4fr'
+const COLUMNAS_SIN_PRACTICA = '1.5fr 80px 90px 90px 160px 1.4fr'
+const COLUMNAS_CON_PRACTICA = '1.5fr 80px 90px 90px 160px 110px 1.4fr'
 
 function esMovil() {
   return window.innerWidth <= 768
@@ -62,6 +63,7 @@ export default function EstadisticaAdmin() {
   const [orden, setOrden]         = useState('reciente')
   const [soloCantantes, setSoloCantantes] = useState(false)
   const [abierto, setAbierto]     = useState(null)
+  const [informes, setInformes]   = useState({}) // { perfil_id: { total, ultima } }
   const movil = esMovil()
 
   const cargar = useCallback(async () => {
@@ -78,12 +80,36 @@ export default function EstadisticaAdmin() {
       if (err) throw err
       setCoroId(coro.id)
       setDesde(desdeISO)
-      setDatos((data || []).map(d => ({
+      const filasMapeadas = (data || []).map(d => ({
         ...d,
         ingresos: Number(d.ingresos),
         dias_activos: Number(d.dias_activos),
         vistas: Number(d.vistas),
-      })))
+      }))
+      setDatos(filasMapeadas)
+
+      // Informes de afinación por cantante
+      try {
+        const { data: infData } = await supabase
+          .from('informes_afinacion')
+          .select('perfil_id, creado_en')
+          .eq('coro_id', coro.id)
+        if (infData && infData.length > 0) {
+          const mapa = {}
+          for (const inf of infData) {
+            if (!mapa[inf.perfil_id]) mapa[inf.perfil_id] = { total: 0, ultima: null }
+            mapa[inf.perfil_id].total += 1
+            if (!mapa[inf.perfil_id].ultima || inf.creado_en > mapa[inf.perfil_id].ultima) {
+              mapa[inf.perfil_id].ultima = inf.creado_en
+            }
+          }
+          setInformes(mapa)
+        } else {
+          setInformes({})
+        }
+      } catch {
+        setInformes({})
+      }
     } catch (err) {
       console.error('Estadística:', err)
       const msg = `${err?.code || ''} ${err?.message || ''}`
@@ -106,6 +132,8 @@ export default function EstadisticaAdmin() {
   const totalIngresos = base.reduce((s, d) => s + d.ingresos, 0)
   const totalVistas   = base.reduce((s, d) => s + d.vistas, 0)
   const sinDatos      = !cargando && !error && base.every(d => d.ingresos === 0 && d.vistas === 0)
+  const hayPractica   = Object.keys(informes).length > 0
+  const COLUMNAS      = hayPractica ? COLUMNAS_CON_PRACTICA : COLUMNAS_SIN_PRACTICA
 
   return (
     <div>
@@ -211,6 +239,8 @@ export default function EstadisticaAdmin() {
               onToggle={() => setAbierto(abierto === d.perfil_id ? null : d.perfil_id)}
               coroId={coroId}
               desde={desde}
+              inf={informes[d.perfil_id]}
+              hayPractica={hayPractica}
             />
           ))}
           {filtrados.length === 0 && !sinDatos && <Vacio />}
@@ -226,6 +256,7 @@ export default function EstadisticaAdmin() {
             <span>Días activos</span>
             <span>Pantallas</span>
             <span>Última actividad</span>
+            {hayPractica && <span>Práctica 🎤</span>}
             <span>Más visto</span>
           </div>
           {filtrados.length === 0 && <Vacio />}
@@ -244,6 +275,7 @@ export default function EstadisticaAdmin() {
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_NIVEL[u.nivel], flexShrink: 0 }} />
                     {u.texto}
                   </span>
+                  {hayPractica && <PracticaCell inf={informes[d.perfil_id]} />}
                   <TopSecciones secciones={d.secciones} />
                 </div>
                 {expandido && <Historial perfilId={d.perfil_id} coroId={coroId} desde={desde} />}
@@ -297,6 +329,25 @@ function Nombre({ d }) {
   )
 }
 
+function diasDesde(iso) {
+  if (!iso) return null
+  const dias = Math.round((inicioDeDia(new Date()) - inicioDeDia(new Date(iso))) / 86400000)
+  if (dias <= 0) return 'hoy'
+  if (dias === 1) return 'ayer'
+  return `hace ${dias}d`
+}
+
+function PracticaCell({ inf }) {
+  if (!inf) return <span style={{ fontSize: '12px', color: '#B4B2A9' }}>—</span>
+  const cuando = diasDesde(inf.ultima)
+  return (
+    <div>
+      <span style={{ fontSize: '13px', fontWeight: '600', color: '#1A1A18' }}>{inf.total}</span>
+      {cuando && <span style={{ fontSize: '11px', color: '#888780', marginLeft: '4px' }}>({cuando})</span>}
+    </div>
+  )
+}
+
 function TopSecciones({ secciones }) {
   const items = Object.entries(secciones || {}).sort((a, b) => b[1] - a[1]).slice(0, 3)
   if (items.length === 0) return <span style={{ fontSize: '12px', color: '#B4B2A9' }}>—</span>
@@ -323,7 +374,7 @@ function Total({ valor, label, color, bg }) {
 // Tarjeta de cada persona en el celular:
 // cabecera (iniciales, nombre, voz y última actividad), tres cifras juntas y lo más visto.
 // Sin actividad, la tarjeta se reduce a una línea para no llenar la pantalla de ceros.
-function TarjetaMovil({ d, expandido, onToggle, coroId, desde }) {
+function TarjetaMovil({ d, expandido, onToggle, coroId, desde, inf, hayPractica }) {
   const u = ultimoIngreso(d.ultimo_ingreso)
   const activo = d.ultimo_ingreso != null
   const iniciales = (d.nombre || '?').split(' ').map(n => (n.match(/[\p{L}\p{N}]/u) || [''])[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
@@ -386,6 +437,7 @@ function TarjetaMovil({ d, expandido, onToggle, coroId, desde }) {
               <Cifra label="Ingresos" valor={d.ingresos} />
               <Cifra label="Días activos" valor={d.dias_activos} separada />
               <Cifra label="Pantallas" valor={d.vistas} separada />
+              {hayPractica && <Cifra label="Práctica 🎤" valor={inf?.total ?? '—'} separada />}
             </div>
 
             {/* Lo más visto */}
