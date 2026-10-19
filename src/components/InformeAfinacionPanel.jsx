@@ -18,6 +18,7 @@ const COLOR = {
   neutro: { fuerte: '#B9B7AC', suave: '#EFEEE7', texto: '#5F5E5A' },
 }
 const MAX_SEG_FRAGMENTO = 90
+const BANDA_VERDE_CENTS = 20 // igual que en informeAfinacion.js (no se importa de ahí para no cargar el motor en la pantalla principal)
 const SEG_SUGERIDOS = 30
 const COMPASES_SUGERIDOS = 8
 
@@ -84,7 +85,7 @@ function Chip({ estado, children }) {
 function textoCents(c) {
   if (c == null) return ''
   const abs = Math.abs(c)
-  if (abs <= 15) return 'afinada'
+  if (abs <= BANDA_VERDE_CENTS) return 'afinada'
   return `${abs} cents ${c > 0 ? 'alta' : 'baja'}`
 }
 
@@ -427,8 +428,8 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   } else if (etapa === 'informe' && informe) {
     const r = informe.resumen
     const rit = r.ritmo
-    const estadoAf = r.pctVerde >= 70 ? 'verde' : r.pctVerde >= 40 ? 'amarillo' : 'rojo'
-    const estadoRi = rit?.pctOk == null ? 'neutro' : rit.pctOk >= 75 ? 'verde' : rit.pctOk >= 50 ? 'amarillo' : 'rojo'
+    const estadoAf = r.pctVerde >= 60 ? 'verde' : r.pctVerde >= 30 ? 'amarillo' : 'rojo'
+    const estadoRi = rit?.pctOk == null ? 'neutro' : rit.pctOk >= 70 ? 'verde' : rit.pctOk >= 45 ? 'amarillo' : 'rojo'
     const dudosa = r.alineacionDudosa
     const diag = r.diagnostico
     const notasDe = (compas) => informe.notas.filter((n) => n.compas === compas)
@@ -450,14 +451,19 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
         )}
         {!dudosa && (
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
-            {tile(estadoAf, 'Afinación', `${r.pctVerde}%`, Math.abs(r.offsetGlobalCents) >= 25 ? 'entre tus notas, en la zona verde' : 'del tiempo en la zona verde')}
+            {tile(estadoAf, 'Afinación', `${r.pctVerde}%`, Math.abs(r.offsetGlobalCents) >= 25 ? 'entre tus notas, bien afinado' : 'del tiempo bien afinado')}
             {tile(estadoRi, 'Ritmo', rit?.pctOk == null ? '–' : `${rit.pctOk}%`, rit?.concluyente === false ? 'no concluyente en este fragmento' : 'de las entradas en tiempo')}
           </div>
         )}
 
-        {!dudosa && <div style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A18', margin: '4px 0 6px' }}>Para trabajar</div>}
+        {!dudosa && informe.notas.filter((n) => n.estado === 'verde').length > 0 && (
+          <div style={{ fontSize: '13px', color: '#27500A', background: '#EAF3DE', borderRadius: '8px', padding: '8px 10px', margin: '0 0 10px' }}>
+            ✓ <strong>{informe.notas.filter((n) => n.estado === 'verde').length} de {r.notasDetectadas} notas</strong> bien afinadas.
+          </div>
+        )}
+        {!dudosa && <div style={{ fontSize: '13px', fontWeight: 700, color: '#1A1A18', margin: '4px 0 6px' }}>Para pulir</div>}
         {!dudosa && <ul style={{ margin: '0 0 14px', paddingLeft: '18px', fontSize: '13px', color: '#3D3D3A', lineHeight: 1.5 }}>
-          {informe.mensajes.map((m, i) => <li key={i} style={{ marginBottom: '4px' }}>{m}</li>)}
+          {informe.mensajes.slice(0, 4).map((m, i) => <li key={i} style={{ marginBottom: '4px' }}>{m}</li>)}
         </ul>}
 
         {!dudosa && (

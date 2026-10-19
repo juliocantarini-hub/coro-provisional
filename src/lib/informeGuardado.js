@@ -34,8 +34,9 @@ export async function guardarInformeParaDirector({ perfil, titulo, vozNombre, de
       voz: vozNombre ? String(vozNombre).slice(0, 40) : null,
       compas_desde: desde != null ? String(desde) : null,
       compas_hasta: hasta != null ? String(hasta) : null,
-      pct_afinacion: r.alineacionDudosa ? null : r.pctVerde,
-      pct_ritmo: r.alineacionDudosa ? null : (r.ritmo?.pctOk ?? null),
+      // Para el director se guardan los números estrictos (los de antes); el cantante ve los más permisivos
+      pct_afinacion: r.alineacionDudosa ? null : (r.pctVerdeEstricto ?? r.pctVerde),
+      pct_ritmo: r.alineacionDudosa ? null : (r.ritmo?.pctOkEstricto ?? r.ritmo?.pctOk ?? null),
       corrimiento_cents: r.offsetGlobalCents ?? null,
       confianza: r.confianza ?? null,
       dudosa: !!r.alineacionDudosa,

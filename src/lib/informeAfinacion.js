@@ -12,8 +12,11 @@
 // "inicio" y "duracion" en cualquier unidad consistente (pulsos o segundos):
 // solo se usan de forma relativa, porque el cantante va a su propio tempo.
 
-export const BANDA_VERDE_CENTS = 15
-export const BANDA_AMARILLA_CENTS = 35
+// Márgenes del informe para el cantante: algo permisivos, para no desalentar (un coro tolera ±20-25 cents).
+// Los márgenes estrictos de antes (±15) se siguen calculando aparte para el director (pctVerdeEstricto).
+export const BANDA_VERDE_CENTS = 20
+export const BANDA_AMARILLA_CENTS = 40
+export const BANDA_VERDE_ESTRICTA_CENTS = 15
 const UMBRAL_NOTA_DISTINTA_CENTS = 75
 
 const fold = (x) => ((x + 6) % 12 + 12) % 12 - 6 // semitonos → [-6, 6)
@@ -276,6 +279,20 @@ function estadoPorCents(c) {
   return a <= BANDA_VERDE_CENTS ? 'verde' : a <= BANDA_AMARILLA_CENTS ? 'amarillo' : 'rojo'
 }
 
+// Puntaje de una nota: % del tiempo en la zona de afinación. En verde cuenta entero y en amarillo
+// la mitad ("blando", lo que ve el cantante). "estricto" = solo verde con el margen de ±15 (para el director).
+function puntajeZona(vals) {
+  const n = vals.length || 1
+  let verde = 0, amarillo = 0, estricto = 0
+  for (const v of vals) {
+    const a = Math.abs(v)
+    if (a <= BANDA_VERDE_CENTS) verde++
+    else if (a <= BANDA_AMARILLA_CENTS) amarillo++
+    if (a <= BANDA_VERDE_ESTRICTA_CENTS) estricto++
+  }
+  return { blando: Math.round(((verde + 0.5 * amarillo) / n) * 100), estricto: Math.round((estricto / n) * 100) }
+}
+
 function pendienteCentsPorSeg(ts, ms) {
   const n = ts.length
   if (n < 5) return 0
@@ -302,8 +319,9 @@ function ajusteLineal(xs, ys) {
   return { a, b }
 }
 
-const RITMO_OK_PULSOS = 0.15 // hasta 15% de un pulso: bien
-const RITMO_LEVE_PULSOS = 0.3 // hasta 30%: leve; más: marcado
+const RITMO_OK_PULSOS = 0.2 // hasta 20% de un pulso: bien
+const RITMO_LEVE_PULSOS = 0.4 // hasta 40%: leve; más: marcado
+const RITMO_OK_ESTRICTO_PULSOS = 0.15 // el margen de antes, solo para el director
 const RITMO_COBERTURA_MIN = 0.5 // si se pueden medir menos de la mitad de las notas escritas, el ritmo no es concluyente
 
 /**
@@ -340,7 +358,7 @@ function analizarRitmo(resultados, notas) {
     ajustes.set(t, rs.length >= 5 ? ajusteLineal(rs.map((r) => notas[r.indice].inicio), rs.map((r) => r.inicioSeg)) : global)
   }
 
-  let evaluadas = 0, ok = 0
+  let evaluadas = 0, ok = 0, okEstricto = 0
   for (const r of conFrames) {
     const nota = notas[r.indice]
     const aj = ajustes.get(nota.tramo ?? 0) || global
@@ -357,6 +375,7 @@ function analizarRitmo(resultados, notas) {
       }
       evaluadas++
       if (r.ritmo.estado === 'ok') ok++
+      if (mag <= RITMO_OK_ESTRICTO_PULSOS) okEstricto++
     }
     if (r.inicioFiable && r.finFiable && nota.duracion >= 0.75 * (nota.pulsoSeg ?? 0.5)) {
       const ratio = (r.finSeg - r.inicioSeg) / (nota.duracion * aj.b)
@@ -392,6 +411,7 @@ function analizarRitmo(resultados, notas) {
     tempoRelativo: Math.round(100 / global.b) / 100,
     evaluadas,
     pctOk: evaluadas ? Math.round((ok / evaluadas) * 100) : null,
+    pctOkEstricto: evaluadas ? Math.round((okEstricto / evaluadas) * 100) : null,
     concluyente: true,
   }
 }
@@ -462,7 +482,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     // curva suavizada para no castigar el vibrato.
     const suave = suavizar(devs, Math.max(1, Math.round(0.2 / paso)))
     const desv = mediana(suave.map((v) => Math.abs(v - dev))) * 1.4826
-    const enVerde = suave.filter((v) => Math.abs(v) <= BANDA_VERDE_CENTS).length / suave.length
+    const pz = puntajeZona(suave)
     suavesPorNota[j] = suave
     const vib = medirVibrato(devs, paso)
     const duracionSeg = g.t[n - 1] - g.t[0]
@@ -473,13 +493,14 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
       finSeg: g.t[n - 1],
       desviacionCents: Math.round(dev),
       estabilidadCents: Math.round(desv),
-      pctVerde: Math.round(enVerde * 100),
+      pctVerde: pz.blando,
+      pctVerdeEstricto: pz.estricto,
       pendienteCentsPorSeg: duracionSeg >= 0.5 ? Math.round(pendienteCentsPorSeg(tc, mc)) : 0,
       octavaDistinta: octava !== octavaGlobal,
       estado: estadoPorCents(dev),
       vibratoCents: vib ? vib.ampCents : null,
       vibratoHz: vib ? vib.hz : null,
-      vibratoAmplio: !!vib && vib.ampCents >= 30 && vib.hz >= 2.5 && vib.hz <= 8 && vib.cruces >= 4,
+      vibratoAmplio: !!vib && vib.ampCents >= 40 && vib.hz >= 2.5 && vib.hz <= 8 && vib.cruces >= 4,
     }
   })
 
@@ -507,7 +528,9 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     r.pctVerdeAbsoluto = r.pctVerde
     const suaveRel = suavesPorNota[r.indice] || []
     if (suaveRel.length) {
-      r.pctVerde = Math.round((suaveRel.filter((v) => Math.abs(foldCents(v - offsetGlobal)) <= BANDA_VERDE_CENTS).length / suaveRel.length) * 100)
+      const pzRel = puntajeZona(suaveRel.map((v) => foldCents(v - offsetGlobal)))
+      r.pctVerde = pzRel.blando
+      r.pctVerdeEstricto = pzRel.estricto
     }
     r.estadoAbsoluto = r.estado
     if (Math.abs(r.desviacionRelativaCents) >= UMBRAL_NOTA_DISTINTA_CENTS) {
@@ -550,15 +573,16 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
         notas: rs.length,
         pctVerde: Math.round(verde),
         desviacionCents: Math.round(dev),
-        estado: verde >= 70 ? 'verde' : verde >= 40 ? 'amarillo' : 'rojo',
+        estado: verde >= 60 ? 'verde' : verde >= 30 ? 'amarillo' : 'rojo',
         pctRitmoOk,
-        estadoRitmo: pctRitmoOk == null ? null : pctRitmoOk >= 75 ? 'verde' : pctRitmoOk >= 50 ? 'amarillo' : 'rojo',
+        estadoRitmo: pctRitmoOk == null ? null : pctRitmoOk >= 70 ? 'verde' : pctRitmoOk >= 45 ? 'amarillo' : 'rojo',
         ritmoTendencia: tardes > tempranos ? 'tarde' : tempranos > tardes ? 'temprano' : null,
       }
     })
 
   const totalFrames = validas.reduce((s, r) => s + r.frames, 0)
   const pctVerdeAbsolutoTotal = totalFrames ? Math.round(validas.reduce((s, r) => s + (r.pctVerdeAbsoluto ?? r.pctVerde) * r.frames, 0) / totalFrames) : 0
+  const pctVerdeEstrictoTotal = totalFrames ? Math.round(validas.reduce((s, r) => s + (r.pctVerdeEstricto ?? r.pctVerde) * r.frames, 0) / totalFrames) : 0
   const pctVerdeTotal = totalFrames ? Math.round(validas.reduce((s, r) => s + r.pctVerde * r.frames, 0) / totalFrames) : 0
   let costoAltura = 0
   for (let i = 0; i < frames.t.length; i++) {
@@ -594,6 +618,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     notasDetectadas: validas.length,
     pctVerde: pctVerdeTotal, // entre notas (descontando la afinación general)
     pctVerdeAbsoluto: pctVerdeAbsolutoTotal,
+    pctVerdeEstricto: pctVerdeEstrictoTotal, // márgenes de antes (±15, solo verde): para el director
     offsetGlobalCents: offsetGlobal,
     octavaGlobal,
     notasDistintas: resultados.filter((r) => r.estado === 'nota_distinta').map((r) => r.indice),
@@ -703,10 +728,10 @@ function redactarMensajes(inf) {
     )
   }
   const t = inf.tendencias
-  if (t.saltosAscendentes.n >= 2 && t.saltosAscendentes.cents != null && t.saltosAscendentes.cents <= -15) {
+  if (t.saltosAscendentes.n >= 2 && t.saltosAscendentes.cents != null && t.saltosAscendentes.cents <= -20) {
     m.push('Los saltos hacia arriba te quedan bajos: probá preparar la nota de llegada antes de cantarla.')
   }
-  if (t.finalesDeFrase.n >= 2 && t.finalesDeFrase.cents != null && t.finalesDeFrase.cents <= -15) {
+  if (t.finalesDeFrase.n >= 2 && t.finalesDeFrase.cents != null && t.finalesDeFrase.cents <= -20) {
     m.push('Tendés a bajar al final de las frases: sostené el apoyo hasta cortar la nota.')
   }
   if (t.notasLargas.n >= 2 && t.notasLargas.pendienteCentsPorSeg != null && t.notasLargas.pendienteCentsPorSeg <= -15) {
