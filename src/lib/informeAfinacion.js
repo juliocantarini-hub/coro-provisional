@@ -126,6 +126,41 @@ function corregirOctavas(midi, vozeado, ventana = 4) {
   }
 }
 
+// Errores de armónico: en tramos de varios cuadros seguidos el detector de altura puede
+// quedarse con un armónico en vez de la fundamental. El 3.º suena una 12.ª (19,02
+// semitonos) arriba; el 4.º, dos octavas; el 5.º y el 6.º, 27,86 y 31,02. Plegar por
+// octavas no alcanza (una 12.ª plegada parece una nota ~500 cents más baja), así que
+// después de una primera alineación se baja cada cuadro que quedó muy por encima de su
+// nota esperada si, restando ese salto, cae cerca de ella. Solo hacia abajo y solo saltos
+// armónicos: una nota realmente mal cantada (otra altura) o una octava distinta no se toca.
+const SALTOS_ARMONICOS = [19.02, 24, 27.86, 31.02]
+function corregirArmonicos(frames, asig, notas, offset) {
+  const K = notas.length
+  const dif = Array.from({ length: K }, () => [])
+  for (let i = 0; i < frames.t.length; i++) dif[asig[i]].push(frames.m[i] - notas[asig[i]].midi)
+  const octavas = []
+  for (let j = 0; j < K; j++) {
+    if (dif[j].length >= 5) octavas.push(Math.round(mediana(dif[j]) / 12))
+  }
+  const octG = octavas.length ? mediana(octavas) : 0
+  let corregidos = 0
+  for (let i = 0; i < frames.t.length; i++) {
+    const objetivo = notas[asig[i]].midi + 12 * octG + offset
+    const res0 = frames.m[i] - objetivo
+    if (res0 <= 4) continue
+    let mejor = null, mejorRes = Infinity
+    for (const s of SALTOS_ARMONICOS) {
+      const r = Math.abs(res0 - s)
+      if (r < mejorRes) { mejorRes = r; mejor = s }
+    }
+    if (mejor != null && mejorRes <= 2) {
+      frames.m[i] -= mejor
+      corregidos++
+    }
+  }
+  return corregidos
+}
+
 // ─── 2. Alineación con la partitura ─────────────────────────────────────
 
 const CAP_COSTO = 3 // semitonos: un cuadro muy lejano no pesa más que esto
@@ -441,6 +476,8 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
   const kMax = Math.min(16, K)
   const offsetGrueso = estimarOffset(frames, notas, tExp0, escala)
   let asig = alinear(frames, notas, tExp0, escala, 0.4, offsetGrueso, kMax).asig
+  // Cuadros enganchados a un armónico (ver corregirArmonicos): se corrigen antes de seguir.
+  const armonicosCorregidos = corregirArmonicos(frames, asig, notas, offsetGrueso)
   // Segunda pasada: con los tiempos ajustados al tempo real de esta toma.
   const ajuste1 = ajusteDesdeAsignacion(frames, asig, notas)
   if (ajuste1) {
@@ -632,6 +669,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
     ultimoCompasCantado: ultimoDetectado >= 0 ? (resultados[ultimoDetectado].compas ?? null) : null,
     confianza: Math.round(confianza * 100) / 100,
     alineacionDudosa: confianza < 0.45,
+    armonicosCorregidos, // cuadros que el detector de altura confundió con un armónico (diagnóstico)
     ritmo: ritmoResumen,
     vibrato,
     diagnostico: {
