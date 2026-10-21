@@ -40,6 +40,15 @@ export function midiANombre(midi) {
   return `${nombre}${octava}`
 }
 
+// Nombre de nota en cifrado latino (Do, Re, Mi…): "F#3" → "Fa#3", "Bb2" → "Sib2".
+// Solo para mostrar en pantalla; el audio y el motor siguen usando los nombres C, D, E…
+const SOLFEO = { C: 'Do', D: 'Re', E: 'Mi', F: 'Fa', G: 'Sol', A: 'La', B: 'Si' }
+export function nombreEnEspanol(nombre) {
+  const m = (nombre || '').match(/^([A-G])(#{1,2}|b{1,2})?(-?\d+)?$/)
+  if (!m) return nombre
+  return `${SOLFEO[m[1]]}${m[2] || ''}${m[3] ?? ''}`
+}
+
 // Diferencia en centésimas de semitono entre dos frecuencias (positivo = agudo respecto de la referencia).
 export function centsEntre(frecuencia, frecuenciaReferencia) {
   return 1200 * Math.log2(frecuencia / frecuenciaReferencia)

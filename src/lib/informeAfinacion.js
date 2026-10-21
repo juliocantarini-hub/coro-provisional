@@ -12,6 +12,8 @@
 // "inicio" y "duracion" en cualquier unidad consistente (pulsos o segundos):
 // solo se usan de forma relativa, porque el cantante va a su propio tempo.
 
+import { nombreEnEspanol } from './afinacion'
+
 // Márgenes del informe para el cantante: algo permisivos, para no desalentar (un coro tolera ±20-25 cents).
 // Los márgenes estrictos de antes (±15) se siguen calculando aparte para el director (pctVerdeEstricto).
 export const BANDA_VERDE_CENTS = 20
@@ -808,7 +810,7 @@ function redactarMensajes(inf) {
     )
   }
   if (r.notasSinMedir.length) {
-    const lista = r.notasSinMedir.slice(0, 4).map((x) => `${x.nombre ?? 'una nota'} (compás ${x.compas})`).join(', ')
+    const lista = r.notasSinMedir.slice(0, 4).map((x) => `${x.nombre ? nombreEnEspanol(x.nombre) : 'una nota'} (compás ${x.compas})`).join(', ')
     m.push(`No pude medir ${r.notasSinMedir.length === 1 ? 'esta nota' : 'estas notas'}: ${lista}. Suele pasar con notas muy cortas pegadas a otras, o si se saltearon.`)
   }
   if (r.notasDistintas.length) {

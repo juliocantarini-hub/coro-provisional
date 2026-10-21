@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { nombreEnEspanol } from './afinacion'
 
 // Consejos de práctica escritos por IA a partir del informe de afinación y ritmo.
 // IMPORTANTE: solo viaja un resumen en números (compases, desvíos en cents, tendencias).
@@ -27,7 +28,7 @@ export function armarResumenParaCoaching(informe, { titulo, vozNombre, desde, ha
     .sort((a, b) => b.s - a.s)
     .slice(0, MAX_NOTAS_PROBLEMA)
     .map(({ n }) => {
-      const o = { compas: n.compas, nota: n.nombre }
+      const o = { compas: n.compas, nota: nombreEnEspanol(n.nombre) }
       if (n.estado === 'nota_distinta') o.nota_distinta = true
       else if (n.estado !== 'verde') o.cents = Math.round(n.desviacionRelativaCents ?? n.desviacionCents) // + = alto, − = bajo
       if (n.ritmo && n.ritmo.estado !== 'ok') o.ritmo = `${n.ritmo.direccion || ''} (${n.ritmo.estado})`.trim()

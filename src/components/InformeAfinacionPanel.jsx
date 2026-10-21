@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { listarCompases, notasParaInforme, rangoEnSegundos, pulsosMetronomo } from '../lib/informeNotas'
 import { iniciarGrabacion } from '../lib/grabadora'
 import { tocarNotaDePartida, tocarPrimerCompas, iniciarGuiaPiano, contar, prepararPianoDeGuia, iniciarClicsDeSilencio, MARGEN_CLIC_SILENCIO } from '../lib/guiaInforme'
-import { midiANombre } from '../lib/afinacion'
+import { midiANombre, nombreEnEspanol } from '../lib/afinacion'
 import { armarResumenParaCoaching, pedirCoaching } from '../lib/coaching'
 import { armarDiagnostico, guardarInformeParaDirector } from '../lib/informeGuardado'
 import { useAuth } from '../hooks/useAuth'
@@ -396,7 +396,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
           {rango
             ? `${notas.length} notas · aprox. ${Math.round(rango.duracion)} s al tempo escrito${muyLargo ? ` — elegí un tramo de hasta ${MAX_SEG_FRAGMENTO} s` : ''}`
             : 'Elegí un rango válido.'}
-          {notas.length > 0 && <> · primera nota: <strong>{midiANombre(notas[0].midi)}</strong></>}
+          {notas.length > 0 && <> · primera nota: <strong>{nombreEnEspanol(midiANombre(notas[0].midi))}</strong></>}
         </div>
         {silencioInicial.length > 0 && (
           <div style={{ fontSize: '12px', color: '#3D3D3A', background: '#F7F6F1', borderRadius: '8px', padding: '8px 10px', margin: '-8px 0 14px', lineHeight: 1.5 }}>
@@ -420,7 +420,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       </>
     )
   } else if (etapa === 'nota' || etapa === 'conteo' || etapa === 'grabando') {
-    const nombre = notas[0] ? midiANombre(notas[0].midi) : ''
+    const nombre = notas[0] ? nombreEnEspanol(midiANombre(notas[0].midi)) : ''
     const nSil = silenciosRef.current.clics.length
     cuerpo = (
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -589,7 +589,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
             <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>Compás {compasAbierto}</div>
             {notasDe(compasAbierto).map((n) => (
               <div key={n.indice} style={{ display: 'flex', gap: '8px', alignItems: 'baseline', fontSize: '12px', padding: '3px 0', borderTop: '1px solid #ECEAE2' }}>
-                <strong style={{ width: '34px' }}>{n.nombre}</strong>
+                <strong style={{ width: '46px' }}>{nombreEnEspanol(n.nombre)}</strong>
                 {n.estado === 'no_detectada' ? (
                   <Chip estado="neutro">no la encontré</Chip>
                 ) : n.estado === 'no_separable' ? (
