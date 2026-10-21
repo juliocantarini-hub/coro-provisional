@@ -118,6 +118,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   const [ayudaAfinacionAbierta, setAyudaAfinacionAbierta] = useState(false)
   // "Grabarme y ver informe": panel para grabar un fragmento y recibir un informe
   const [informeAbierto, setInformeAbierto] = useState(false)
+  const [alturaInforme, setAlturaInforme] = useState(0) // alto de la hoja del informe (pegada abajo): la partitura deja ese lugar para poder leerla entera
 
   // Menú flotante de velocidad (se abre con el ícono de hamburguesa, en vez de
   // tener las 5 opciones siempre expuestas en la barra de controles) y, por
@@ -684,7 +685,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
       display: 'flex', flexDirection: 'column',
       height: pantallaCompleta ? '100%' : 'min(72vh, 640px)',
     }}>
-      <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px' }}>
+      <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px', paddingBottom: alturaInforme ? `${alturaInforme + 12}px` : '12px' }}>
         <PartituraVisual
           musicxml={partitura.musicxml}
           tiempos={partituraParseada.tiempos}
@@ -989,7 +990,8 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
               partitura={partituraParseada}
               voz={vozPropia}
               titulo={partitura.titulo}
-              onCerrar={() => setInformeAbierto(false)}
+              onCerrar={() => { setInformeAbierto(false); setAlturaInforme(0) }}
+              onAltura={setAlturaInforme}
             />
           )}
 

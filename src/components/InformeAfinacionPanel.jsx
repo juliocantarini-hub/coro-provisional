@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { listarCompases, notasParaInforme, rangoEnSegundos, pulsosMetronomo } from '../lib/informeNotas'
 import { iniciarGrabacion } from '../lib/grabadora'
-import { tocarNotaDePartida, tocarPrimerCompas, iniciarGuiaPiano, contar, prepararPianoDeGuia } from '../lib/guiaInforme'
+import { tocarNotaDePartida, tocarPrimerCompas, iniciarGuiaPiano, contar, prepararPianoDeGuia, iniciarClicsDeSilencio, MARGEN_CLIC_SILENCIO } from '../lib/guiaInforme'
 import { midiANombre } from '../lib/afinacion'
 import { armarResumenParaCoaching, pedirCoaching } from '../lib/coaching'
 import { armarDiagnostico, guardarInformeParaDirector } from '../lib/informeGuardado'
@@ -96,7 +96,7 @@ function textoRitmo(r) {
   return `${r.direccion === 'tarde' ? 'tarde' : 'antes de tiempo'} (${seg} s)`
 }
 
-export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar }) {
+export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar, onAltura }) {
   const { perfil } = useAuth()
   const lista = useMemo(() => listarCompases(partitura), [partitura])
   const [desde, setDesde] = useState(lista[0])
@@ -129,6 +129,9 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
 
   const grabadoraRef = useRef(null)
   const guiaRef = useRef(null) // guía de piano que suena durante la grabación
+  const clicsSilencioRef = useRef(null) // clics que marcan el silencio inicial mientras se graba
+  const silenciosRef = useRef({ clics: [], pulso: 0.5 }) // los de esta toma (para enmascararlos en el análisis)
+  const hojaRef = useRef(null) // la hoja inferior (para avisarle al reproductor cuánto mide)
   const conGuiaRef = useRef(false) // esta toma se hizo con guía sonando
   const cancelado = useRef(false)
   const marcaRef = useRef({ inicioMs: 0, yaMs: 0 })
@@ -143,6 +146,14 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     () => (voz && desde != null && hasta != null ? notasParaInforme(partitura, voz.id, desde, hasta) : { notas: [], rango: null }),
     [partitura, voz, desde, hasta],
   )
+  // Si la parte empieza con silencio, un clic por cada tiempo de silencio (así se sabe cuándo entrar)
+  const { silencioInicial, pulsoClic } = useMemo(() => {
+    if (!notas.length || desde == null || hasta == null) return { silencioInicial: [], pulsoClic: 0.5 }
+    const pm = pulsosMetronomo(partitura, desde, hasta)
+    const p = Math.max(0.35, Math.min(2.5, pm.pulsoSeg != null ? pm.pulsoSeg : notas[0].pulsoSeg))
+    const clics = (pm.clics || []).filter((cl) => cl.t < notas[0].inicio - 0.1 * p).slice(0, 16)
+    return { silencioInicial: clics, pulsoClic: p }
+  }, [partitura, desde, hasta, notas])
   const muyLargo = rango && rango.duracion > MAX_SEG_FRAGMENTO
   const idxDesde = lista.indexOf(desde)
   const idxHasta = lista.indexOf(hasta)
@@ -152,8 +163,21 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     return () => {
       cancelado.current = true
       guiaRef.current?.detener()
+      clicsSilencioRef.current?.detener()
       grabadoraRef.current?.cancelar()
     }
+  }, [])
+
+  // Le avisa al reproductor cuánto mide la hoja de abajo, para que la partitura pueda scrollear hasta quedar por encima
+  useEffect(() => {
+    const el = hojaRef.current
+    if (!el || !onAltura) return undefined
+    const avisar = () => onAltura(Math.round(el.getBoundingClientRect().height))
+    avisar()
+    let ro = null
+    try { ro = new ResizeObserver(avisar); ro.observe(el) } catch { /* sin ResizeObserver */ }
+    return () => { try { ro?.disconnect() } catch { /* nada */ } onAltura(0) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Cronómetro y nivel mientras se graba
@@ -223,12 +247,17 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       setSegundos(0)
       setEtapa('grabando')
       conGuiaRef.current = false
+      // Silencio al comienzo de la parte: un clic por tiempo, hasta la entrada
+      silenciosRef.current = { clics: silencioInicial, pulso: pulsoClic }
+      if (silencioInicial.length) clicsSilencioRef.current = iniciarClicsDeSilencio(silencioInicial)
       if (conGuia) {
         guiaRef.current = iniciarGuiaPiano(notasRef.current)
         conGuiaRef.current = !!guiaRef.current
       }
     } catch (e) {
       guiaRef.current?.detener()
+      clicsSilencioRef.current?.detener()
+      clicsSilencioRef.current = null
       grabadoraRef.current?.cancelar()
       grabadoraRef.current = null
       setError(
@@ -248,10 +277,18 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     const descartar = Math.max(0, yaSeg - 0.15)
     guiaRef.current?.detener()
     guiaRef.current = null
+    clicsSilencioRef.current?.detener()
+    clicsSilencioRef.current = null
     const { muestras, sampleRate } = g.detener()
     setEtapa('analizando')
     try {
-      const opcionesAnalisis = { descartarAntesDeSeg: descartar, inicioCantoSeg: yaSeg }
+      // Los clics de silencio suenan con la grabación en marcha: se ignoran en el análisis para que no se lean como notas
+      const { clics: clicsSil, pulso: pulsoSil } = silenciosRef.current
+      const ignorar = clicsSil.map((cl) => [
+        Math.round((yaSeg + cl.t - 0.02) * 1000) / 1000,
+        Math.round((yaSeg + cl.t + MARGEN_CLIC_SILENCIO + Math.min(0.4, 0.75 * pulsoSil)) * 1000) / 1000,
+      ])
+      const opcionesAnalisis = { descartarAntesDeSeg: descartar, inicioCantoSeg: yaSeg, ...(ignorar.length ? { ignorar } : {}) }
       diagRef.current = { sampleRate, opciones: opcionesAnalisis, notas: notasRef.current, conGuia: conGuiaRef.current }
       const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, opcionesAnalisis)
       if (cancelado.current) return
@@ -300,6 +337,8 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     cancelado.current = true
     guiaRef.current?.detener()
     guiaRef.current = null
+    clicsSilencioRef.current?.detener()
+    clicsSilencioRef.current = null
     grabadoraRef.current?.cancelar()
     grabadoraRef.current = null
     onCerrar()
@@ -366,6 +405,12 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
             : 'Elegí un rango válido.'}
           {notas.length > 0 && <> · primera nota: <strong>{midiANombre(notas[0].midi)}</strong></>}
         </div>
+        {silencioInicial.length > 0 && (
+          <div style={{ fontSize: '12px', color: '#3D3D3A', background: '#F7F6F1', borderRadius: '8px', padding: '8px 10px', margin: '-8px 0 14px', lineHeight: 1.5 }}>
+            🔔 Tu parte empieza con silencio: después del conteo vas a oír {silencioInicial.length === 1 ? 'un clic' : `${silencioInicial.length} clics`} (uno por tiempo)
+            y entrás justo después.
+          </div>
+        )}
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#3D3D3A', margin: '0 0 12px', cursor: 'pointer', lineHeight: 1.45 }}>
           <input type="checkbox" checked={conGuia} onChange={(e) => setConGuia(e.target.checked)} style={{ marginTop: '2px' }} />
           <span>
@@ -383,37 +428,43 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     )
   } else if (etapa === 'nota' || etapa === 'conteo' || etapa === 'grabando') {
     const nombre = notas[0] ? midiANombre(notas[0].midi) : ''
+    const nSil = silenciosRef.current.clics.length
     cuerpo = (
-      <div style={{ textAlign: 'center', padding: '10px 0' }}>
-        <div style={{ fontSize: '13px', color: '#5F5E5A', marginBottom: '8px' }}>
-          Compases {desde} a {hasta}
-        </div>
-        {etapa === 'nota' && (
-          <>
-            <div style={{ fontSize: '40px', fontWeight: 700, color: '#1D7A5F' }}>{faseGuia === 'compas' ? `Compás ${desde}` : nombre}</div>
-            <div style={{ fontSize: '14px', color: '#3D3D3A' }}>
-              {faseGuia === 'compas' ? 'Escuchá cómo va el primer compás (en piano)…' : 'Esta es tu nota de partida. Escuchala…'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {etapa === 'nota' && (
+            <>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#1D7A5F' }}>{faseGuia === 'compas' ? `Compás ${desde}` : nombre}</div>
+              <div style={{ fontSize: '13px', color: '#3D3D3A' }}>
+                {faseGuia === 'compas' ? 'Escuchá cómo va el primer compás (en piano)…' : 'Esta es tu nota de partida. Escuchala…'}
+              </div>
+            </>
+          )}
+          {etapa === 'conteo' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ fontSize: '40px', fontWeight: 700, color: '#1D7A5F', lineHeight: 1, minWidth: '28px', textAlign: 'center' }}>{conteo || '·'}</div>
+              <div style={{ fontSize: '13px', color: '#3D3D3A' }}>
+                Preparate: entrás en el compás {desde}
+                {silencioInicial.length > 0 && <><br />Tu parte empieza con silencio: seguí los clics.</>}
+              </div>
             </div>
-          </>
-        )}
-        {etapa === 'conteo' && (
-          <>
-            <div style={{ fontSize: '56px', fontWeight: 700, color: '#1D7A5F', lineHeight: 1 }}>{conteo || '·'}</div>
-            <div style={{ fontSize: '14px', color: '#3D3D3A' }}>Preparate: entrás en el compás {desde}</div>
-          </>
-        )}
-        {etapa === 'grabando' && (
-          <>
-            <div style={{ fontSize: '14px', color: '#A32D2D', fontWeight: 600 }}>● Grabando… {Math.floor(segundos)} s</div>
-            <div style={{ fontSize: '13px', color: '#5F5E5A', margin: '6px 0 14px' }}>Cantá hasta el final del compás {hasta}.</div>
-          </>
-        )}
-        <div style={{ height: '8px', borderRadius: '4px', background: '#EFEEE7', margin: '12px auto', maxWidth: '260px', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${Math.round(nivel * 100)}%`, background: '#3FAE83', transition: 'width 0.1s' }} />
+          )}
+          {etapa === 'grabando' && (
+            <>
+              <div style={{ fontSize: '14px', color: '#A32D2D', fontWeight: 600 }}>● Grabando… {Math.floor(segundos)} s</div>
+              <div style={{ fontSize: '12px', color: '#5F5E5A' }}>
+                Cantá hasta el final del compás {hasta}.
+                {nSil > 0 && segundos < pulsoClic * nSil + 0.5 && <> Seguí los clics: entrás después del {nSil === 1 ? 'clic' : `${nSil}.º clic`}.</>}
+              </div>
+            </>
+          )}
+          <div style={{ height: '6px', borderRadius: '3px', background: '#EFEEE7', margin: '8px 0 0', maxWidth: '260px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${Math.round(nivel * 100)}%`, background: '#3FAE83', transition: 'width 0.1s' }} />
+          </div>
         </div>
         {etapa === 'grabando'
           ? <button style={boton(true)} onClick={terminar}>⏹ Terminé</button>
-          : <button style={boton(false)} onClick={() => { cancelado.current = true; guiaRef.current?.detener(); guiaRef.current = null; grabadoraRef.current?.cancelar(); grabadoraRef.current = null; setEtapa('config') }}>Cancelar</button>}
+          : <button style={boton(false)} onClick={() => { cancelado.current = true; guiaRef.current?.detener(); guiaRef.current = null; clicsSilencioRef.current?.detener(); clicsSilencioRef.current = null; grabadoraRef.current?.cancelar(); grabadoraRef.current = null; setEtapa('config') }}>Cancelar</button>}
       </div>
     )
   } else if (etapa === 'analizando') {
@@ -576,16 +627,30 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     )
   }
 
+  // Hoja pegada abajo: deja a la vista la partitura (y se puede scrollear mientras se elige o se canta).
+  // Mientras se escucha, cuenta y graba es compacta, así se lee casi toda la partitura.
+  const compacto = etapa === 'nota' || etapa === 'conteo' || etapa === 'grabando'
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(26,26,24,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-      <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', padding: '18px 18px 20px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-          <div>
-            <div onClick={tocarTitulo} style={{ fontSize: '16px', fontWeight: 700, color: '#1A1A18' }}>Grabarme y ver informe</div>
-            <div style={{ fontSize: '12px', color: '#8A8878' }}>{[titulo, voz?.nombre].filter(Boolean).join(' · ')}</div>
+    <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 60, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+      <div ref={hojaRef} style={{
+        pointerEvents: 'auto', background: '#FFFFFF', width: '100%', maxWidth: '640px',
+        borderRadius: '16px 16px 0 0', boxShadow: '0 -6px 28px rgba(0,0,0,0.22)', borderTop: '1px solid #E8E6DF',
+        maxHeight: compacto ? 'none' : '62vh', overflowY: compacto ? 'visible' : 'auto',
+        padding: compacto ? '10px 16px' : '14px 18px 18px', paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+      }}>
+        {!compacto ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+            <div>
+              <div onClick={tocarTitulo} style={{ fontSize: '16px', fontWeight: 700, color: '#1A1A18' }}>Grabarme y ver informe</div>
+              <div style={{ fontSize: '12px', color: '#8A8878' }}>{[titulo, voz?.nombre].filter(Boolean).join(' · ')}</div>
+            </div>
+            <button onClick={cerrar} aria-label="Cerrar" style={{ border: 'none', background: 'transparent', fontSize: '22px', cursor: 'pointer', color: '#5F5E5A', lineHeight: 1 }}>×</button>
           </div>
-          <button onClick={cerrar} aria-label="Cerrar" style={{ border: 'none', background: 'transparent', fontSize: '22px', cursor: 'pointer', color: '#5F5E5A', lineHeight: 1 }}>×</button>
-        </div>
+        ) : (
+          <div style={{ fontSize: '11px', color: '#8A8878', marginBottom: '6px' }}>
+            Compases {desde} a {hasta} · {[titulo, voz?.nombre].filter(Boolean).join(' · ')}
+          </div>
+        )}
         {cuerpo}
       </div>
     </div>

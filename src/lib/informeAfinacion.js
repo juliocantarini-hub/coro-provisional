@@ -219,10 +219,14 @@ function alinear(frames, notas, tExp, escala, lambda, offset, kMax) {
   return { asig, costo: mejorTotal }
 }
 
-function cuadrosVozeados(curva, desdeSeg = 0) {
+function cuadrosVozeados(curva, desdeSeg = 0, ignorar = []) {
   const t = [], m = []
   for (let i = 0; i < curva.t.length; i++) {
-    if (curva.vozeado[i] && curva.t[i] >= desdeSeg) { t.push(curva.t[i]); m.push(curva.midi[i]) }
+    if (!curva.vozeado[i] || curva.t[i] < desdeSeg) continue
+    const ti = curva.t[i]
+    // "ignorar": tramos [desde, hasta] en segundos (los clics de silencio que suenan mientras se graba)
+    if (ignorar.some((r) => ti >= r[0] && ti <= r[1])) continue
+    t.push(ti); m.push(curva.midi[i])
   }
   return { t, m }
 }
@@ -461,7 +465,7 @@ export function analizarGrabacion(muestras, sampleRate, notas, opciones = {}) {
   const curva = opciones.curva || extraerCurvaF0(muestras, sampleRate)
   // Lo anterior a "descartarAntesDeSeg" (el conteo con clics) se ignora: el clic
   // que se cuela en el micrófono no debe tomarse como una nota cantada.
-  const frames = cuadrosVozeados(curva, opciones.descartarAntesDeSeg || 0)
+  const frames = cuadrosVozeados(curva, opciones.descartarAntesDeSeg || 0, opciones.ignorar || [])
   const K = notas.length
   if (K === 0) return { error: 'sin_notas' }
   if (frames.t.length < 20) return { error: 'sin_voz', mensaje: 'No se detectó voz suficiente en la grabación.' }

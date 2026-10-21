@@ -152,3 +152,32 @@ export async function contar(pulsoSeg, alPulso, clics = 4) {
   try { await ctx.close() } catch { /* ya cerrado */ }
   return 0.1 + clics * pulsoSeg
 }
+
+/**
+ * Clics que suenan MIENTRAS se graba, durante el silencio con que empieza la parte del cantante
+ * (un clic por tiempo de silencio, el primero acentuado), para que sepa cuándo entrar.
+ * "tiempos": segundos desde el "ya" ({ t, acento }). Hay que llamarla justo cuando empieza la grabación.
+ * Devuelve { detener() }; no hace nada si no hay clics o el audio no está disponible.
+ */
+export function iniciarClicsDeSilencio(tiempos) {
+  if (!tiempos || !tiempos.length) return { detener() {} }
+  let ctx = null
+  try {
+    ctx = crearContexto()
+    if (ctx.state === 'suspended') ctx.resume()
+    const inicio = ctx.currentTime + MARGEN_CLIC_SILENCIO
+    for (const c of tiempos) clicSuave(ctx, inicio + c.t, { acento: !!c.acento, volumen: 0.35 })
+  } catch {
+    ctx = null
+  }
+  const cierre = setTimeout(() => { try { ctx?.close() } catch { /* ya cerrado */ } }, (tiempos[tiempos.length - 1].t + 1) * 1000)
+  return {
+    detener() {
+      clearTimeout(cierre)
+      try { ctx?.close() } catch { /* ya cerrado */ }
+    },
+  }
+}
+
+// Desfase con el que arranca el primer clic de silencio respecto del "ya" (lo usa el panel para enmascarar el clic en el análisis)
+export const MARGEN_CLIC_SILENCIO = 0.05
