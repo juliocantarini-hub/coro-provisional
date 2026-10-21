@@ -627,18 +627,13 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     )
   }
 
-  // Hoja pegada abajo: deja a la vista la partitura (y se puede scrollear mientras se elige o se canta).
-  // Mientras se escucha, cuenta y graba es compacta, así se lee casi toda la partitura.
+  // Elegir fragmento e informe: ventana centrada. Mientras se escucha, cuenta y graba: hoja compacta pegada
+  // abajo, para poder leer la partitura (y scrollearla) mientras se canta.
   const compacto = etapa === 'nota' || etapa === 'conteo' || etapa === 'grabando'
-  return (
-    <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 60, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-      <div ref={hojaRef} style={{
-        pointerEvents: 'auto', background: '#FFFFFF', width: '100%', maxWidth: '640px',
-        borderRadius: '16px 16px 0 0', boxShadow: '0 -6px 28px rgba(0,0,0,0.22)', borderTop: '1px solid #E8E6DF',
-        maxHeight: compacto ? 'none' : '62vh', overflowY: compacto ? 'visible' : 'auto',
-        padding: compacto ? '10px 16px' : '14px 18px 18px', paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
-      }}>
-        {!compacto ? (
+  if (!compacto) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(26,26,24,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
+        <div ref={hojaRef} style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', padding: '18px 18px 20px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
             <div>
               <div onClick={tocarTitulo} style={{ fontSize: '16px', fontWeight: 700, color: '#1A1A18' }}>Grabarme y ver informe</div>
@@ -646,11 +641,21 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
             </div>
             <button onClick={cerrar} aria-label="Cerrar" style={{ border: 'none', background: 'transparent', fontSize: '22px', cursor: 'pointer', color: '#5F5E5A', lineHeight: 1 }}>×</button>
           </div>
-        ) : (
-          <div style={{ fontSize: '11px', color: '#8A8878', marginBottom: '6px' }}>
-            Compases {desde} a {hasta} · {[titulo, voz?.nombre].filter(Boolean).join(' · ')}
-          </div>
-        )}
+          {cuerpo}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 60, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+      <div ref={hojaRef} style={{
+        pointerEvents: 'auto', background: '#FFFFFF', width: '100%', maxWidth: '640px',
+        borderRadius: '16px 16px 0 0', boxShadow: '0 -6px 28px rgba(0,0,0,0.22)', borderTop: '1px solid #E8E6DF',
+        padding: '10px 16px', paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+      }}>
+        <div style={{ fontSize: '11px', color: '#8A8878', marginBottom: '6px' }}>
+          Compases {desde} a {hasta} · {[titulo, voz?.nombre].filter(Boolean).join(' · ')}
+        </div>
         {cuerpo}
       </div>
     </div>
