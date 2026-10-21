@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { listarCompases, notasParaInforme, rangoEnSegundos, pulsosMetronomo } from '../lib/informeNotas'
 import { iniciarGrabacion } from '../lib/grabadora'
 import { tocarNotaDePartida, tocarPrimerCompas, iniciarGuiaPiano, contar, prepararPianoDeGuia, iniciarClicsDeSilencio, MARGEN_CLIC_SILENCIO } from '../lib/guiaInforme'
@@ -96,7 +97,7 @@ function textoRitmo(r) {
   return `${r.direccion === 'tarde' ? 'tarde' : 'antes de tiempo'} (${seg} s)`
 }
 
-export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar, onAltura }) {
+export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar, anclaHoja, alturaCubrir, onIrACompas }) {
   const { perfil } = useAuth()
   const lista = useMemo(() => listarCompases(partitura), [partitura])
   const [desde, setDesde] = useState(lista[0])
@@ -107,6 +108,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const [nivel, setNivel] = useState(0)
   const [informe, setInforme] = useState(null)
   const [error, setError] = useState('')
+  const [errorTipo, setErrorTipo] = useState('otro') // mic | sin_voz | otro
   const [compasAbierto, setCompasAbierto] = useState(null)
   const [coaching, setCoaching] = useState({ estado: 'idle', texto: '', mensaje: '' }) // idle | cargando | listo | error
   const [faseGuia, setFaseGuia] = useState('nota') // durante la etapa 'nota': 'nota' (nota de partida) | 'compas' (primer compás en piano)
@@ -131,7 +133,6 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   const guiaRef = useRef(null) // guía de piano que suena durante la grabación
   const clicsSilencioRef = useRef(null) // clics que marcan el silencio inicial mientras se graba
   const silenciosRef = useRef({ clics: [], pulso: 0.5 }) // los de esta toma (para enmascararlos en el análisis)
-  const hojaRef = useRef(null) // la hoja inferior (para avisarle al reproductor cuánto mide)
   const conGuiaRef = useRef(false) // esta toma se hizo con guía sonando
   const cancelado = useRef(false)
   const marcaRef = useRef({ inicioMs: 0, yaMs: 0 })
@@ -168,18 +169,6 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     }
   }, [])
 
-  // Le avisa al reproductor cuánto mide la hoja de abajo, para que la partitura pueda scrollear hasta quedar por encima
-  useEffect(() => {
-    const el = hojaRef.current
-    if (!el || !onAltura) return undefined
-    const avisar = () => onAltura(Math.round(el.getBoundingClientRect().height))
-    avisar()
-    let ro = null
-    try { ro = new ResizeObserver(avisar); ro.observe(el) } catch { /* sin ResizeObserver */ }
-    return () => { try { ro?.disconnect() } catch { /* nada */ } onAltura(0) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   // Cronómetro y nivel mientras se graba
   useEffect(() => {
     if (etapa !== 'grabando' && etapa !== 'conteo' && etapa !== 'nota') return
@@ -214,6 +203,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
     setError('')
     cancelado.current = false
     notasRef.current = notas
+    onIrACompas?.(desde) // lleva la partitura al compás donde se empieza
     try {
       setFaseGuia('compas')
       setEtapa('nota')
@@ -260,6 +250,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       clicsSilencioRef.current = null
       grabadoraRef.current?.cancelar()
       grabadoraRef.current = null
+      setErrorTipo(e?.name === 'NotAllowedError' ? 'mic' : 'otro')
       setError(
         e?.name === 'NotAllowedError'
           ? 'No pudimos usar el micrófono. Revisá el permiso del navegador y volvé a intentar.'
@@ -293,6 +284,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       const inf = await analizarEnWorker(muestras, sampleRate, notasRef.current, opcionesAnalisis)
       if (cancelado.current) return
       if (inf.error) {
+        setErrorTipo(inf.error === 'sin_voz' ? 'sin_voz' : 'otro')
         setError(inf.mensaje || 'No pudimos analizar la grabación.')
         setEtapa('error')
         return
@@ -306,6 +298,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       setCompasAbierto(null)
       setEtapa('informe')
     } catch (e) {
+      setErrorTipo('otro')
       setError('Ocurrió un error al analizar la grabación. Probá de nuevo.')
       setEtapa('error')
     }
@@ -470,11 +463,40 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   } else if (etapa === 'analizando') {
     cuerpo = <div style={{ textAlign: 'center', padding: '30px 0', color: '#5F5E5A', fontSize: '14px' }}>Analizando tu grabación…</div>
   } else if (etapa === 'error') {
+    const info = {
+      mic: {
+        icono: '🎤', titulo: 'No pudimos usar el micrófono',
+        texto: 'Para grabarte necesitamos acceso al micrófono.',
+        consejos: ['Permití el micrófono para este sitio (en el candado o el ícono de la barra de direcciones).', 'Cerrá otras apps que estén usando el micrófono.'],
+      },
+      sin_voz: {
+        icono: '🔇', titulo: 'No se oyó tu voz',
+        texto: 'La grabación no tenía voz suficiente para armar el informe.',
+        consejos: ['Cantá a un volumen cómodo y cerca del micrófono.', 'Probá en un lugar sin ruido de fondo.', 'Revisá que el micrófono no esté tapado ni silenciado.'],
+      },
+      otro: {
+        icono: '⚠️', titulo: 'No pudimos analizar la grabación',
+        texto: error || 'Ocurrió un problema inesperado.',
+        consejos: ['Probá de nuevo con el mismo fragmento o con uno más corto.'],
+      },
+    }[errorTipo] || { icono: '⚠️', titulo: 'Algo salió mal', texto: error, consejos: [] }
     cuerpo = (
-      <>
-        <p style={{ fontSize: '14px', color: '#A32D2D' }}>{error}</p>
-        <button style={boton(true)} onClick={repetir}>Volver</button>
-      </>
+      <div style={{ textAlign: 'center', padding: '6px 4px 2px' }}>
+        <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: COLOR.rojo.suave, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', margin: '4px auto 12px' }}>
+          {info.icono}
+        </div>
+        <div style={{ fontSize: '17px', fontWeight: 700, color: '#1A1A18', marginBottom: '4px' }}>{info.titulo}</div>
+        <div style={{ fontSize: '14px', color: '#5F5E5A', lineHeight: 1.5, marginBottom: '14px' }}>{info.texto}</div>
+        {info.consejos.length > 0 && (
+          <ul style={{ textAlign: 'left', margin: '0 0 16px', padding: '10px 12px 10px 28px', background: '#F7F6F1', borderRadius: '10px', fontSize: '13px', color: '#3D3D3A', lineHeight: 1.5 }}>
+            {info.consejos.map((x, i) => <li key={i} style={{ marginBottom: i < info.consejos.length - 1 ? '4px' : 0 }}>{x}</li>)}
+          </ul>
+        )}
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button style={boton(true)} onClick={repetir}>Probar de nuevo</button>
+          <button style={boton(false)} onClick={cerrar}>Cerrar</button>
+        </div>
+      </div>
     )
   } else if (etapa === 'informe' && informe) {
     const r = informe.resumen
@@ -633,7 +655,7 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
   if (!compacto) {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(26,26,24,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-        <div ref={hojaRef} style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', padding: '18px 18px 20px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+        <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '100%', maxWidth: '560px', maxHeight: '92vh', overflowY: 'auto', padding: '18px 18px 20px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
             <div>
               <div onClick={tocarTitulo} style={{ fontSize: '16px', fontWeight: 700, color: '#1A1A18' }}>Grabarme y ver informe</div>
@@ -646,16 +668,34 @@ export default function InformeAfinacionPanel({ partitura, voz, titulo, onCerrar
       </div>
     )
   }
+  const encabezado = (
+    <div style={{ fontSize: '11px', color: '#8A8878', marginBottom: '6px' }}>
+      Compases {desde} a {hasta} · {[titulo, voz?.nombre].filter(Boolean).join(' · ')}
+    </div>
+  )
+  // Anclada al bloque del reproductor: tapa entero su panel de reproducción (queda toda la partitura a la vista).
+  if (anclaHoja) {
+    return createPortal(
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60, boxSizing: 'border-box',
+        minHeight: alturaCubrir || undefined, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        background: '#FFFFFF', borderTop: '1px solid #E8E6DF', boxShadow: '0 -4px 14px rgba(26,26,24,0.08)',
+        padding: '12px 18px', paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+      }}>
+        {encabezado}
+        {cuerpo}
+      </div>,
+      anclaHoja,
+    )
+  }
   return (
     <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 60, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-      <div ref={hojaRef} style={{
+      <div style={{
         pointerEvents: 'auto', background: '#FFFFFF', width: '100%', maxWidth: '640px',
         borderRadius: '16px 16px 0 0', boxShadow: '0 -6px 28px rgba(0,0,0,0.22)', borderTop: '1px solid #E8E6DF',
         padding: '10px 16px', paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
       }}>
-        <div style={{ fontSize: '11px', color: '#8A8878', marginBottom: '6px' }}>
-          Compases {desde} a {hasta} · {[titulo, voz?.nombre].filter(Boolean).join(' · ')}
-        </div>
+        {encabezado}
         {cuerpo}
       </div>
     </div>

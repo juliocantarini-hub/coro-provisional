@@ -118,7 +118,9 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   const [ayudaAfinacionAbierta, setAyudaAfinacionAbierta] = useState(false)
   // "Grabarme y ver informe": panel para grabar un fragmento y recibir un informe
   const [informeAbierto, setInformeAbierto] = useState(false)
-  const [alturaInforme, setAlturaInforme] = useState(0) // alto de la hoja del informe (pegada abajo): la partitura deja ese lugar para poder leerla entera
+  const [bloque, setBloque] = useState(null) // el bloque del reproductor: la hoja de grabación se ancla ahí
+  const controlesRef = useRef(null)
+  const [alturaControles, setAlturaControles] = useState(0) // alto del panel de reproducción (la hoja de grabación lo tapa entero)
 
   // Menú flotante de velocidad (se abre con el ícono de hamburguesa, en vez de
   // tener las 5 opciones siempre expuestas en la barra de controles) y, por
@@ -308,6 +310,23 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
       else break
     }
     return irAPosicionMusical(posicionMusical)
+  }
+
+  // Muestra (y lleva a la vista) el compás indicado: mueve solo el cursor de la partitura, sin tocar el audio.
+  useEffect(() => {
+    const el = controlesRef.current
+    if (!el) return undefined
+    const medir = () => setAlturaControles(Math.round(el.getBoundingClientRect().height))
+    medir()
+    let ro = null
+    try { ro = new ResizeObserver(medir); ro.observe(el) } catch { /* sin ResizeObserver */ }
+    return () => { try { ro?.disconnect() } catch { /* nada */ } }
+  }, [informeAbierto, partituraParseada])
+
+  function mostrarCompas(numero) {
+    if (!partituraParseada || reproduciendo) return
+    const m = (partituraParseada.medidas || []).find((x) => String(x.numero) === String(numero))
+    if (m && velocidad > 0) setTiempoActual(m.tiempo / velocidad)
   }
 
   // Botones "compás anterior" / "compás siguiente": saltan al principio del
@@ -680,12 +699,12 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
   // altura disponible del contenedor en vez de una altura fija acotada.
   return (
     <div style={{
-      background: '#F8F7F3', border: pantallaCompleta ? 'none' : '1px solid #E8E6DF',
+      position: 'relative', background: '#F8F7F3', border: pantallaCompleta ? 'none' : '1px solid #E8E6DF',
       borderRadius: pantallaCompleta ? 0 : '12px', overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
       height: pantallaCompleta ? '100%' : 'min(72vh, 640px)',
-    }}>
-      <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px', paddingBottom: alturaInforme ? `${alturaInforme + 12}px` : '12px' }}>
+    }} ref={setBloque}>
+      <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '18px 18px 12px' }}>
         <PartituraVisual
           musicxml={partitura.musicxml}
           tiempos={partituraParseada.tiempos}
@@ -702,7 +721,7 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
           propia, siempre visible como un único bloque pegado abajo. Mostrar u
           oír las demás voces quedó afuera: para eso ya está Repertorio, que
           tiene la partitura y el audio completos con todas las voces. */}
-      <div style={{ flex: '0 0 auto', boxShadow: '0 -4px 10px rgba(26,26,24,0.05)' }}>
+      <div ref={controlesRef} style={{ flex: '0 0 auto', boxShadow: '0 -4px 10px rgba(26,26,24,0.05)' }}>
         <div style={{ padding: '14px 18px 4px', borderTop: '1px solid #E8E6DF' }}>
           {/* Área de toque más alta que la barra visual (3px es muy fino para
               tocar con el dedo) — permite ir directo a un punto de la partitura
@@ -990,8 +1009,10 @@ export default function PartituraPlayer({ partitura, pantallaCompleta, onVoz }) 
               partitura={partituraParseada}
               voz={vozPropia}
               titulo={partitura.titulo}
-              onCerrar={() => { setInformeAbierto(false); setAlturaInforme(0) }}
-              onAltura={setAlturaInforme}
+              onCerrar={() => setInformeAbierto(false)}
+              anclaHoja={bloque}
+              alturaCubrir={alturaControles}
+              onIrACompas={mostrarCompas}
             />
           )}
 
