@@ -10,6 +10,7 @@ import RitmoEntrenamiento from '../../components/RitmoEntrenamiento'
 import AuditivaEntrenamiento from '../../components/AuditivaEntrenamiento'
 import BotonVolver from '../../components/BotonVolver'
 import { useRitmoProgreso } from '../../hooks/useRitmoProgreso'
+import { useRitmoDictadoProgreso } from '../../hooks/useRitmoDictadoProgreso'
 import { useAuditivaProgreso } from '../../hooks/useAuditivaProgreso'
 
 function useEsMovil() {
@@ -152,6 +153,7 @@ export default function Entrenamiento() {
   const { partituras, cargando: cargandoPartituras } = usePartituras()
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
   const ritmo = useRitmoProgreso()
+  const ritmoDictado = useRitmoDictadoProgreso()
   const auditiva = useAuditivaProgreso()
   const [seccion, setSeccion] = useState(null) // null = pantalla de inicio con las tarjetas
   // Tocar "Entrenamiento" en el menú estando adentro de una sección vuelve a la pantalla de inicio:
@@ -302,7 +304,7 @@ export default function Entrenamiento() {
       )}
 
       {/* Ritmo */}
-      {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} onSalir={() => setSeccion(null)} />}
+      {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} progDictado={ritmoDictado} onSalir={() => setSeccion(null)} />}
 
       {/* Práctica auditiva */}
       {seccion === 'auditiva' && <AuditivaEntrenamiento prog={auditiva} voz={perfil?.voz} onSalir={() => setSeccion(null)} />}

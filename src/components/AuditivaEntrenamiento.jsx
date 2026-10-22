@@ -122,6 +122,7 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
   const [revelado, setRevelado] = useState(false)
   const [reintento, setReintento] = useState(false) // esta pregunta ya se respondió una vez
   const [sonando, setSonando] = useState(false)
+  const [rotulo, setRotulo] = useState(null) // 'Escala' | 'Melodía' mientras suena esa parte del dictado
   const [notaActiva, setNotaActiva] = useState(-1)
   const [sinAudio, setSinAudio] = useState(false)
   const [ayuda, setAyuda] = useState(leerAyuda)
@@ -157,13 +158,20 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
     if (fase === 'pregunta') escuchar(false)
   }, [fase, idx]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function reproducir(notas, conIluminado = false) {
+  function reproducir(notas, conIluminado = false, rotulos = null) {
     const turno = ++turnoRef.current
     limpiarTemporizadores()
-    setSonando(true); setSinAudio(false); setNotaActiva(-1)
+    setSonando(true); setSinAudio(false); setNotaActiva(-1); setRotulo(null)
     tocarNotas(notas)
-      .then(() => { if (turno === turnoRef.current) { setSonando(false); setNotaActiva(-1) } })
-      .catch(() => { if (turno === turnoRef.current) { setSonando(false); setSinAudio(true) } })
+      .then(() => { if (turno === turnoRef.current) { setSonando(false); setNotaActiva(-1); setRotulo(null) } })
+      .catch(() => { if (turno === turnoRef.current) { setSonando(false); setSinAudio(true); setRotulo(null) } })
+    if (rotulos) {
+      // Rótulos que titilan en el espacio en blanco mientras suena cada parte: [{ texto, desde, hasta }] en segundos
+      rotulos.forEach((r) => {
+        temporizadoresRef.current.push(setTimeout(() => { if (turno === turnoRef.current) setRotulo(r.texto) }, r.desde * 1000))
+        temporizadoresRef.current.push(setTimeout(() => { if (turno === turnoRef.current) setRotulo((x) => (x === r.texto ? null : x)) }, r.hasta * 1000))
+      })
+    }
     if (conIluminado) {
       notas.forEach((n, i) => {
         temporizadoresRef.current.push(setTimeout(() => { if (turno === turnoRef.current) setNotaActiva(i) }, n.inicio * 1000 + 120))
@@ -175,19 +183,27 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
     const p = pRef.current
     if (!p) return
     let notas = p.notas
+    let rotulos = null
+    const finDe = (lista) => lista.reduce((m, n) => Math.max(m, n.inicio + n.duracion), 0)
     if (p.tipo === 'dictado' && !soloMelodia) {
       const desfase = p.escala.length * 0.45 + 0.7
       notas = [...p.escala, ...p.notas.map((n) => ({ ...n, inicio: n.inicio + desfase }))]
+      rotulos = [{ texto: 'Escala', desde: 0, hasta: finDe(p.escala) + 0.3 }, { texto: 'Melodía', desde: desfase, hasta: desfase + finDe(p.notas) + 0.3 }]
+    } else if (p.tipo === 'dictado') {
+      rotulos = [{ texto: 'Melodía', desde: 0, hasta: finDe(p.notas) + 0.3 }]
     }
-    reproducir(notas, p.tipo === 'eco')
+    reproducir(notas, p.tipo === 'eco', rotulos)
   }
 
-  const tocarEscala = () => reproducir(pRef.current.escala)
+  const tocarEscala = () => {
+    const esc = pRef.current.escala
+    reproducir(esc, false, [{ texto: 'Escala', desde: 0, hasta: esc.reduce((m, n) => Math.max(m, n.inicio + n.duracion), 0) + 0.3 }])
+  }
 
   const tocarGrado = (g) => {
     ++turnoRef.current
     limpiarTemporizadores()
-    setSonando(false)
+    setSonando(false); setRotulo(null)
     tocarNotas([{ midi: midiDePaso(pRef.current.grafiaEscala[g].paso), inicio: 0, duracion: 0.55 }], { cola: 0.1 }).catch(() => setSinAudio(true))
   }
 
@@ -239,7 +255,7 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
   }
 
   const siguiente = () => {
-    detenerAudio(); ++turnoRef.current; limpiarTemporizadores(); setSonando(false); setNotaActiva(-1)
+    detenerAudio(); ++turnoRef.current; limpiarTemporizadores(); setSonando(false); setNotaActiva(-1); setRotulo(null)
     // Un eco salteado cuenta como cero
     const cero = (p) => ({ puntos: 0, total: p.tipo === 'dictado' ? p.grados.length : p.tipo === 'eco' ? p.notas.length : 1 })
     const res = resultados.slice()
@@ -253,7 +269,7 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
 
   // ─── Cantar (eco) ───
   const empezarCanto = async () => {
-    detenerAudio(); ++turnoRef.current; limpiarTemporizadores(); setSonando(false); setNotaActiva(-1)
+    detenerAudio(); ++turnoRef.current; limpiarTemporizadores(); setSonando(false); setNotaActiva(-1); setRotulo(null)
     setErrEco(null); setInformeEco(null)
     let g
     try { g = await iniciarGrabacion() } catch (e) { setErrEco(mensajeMic(e)); return }
@@ -481,6 +497,18 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
         <div style={{ textAlign: 'center', fontSize: '15px', color: '#1A1A18', fontWeight: 600 }}>
           {revelado ? 'Tu respuesta' : enPentagrama ? 'Ubicá cada nota en el pentagrama' : 'Armá la melodía, nota por nota'}
         </div>
+        {!revelado && (
+          <div aria-live="polite" style={{ height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {rotulo && (
+              <span key={rotulo} style={{
+                padding: '3px 16px', borderRadius: '999px', fontSize: '15px', fontWeight: 700, letterSpacing: '0.3px',
+                background: rotulo === 'Escala' ? '#E1F5EE' : '#EEEAF9', color: rotulo === 'Escala' ? '#04342C' : '#4A3A92',
+                animation: 'auditivaTitila 0.7s ease-in-out infinite',
+              }}>{rotulo === 'Escala' ? '🎼 Escala' : '🎵 Melodía'}</span>
+            )}
+          </div>
+        )}
+        <style>{'@keyframes auditivaTitila{0%,100%{opacity:1}50%{opacity:0.25}}'}</style>
         <div style={{ ...tarjeta, padding: '6px 6px' }}>
           <Pentagrama clave={p.clave} ls={enPentagrama && !revelado ? 15 : 12} descripcion="Tu melodía en el pentagrama"
             pasoVacio={pasoTonica} pasoMin={enPentagrama && !revelado ? pasoTonica : undefined} pasoMax={enPentagrama && !revelado ? pasoTonica + p.max - 1 : undefined}

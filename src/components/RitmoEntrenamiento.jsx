@@ -6,57 +6,9 @@ import {
 import { crearMotorRitmo, precargarPiano } from '../lib/ritmoAudio'
 import RitmoPartitura, { COLOR_ESTADO } from './RitmoPartitura'
 import BotonVolver from './BotonVolver'
-
-const VERDE = '#0F6E56'
-const DORADO = '#E9A91B'
-
-function Estrellas({ n, max = 3, size = 14 }) {
-  return (
-    <span aria-label={`${n} de ${max} estrellas`} style={{ whiteSpace: 'nowrap' }}>
-      {Array.from({ length: max }, (_, i) => (
-        <span key={i} style={{ fontSize: `${size}px`, color: i < n ? DORADO : '#D3D1C7' }}>★</span>
-      ))}
-    </span>
-  )
-}
-
-const boton = (primario, extra = {}) => ({
-  flex: '1 1 0', minWidth: 0, padding: '13px 10px', borderRadius: '12px', cursor: 'pointer',
-  fontSize: '14px', fontWeight: 600,
-  border: primario ? 'none' : `1px solid ${VERDE}`,
-  background: primario ? VERDE : '#FFFFFF',
-  color: primario ? '#FFFFFF' : VERDE,
-  ...extra,
-})
-
-// Los tiempos del compás, para seguirlos mientras suena: se enciende el pulso que está sonando
-function ContadorPulsos({ ej, pulso }) {
-  const ppc = ej.pulsosPorCompas
-  const enCurso = pulso >= 0
-  const enCompas = enCurso ? pulso % ppc : -1
-  const compas = enCurso ? Math.floor(pulso / ppc) + 1 : null
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '2px' }}>
-      <div style={{ fontSize: '10px', color: '#B4B2A9', minWidth: '70px', textAlign: 'right' }}>
-        {compas ? `Compás ${compas} de ${ej.compases.length}` : ' '}
-      </div>
-      <div style={{ display: 'flex', gap: '6px' }}>
-        {Array.from({ length: ppc }, (_, i) => {
-          const activo = i === enCompas
-          return (
-            <div key={i} style={{
-              width: '24px', height: '24px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '12px', fontWeight: 600, transition: 'background 80ms, color 80ms',
-              background: activo ? (i === 0 ? '#F0DDB0' : '#CDE7DC') : '#EFEDE4',
-              color: activo ? (i === 0 ? '#8A6D1D' : VERDE) : '#CFCDC2',
-            }}>{i + 1}</div>
-          )
-        })}
-      </div>
-      <div style={{ minWidth: '70px' }} />
-    </div>
-  )
-}
+import { VERDE, Estrellas, boton, ContadorPulsos } from './RitmoUI'
+import PantallaDictadoRitmo from './RitmoDictado'
+import { NIVELES_DICTADO, nivelDictado, modoDeEjercicio } from '../lib/ritmoDictado'
 
 // ─── Pantalla de un ejercicio ──────────────────────────────────────────────
 
@@ -349,8 +301,8 @@ function FilaNivel({ nivel, info, anterior, onAbrir }) {
   )
 }
 
-function ListaEjercicios({ nivelId, prog, onVolver, onElegir }) {
-  const nivel = nivelPorId(nivelId)
+function ListaEjercicios({ nivelId, prog, onVolver, onElegir, dictado = false }) {
+  const nivel = dictado ? nivelDictado(nivelId) : nivelPorId(nivelId)
   const info = prog.estado[nivelId - 1]
   return (
     <div>
@@ -373,7 +325,10 @@ function ListaEjercicios({ nivelId, prog, onVolver, onElegir }) {
               padding: '13px 14px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
             }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: 500, color: '#1A1A18' }}>Ejercicio {n}</div>
+                <div style={{ fontSize: '14px', fontWeight: 500, color: '#1A1A18' }}>
+                  Ejercicio {n}
+                  {dictado && <span style={{ fontWeight: 400, color: '#888780' }}>{modoDeEjercicio(n) === 'oido' ? ' · 👂 escuchar y tocar' : ' · ✍️ escuchar y escribir'}</span>}
+                </div>
                 <div style={{ fontSize: '12px', color: '#888780' }}>
                   {fila ? `Mejor: ${fila.mejor_pct} % · ${fila.intentos} ${fila.intentos === 1 ? 'intento' : 'intentos'}` : 'Todavía no lo hiciste'}
                 </div>
@@ -388,11 +343,27 @@ function ListaEjercicios({ nivelId, prog, onVolver, onElegir }) {
   )
 }
 
-export default function RitmoEntrenamiento({ prog, onSalir }) {
+function Pestana({ activa, onClick, titulo, estrellas }) {
+  return (
+    <button onClick={onClick} style={{
+      flex: '1 1 0', minWidth: 0, padding: '10px 8px', borderRadius: '12px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+      border: `1px solid ${activa ? VERDE : '#D3D1C7'}`, background: activa ? VERDE : '#FFFFFF', color: activa ? '#FFFFFF' : '#5F5E5A',
+    }}>
+      {titulo}
+      <span style={{ display: 'block', fontSize: '11px', fontWeight: 500, opacity: 0.85 }}>★ {estrellas}</span>
+    </button>
+  )
+}
+
+export default function RitmoEntrenamiento({ prog, progDictado = null, onSalir }) {
+  const [modo, setModo] = useState('tocar') // 'tocar' (marcar el ritmo) | 'dictado'
   const [nivelSel, setNivelSel] = useState(null)
   const [ejercicio, setEjercicio] = useState(null) // { nivel, numero }
+  const dictado = modo === 'dictado' && progDictado != null
+  const pg = dictado ? progDictado : prog
+  const niveles = dictado ? NIVELES_DICTADO : NIVELES
 
-  if (prog.cargando) {
+  if (prog.cargando || (progDictado && progDictado.cargando)) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {[1, 2, 3].map((i) => <div key={i} style={{ height: '70px', background: '#F1EFE8', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite' }} />)}
@@ -401,38 +372,58 @@ export default function RitmoEntrenamiento({ prog, onSalir }) {
     )
   }
 
+  const cambiarModo = (m) => { setModo(m); setNivelSel(null); setEjercicio(null) }
+
   return (
     <div>
       {nivelSel == null ? (
         <>
           <BotonVolver texto="Entrenamiento" onClick={onSalir} />
+          {progDictado && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <Pestana activa={!dictado} onClick={() => cambiarModo('tocar')} titulo="🥁 Marcar el ritmo" estrellas={prog.estrellas} />
+              <Pestana activa={dictado} onClick={() => cambiarModo('dictado')} titulo="👂 Dictados rítmicos" estrellas={progDictado.estrellas} />
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#FBF3DF', border: '1px solid #E8DBAE', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px' }}>
             <div style={{ fontSize: '13px', color: '#8A6D1D', lineHeight: 1.4 }}>
-              Escuchá, mirá la partitura y marcá el ritmo. Aprobando 3 ejercicios se abre el nivel siguiente.
+              {dictado
+                ? 'Escuchá un ritmo y repetilo: tocándolo de oído o escribiéndolo con figuras. Aprobando 3 ejercicios se abre el nivel siguiente.'
+                : 'Escuchá, mirá la partitura y marcá el ritmo. Aprobando 3 ejercicios se abre el nivel siguiente.'}
             </div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#8A6D1D', whiteSpace: 'nowrap' }}>★ {prog.estrellas}</div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#8A6D1D', whiteSpace: 'nowrap' }}>★ {pg.estrellas}</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {NIVELES.map((n, i) => (
-              <FilaNivel key={n.id} nivel={n} info={prog.estado[i]} anterior={NIVELES[i - 1]} onAbrir={() => setNivelSel(n.id)} />
+            {niveles.map((n, i) => (
+              <FilaNivel key={n.id} nivel={n} info={pg.estado[i]} anterior={niveles[i - 1]} onAbrir={() => setNivelSel(n.id)} />
             ))}
           </div>
-          {prog.soloLocal && (
+          {pg.soloLocal && (
             <div style={{ marginTop: '12px', fontSize: '11px', color: '#888780', textAlign: 'center' }}>
               Tu progreso se está guardando en este dispositivo.
             </div>
           )}
         </>
       ) : (
-        <ListaEjercicios nivelId={nivelSel} prog={prog} onVolver={() => setNivelSel(null)} onElegir={(n) => setEjercicio({ nivel: nivelSel, numero: n })} />
+        <ListaEjercicios nivelId={nivelSel} prog={pg} dictado={dictado} onVolver={() => setNivelSel(null)} onElegir={(n) => setEjercicio({ nivel: nivelSel, numero: n })} />
       )}
 
-      {ejercicio && (
+      {ejercicio && !dictado && (
         <PantallaEjercicio
           key={`${ejercicio.nivel}-${ejercicio.numero}`}
           nivelId={ejercicio.nivel}
           numero={ejercicio.numero}
           prog={prog}
+          onCerrar={() => setEjercicio(null)}
+          onIr={(sig) => { setNivelSel(sig.nivel); setEjercicio(sig) }}
+        />
+      )}
+      {ejercicio && dictado && (
+        <PantallaDictadoRitmo
+          key={`d-${ejercicio.nivel}-${ejercicio.numero}`}
+          nivelId={ejercicio.nivel}
+          numero={ejercicio.numero}
+          prog={progDictado}
           onCerrar={() => setEjercicio(null)}
           onIr={(sig) => { setNivelSel(sig.nivel); setEjercicio(sig) }}
         />

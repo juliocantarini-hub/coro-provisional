@@ -132,26 +132,34 @@ export function armarEjercicio(nivelId, numero) {
   const nivel = nivelPorId(nivelId)
   const base = nivel?.ejercicios[numero - 1]
   if (!base) return null
-  const [pulsosPorCompas, tipoPulso] = nivel.compas
-  const compases = base.c.split('|').map(leerCompas)
-  const pulsoSeg = 60 / base.tempo
+  return construirEjercicio({
+    nivel: nivelId, numero, tempo: base.tempo, pulsosPorCompas: nivel.compas[0], tipoPulso: nivel.compas[1],
+    compases: base.c.split('|').map(leerCompas), titulo: `${nivel.nombre} · ejercicio ${numero}`,
+  })
+}
+
+/**
+ * Arma un ejercicio a partir de compases ya leídos: [[{ dur, silencio }]] (un arreglo de figuras por compás).
+ * Lo usan los ejercicios de Ritmo y los dictados rítmicos.
+ */
+export function construirEjercicio({ nivel, numero, tempo, pulsosPorCompas, tipoPulso, compases, titulo }) {
+  const pulsoSeg = 60 / tempo
   const entradas = [] // notas y silencios en orden
   const notas = []    // solo lo que hay que tocar
   let t = 0
   compases.forEach((fig, c) => {
     const suma = fig.reduce((s, f) => s + f.dur, 0)
-    if (Math.abs(suma - pulsosPorCompas) > EPS) throw new Error(`Nivel ${nivelId} ej. ${numero}, compás ${c + 1}: suma ${suma}, debía ser ${pulsosPorCompas}`)
+    if (Math.abs(suma - pulsosPorCompas) > EPS) throw new Error(`Nivel ${nivel} ej. ${numero}, compás ${c + 1}: suma ${suma}, debía ser ${pulsosPorCompas}`)
     for (const f of fig) {
-      const e = { compas: c + 1, dur: f.dur, silencio: f.silencio, inicioPulsos: t, inicioSeg: t * pulsoSeg, durSeg: f.dur * pulsoSeg }
+      const e = { compas: c + 1, dur: f.dur, silencio: !!f.silencio, inicioPulsos: t, inicioSeg: t * pulsoSeg, durSeg: f.dur * pulsoSeg }
       entradas.push(e)
       if (!f.silencio) { e.indiceNota = notas.length; notas.push(e) }
       t += f.dur
     }
   })
   return {
-    nivel: nivelId, numero, tempo: base.tempo, pulsoSeg, pulsosPorCompas, tipoPulso, compases,
-    entradas, notas, duracionPulsos: t, duracionSeg: t * pulsoSeg,
-    titulo: `${nivel.nombre} · ejercicio ${numero}`,
+    nivel, numero, tempo, pulsoSeg, pulsosPorCompas, tipoPulso, compases,
+    entradas, notas, duracionPulsos: t, duracionSeg: t * pulsoSeg, titulo,
   }
 }
 
