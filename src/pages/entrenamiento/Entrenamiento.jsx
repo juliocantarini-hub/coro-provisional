@@ -163,7 +163,7 @@ export default function Entrenamiento() {
       : 'Empezá por el nivel 1'
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       {/* En mobile "Buscá tu nota" flota fijo arriba a la derecha, a la misma
           altura que el botón de hamburguesa de AppLayout (fixed, top 12px) —
           así se mantiene la estética que ya tienen los demás coros. */}
@@ -182,7 +182,7 @@ export default function Entrenamiento() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {ejerciciosHoy > 0 && (
+          {!seccion && ejerciciosHoy > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#FBF3DF', border: '1px solid #E8DBAE', borderRadius: '20px', padding: '5px 12px' }}>
               <span style={{ fontSize: '16px' }}>⭐</span>
               <span style={{ fontSize: '13px', fontWeight: '600', color: '#8A6D1D' }}>

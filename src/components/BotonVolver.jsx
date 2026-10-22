@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 // Botón "volver" del entrenamiento. En el celular flota arriba a la derecha, en la misma línea que el
 // botón del menú (hamburguesa); en pantallas grandes (donde no hay hamburguesa) queda en línea,
-// arriba del contenido. Mismo tamaño y forma que las pestañas (Respiración, Resonancia…), sin borde.
+// arriba a la derecha, en la línea del título. Mismo tamaño y forma que las pestañas (Respiración, Resonancia…), sin borde.
 
 function useEsMovil() {
   const [esMovil, setEsMovil] = useState(window.innerWidth <= 768)
@@ -33,5 +33,7 @@ export default function BotonVolver({ texto, onClick }) {
       </div>
     )
   }
-  return <button onClick={onClick} style={{ ...base, marginBottom: '12px' }}>← {texto}</button>
+  // En pantallas grandes: arriba a la derecha de la página, en la línea del título
+  // (la página de Entrenamiento tiene position: relative)
+  return <button onClick={onClick} style={{ ...base, position: 'absolute', top: 0, right: 0, zIndex: 5 }}>← {texto}</button>
 }
