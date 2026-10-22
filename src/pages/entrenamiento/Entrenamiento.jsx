@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useEjerciciosEntrenamiento, useEjerciciosHoy } from '../../hooks/useEntrenamiento'
 import EjercicioPlayer from '../../components/EjercicioPlayer'
@@ -149,6 +150,10 @@ export default function Entrenamiento() {
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
   const ritmo = useRitmoProgreso()
   const [seccion, setSeccion] = useState(null) // null = pantalla de inicio con las tres tarjetas
+  // Tocar "Entrenamiento" en el menú estando adentro de una sección vuelve a la pantalla de inicio:
+  // el menú navega a la misma ruta, que no recarga la página pero sí cambia la clave de la ubicación
+  const ubicacion = useLocation()
+  useEffect(() => { setSeccion(null) }, [ubicacion.key])
   const [categoriaActiva, setCategoriaActiva] = useState('respiracion')
   const [pianoAbierto, setPianoAbierto] = useState(false)
   const esMovil = useEsMovil()
