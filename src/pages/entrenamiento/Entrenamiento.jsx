@@ -230,7 +230,7 @@ export default function Entrenamiento() {
             detalle={detalleRitmo}
             onClick={() => setSeccion('ritmo')} />
           <TarjetaSeccion icono="👂" titulo="Práctica auditiva" color="#6B58B8" bg="#EEEAF9"
-            descripcion="Entrená el oído: ¿sube o baja?, eco, saltos, acordes y melodías."
+            descripcion="Entrená el oído con el pentagrama: ¿cuál sonó?, eco, saltos, acordes y melodías."
             detalle={detalleAuditiva}
             onClick={() => setSeccion('auditiva')} />
         </div>

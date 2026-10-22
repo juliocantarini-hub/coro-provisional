@@ -2,7 +2,7 @@
 // No depende de React ni de la red: se puede probar en Node.
 //
 // Cinco tipos de ejercicio, en 12 niveles de 5 ejercicios cada uno:
-//   direccion  ¿Sube o baja?            (niveles 1-2)
+//   cual       ¿Cuál sonó? (2 notas escritas) (niveles 1-2)
 //   eco        Escuchá y cantá          (niveles 3-5)
 //   intervalo  Reconocé el salto        (niveles 6-7)
 //   acorde     Alegre, triste o tenso   (niveles 8-9)
@@ -10,6 +10,7 @@
 // Cada ejercicio se genera al azar cada vez que se hace (no se puede memorizar), dentro de los límites del nivel.
 
 import { midiANombre } from './afinacion'
+import { pasoNatural, midiDePaso, TONALIDADES, tonalidadDeMidi, grafiaDeGrado, claveSegun } from './notacion'
 import { APROBADO_PCT, EJERCICIOS_PARA_AVANZAR, EJERCICIOS_POR_NIVEL, ESTRELLAS_MAX, estrellasPara } from './ritmo'
 
 export { APROBADO_PCT, EJERCICIOS_PARA_AVANZAR, EJERCICIOS_POR_NIVEL, ESTRELLAS_MAX, estrellasPara }
@@ -49,12 +50,12 @@ export const ACORDES = {
 
 // ─── Niveles ───────────────────────────────────────────────────────────
 
-const PREGUNTAS = { direccion: 6, intervalo: 6, acorde: 6, dictado: 4, eco: 3 }
+const PREGUNTAS = { cual: 6, intervalo: 6, acorde: 6, dictado: 4, eco: 3 }
 
 export const NIVELES = [
-  { id: 1, tipo: 'direccion', nombre: '¿Sube o baja? Saltos grandes', descr: 'Suenan dos notas: ¿la segunda es más aguda o más grave?',
+  { id: 1, tipo: 'cual', nombre: '¿Cuál sonó? Notas lejanas', descr: 'En el pentagrama hay dos notas, una más aguda y otra más grave. Suena una: tocá la que escuchaste.',
     ejercicios: [{ saltos: [8, 12] }, { saltos: [7, 12] }, { saltos: [5, 9] }, { saltos: [5, 8] }, { saltos: [4, 7] }] },
-  { id: 2, tipo: 'direccion', nombre: '¿Sube o baja? Saltos chicos', descr: 'Lo mismo, pero las notas están más cerca. Escuchá con atención.',
+  { id: 2, tipo: 'cual', nombre: '¿Cuál sonó? Notas cercanas', descr: 'Lo mismo, pero las dos notas están más cerca. Escuchá con atención.',
     ejercicios: [{ saltos: [3, 5] }, { saltos: [2, 4] }, { saltos: [2, 3] }, { saltos: [1, 3] }, { saltos: [1, 2] }] },
   { id: 3, tipo: 'eco', nombre: 'Eco: dos notas', descr: 'Escuchás dos notas en el piano y las cantás.',
     ejercicios: [{ n: 2, pasos: [1, 1] }, { n: 2, pasos: [1, 2] }, { n: 2, pasos: [1, 2] }, { n: 2, pasos: [2, 3] }, { n: 2, pasos: [2, 4] }] },
@@ -90,42 +91,77 @@ const elegir = (rnd, lista) => lista[Math.floor(rnd() * lista.length)]
 const DUR_NOTA = 0.85
 const SEP = 1.0 // segundos entre el comienzo de una nota y la siguiente
 
-function preguntaDireccion(rnd, { saltos }) {
-  const salto = entero(rnd, saltos[0], saltos[1])
-  const sube = rnd() < 0.5
-  const base = sube ? entero(rnd, 52, 70 - salto) : entero(rnd, 56 + salto, 76)
-  const b = sube ? base + salto : base - salto
+const naturalesEntre = (a, b) => {
+  const r = []
+  for (let m = a; m <= b; m++) if (pasoNatural(m) != null) r.push(m)
+  return r
+}
+
+/** Dos notas escritas en el pentagrama (teclas blancas); suena una sola y hay que tocar la que sonó. */
+function preguntaCual(rnd, { saltos }) {
+  const nat = naturalesEntre(60, 79) // de Do4 a Sol5
+  const pares = []
+  for (const a of nat) for (const b of nat) if (b > a && b - a >= saltos[0] && b - a <= saltos[1]) pares.push([a, b])
+  const [a, b] = elegir(rnd, pares)
+  const orden = rnd() < 0.5 ? [a, b] : [b, a] // de izquierda a derecha, como se lee
+  const opciones = orden.map((m) => ({ midi: m, paso: pasoNatural(m), alter: 0 }))
+  const correcta = entero(rnd, 0, 1)
   return {
-    tipo: 'direccion',
-    notas: [{ midi: base, inicio: 0, duracion: DUR_NOTA }, { midi: b, inicio: SEP, duracion: DUR_NOTA }],
-    correcta: sube ? 'sube' : 'baja',
+    tipo: 'cual',
+    clave: 'sol',
+    opciones,
+    correcta,
+    notas: [{ midi: opciones[correcta].midi, inicio: 0, duracion: 1.3 }],
+    referencia: opciones.map((o, i) => ({ midi: o.midi, inicio: i * SEP, duracion: DUR_NOTA })),
   }
 }
+
+// Cuántas posiciones del pentagrama hay entre las dos notas de cada intervalo (la 2ª es la siguiente, la 3ª salta una, etc.)
+const PASOS_INTERVALO = { '2': 1, '3': 2, '4': 3, '5': 4, '8': 7 }
 
 function preguntaIntervalo(rnd, { pool }, baja) {
   const idElegido = elegir(rnd, pool)
   const it = INTERVALOS.find((i) => i.id === idElegido)
   const desciende = baja && rnd() < 0.5
-  const base = desciende ? entero(rnd, 53 + it.semitonos, 72) : entero(rnd, 52, 70 - it.semitonos)
-  const b = desciende ? base - it.semitonos : base + it.semitonos
+  // La nota de abajo es una tecla blanca (Do4 a La4) y la de arriba se escribe según el intervalo, con su alteración si hace falta
+  const grave = elegir(rnd, naturalesEntre(60, 69))
+  const pasoGrave = pasoNatural(grave)
+  const pasoAgudo = pasoGrave + PASOS_INTERVALO[it.id]
+  const agudo = grave + it.semitonos
+  const escritas = [{ paso: pasoGrave, alter: 0 }, { paso: pasoAgudo, alter: agudo - midiDePaso(pasoAgudo, 0) }]
+  const midis = [grave, agudo]
+  if (desciende) { escritas.reverse(); midis.reverse() }
   return {
     tipo: 'intervalo',
-    notas: [{ midi: base, inicio: 0, duracion: DUR_NOTA }, { midi: b, inicio: SEP, duracion: DUR_NOTA }],
+    clave: 'sol',
+    notas: midis.map((m, i) => ({ midi: m, inicio: i * SEP, duracion: DUR_NOTA })),
+    grafia: escritas,
     correcta: { id: it.id, baja: desciende },
     pool,
     conDireccion: !!baja,
   }
 }
 
+const RAICES_ACORDE = [60, 62, 64] // Do, Re y Mi: sus acordes se escriben sin sostenidos ni bemoles raros
+
 function preguntaAcorde(rnd, { tipos, inv }) {
   const tipo = elegir(rnd, tipos)
-  const raiz = entero(rnd, 48, 59)
-  let notas = ACORDES[tipo].notas.map((s) => raiz + s)
+  const raiz = elegir(rnd, RAICES_ACORDE)
+  const pasoRaiz = pasoNatural(raiz)
+  let notas = ACORDES[tipo].notas.map((s, i) => {
+    const paso = pasoRaiz + 2 * i
+    return { midi: raiz + s, paso, alter: raiz + s - midiDePaso(paso, 0) }
+  })
   const k = elegir(rnd, inv)
-  for (let i = 0; i < k; i++) notas = [...notas.slice(1), notas[0] + 12]
+  for (let i = 0; i < k; i++) {
+    const [primera, ...resto] = notas
+    notas = [...resto, { midi: primera.midi + 12, paso: primera.paso + 7, alter: primera.alter }]
+  }
   return {
     tipo: 'acorde',
-    notas: notas.map((m) => ({ midi: m, inicio: 0, duracion: 2.0 })),
+    clave: 'sol',
+    notas: notas.map((n) => ({ midi: n.midi, inicio: 0, duracion: 2.0 })),
+    grafia: notas.map((n) => ({ paso: n.paso, alter: n.alter })),
     correcta: tipo,
     tipos,
   }
@@ -147,20 +183,36 @@ function gradosDeFrase(rnd, n, pasos, maxGrado) {
   return g
 }
 
+/** Elige la tónica entre las notas de [lo, hi] que dan una tonalidad con pocas alteraciones (Do, Sol, Re, Fa, Si♭). */
+function elegirTonica(rnd, lo, hi) {
+  const candidatas = []
+  for (let m = lo; m <= hi; m++) if (tonalidadDeMidi(m)) candidatas.push(m)
+  if (!candidatas.length) for (let m = lo; m <= lo + 12; m++) if (tonalidadDeMidi(m)) candidatas.push(m)
+  return elegir(rnd, candidatas)
+}
+
 function preguntaEco(rnd, { n, pasos }, voz) {
   const [lo, hi] = rangoDeVoz(voz)
-  const raiz = entero(rnd, lo, Math.max(lo, hi - 12))
+  const raiz = elegirTonica(rnd, lo, Math.max(lo + 5, hi - 12))
+  const ton = tonalidadDeMidi(raiz)
   const grados = gradosDeFrase(rnd, n, pasos, 7)
+  const midis = grados.map((g) => midiDeGrado(raiz, g))
   return {
     tipo: 'eco',
-    notas: grados.map((g, i) => ({ midi: midiDeGrado(raiz, g), inicio: i * SEP, duracion: DUR_NOTA, nombre: midiANombre(midiDeGrado(raiz, g)), pulsoSeg: SEP })),
+    tonalidad: ton,
+    armadura: TONALIDADES[ton].armadura,
+    clave: claveSegun(midis),
+    raiz,
+    notas: grados.map((g, i) => ({ midi: midis[i], inicio: i * SEP, duracion: DUR_NOTA, nombre: midiANombre(midis[i]), pulsoSeg: SEP })),
+    grafia: grados.map((g) => grafiaDeGrado(ton, raiz, g)),
     grados,
   }
 }
 
-function preguntaDictado(rnd, { n, max, doInicio }) {
+function preguntaDictado(rnd, { n, max, doInicio }, numero) {
   const maxGrado = max - 1
-  const raiz = entero(rnd, 53, 62)
+  const raiz = elegirTonica(rnd, 53, 62)
+  const ton = tonalidadDeMidi(raiz)
   const grados = []
   for (let i = 0; i < n; i++) {
     let g
@@ -172,12 +224,20 @@ function preguntaDictado(rnd, { n, max, doInicio }) {
     grados.push(g)
   }
   const escala = Array.from({ length: max }, (_, g) => ({ midi: midiDeGrado(raiz, g), inicio: g * 0.45, duracion: 0.4 }))
+  const todos = [...Array(max).keys()].map((g) => midiDeGrado(raiz, g))
   return {
     tipo: 'dictado',
+    tonalidad: ton,
+    armadura: TONALIDADES[ton].armadura,
+    clave: claveSegun(todos),
+    // Los primeros ejercicios de cada nivel se arman con la escalera de colores; los últimos, ubicando las notas en el pentagrama
+    entrada: numero >= 4 ? 'pentagrama' : 'escalera',
     raiz,
     max,
     grados,
     escala,
+    grafiaEscala: Array.from({ length: max }, (_, g) => grafiaDeGrado(ton, raiz, g)),
+    grafia: grados.map((g) => grafiaDeGrado(ton, raiz, g)),
     notas: grados.map((g, i) => ({ midi: midiDeGrado(raiz, g), inicio: i * 0.9, duracion: 0.8 })),
   }
 }
@@ -191,11 +251,11 @@ export function armarEjercicio(nivelId, numero, { voz = null, rnd = Math.random 
   const preguntas = []
   for (let i = 0; i < cuantas; i++) {
     let p
-    if (nivel.tipo === 'direccion') p = preguntaDireccion(rnd, par)
+    if (nivel.tipo === 'cual') p = preguntaCual(rnd, par)
     else if (nivel.tipo === 'intervalo') p = preguntaIntervalo(rnd, par, nivel.baja)
     else if (nivel.tipo === 'acorde') p = preguntaAcorde(rnd, par)
     else if (nivel.tipo === 'eco') p = preguntaEco(rnd, par, voz)
-    else p = preguntaDictado(rnd, par)
+    else p = preguntaDictado(rnd, par, numero)
     preguntas.push(p)
   }
   return { nivel: nivelId, numero, tipo: nivel.tipo, titulo: `${nivel.nombre} · ejercicio ${numero}`, preguntas }
