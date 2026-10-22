@@ -149,10 +149,10 @@ export function crearMotorRitmo() {
   /**
    * Un compás de conteo y después el ejercicio, con el pulso sonando.
    * tonos: true → suena el ejemplo (escuchar); false → solo pulso, y se registran los toques (practicar).
-   * onConteo(n) en cada clic del conteo; onEntrada(i) cuando llega cada figura (nota o silencio); onFin() al terminar.
+   * onConteo(n) en cada clic del conteo; onPulso(b) en cada pulso del ejercicio (0, 1, 2…); onEntrada(i) cuando llega cada figura (nota o silencio); onFin() al terminar.
    * Devuelve { toques, tomarToque(perfMs), parar }.
    */
-  function correr(ej, { tonos = false, gracia = 0.45, onConteo, onEntrada, onFin } = {}) {
+  function correr(ej, { tonos = false, gracia = 0.45, onConteo, onPulso, onEntrada, onFin } = {}) {
     parar()
     const nodos = []
     const p = ej.pulsoSeg
@@ -180,6 +180,8 @@ export function crearMotorRitmo() {
     const eventos = []
     for (let k = 0; k < nConteo; k++) eventos.push({ t: t0 + k * p, f: () => onConteo && onConteo(k + 1) })
     ej.entradas.forEach((e, i) => eventos.push({ t: inicio + e.inicioSeg, f: () => onEntrada && onEntrada(i) }))
+    for (let b = 0; b < nPulsos; b++) eventos.push({ t: inicio + b * p, f: () => onPulso && onPulso(b) })
+    eventos.sort((a, c) => a.t - c.t)
     const fin = inicio + ej.duracionSeg + gracia
 
     let idx = 0

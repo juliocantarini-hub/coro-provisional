@@ -29,6 +29,36 @@ const boton = (primario, extra = {}) => ({
   ...extra,
 })
 
+// Los tiempos del compás, para seguirlos mientras suena: se enciende el pulso que está sonando
+function ContadorPulsos({ ej, pulso }) {
+  const ppc = ej.pulsosPorCompas
+  const enCurso = pulso >= 0
+  const enCompas = enCurso ? pulso % ppc : -1
+  const compas = enCurso ? Math.floor(pulso / ppc) + 1 : null
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '10px' }}>
+      <div style={{ fontSize: '11px', color: '#888780', minWidth: '64px', textAlign: 'right' }}>
+        {compas ? `Compás ${compas} de ${ej.compases.length}` : ' '}
+      </div>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {Array.from({ length: ppc }, (_, i) => {
+          const activo = i === enCompas
+          return (
+            <div key={i} style={{
+              width: '30px', height: '30px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '14px', fontWeight: 700, transition: 'background 60ms',
+              background: activo ? (i === 0 ? '#B5791B' : VERDE) : '#EAE7DD',
+              color: activo ? '#FFFFFF' : '#B4B2A9',
+              transform: activo ? 'scale(1.12)' : 'scale(1)',
+            }}>{i + 1}</div>
+          )
+        })}
+      </div>
+      <div style={{ minWidth: '64px' }} />
+    </div>
+  )
+}
+
 // ─── Pantalla de un ejercicio ──────────────────────────────────────────────
 
 function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
@@ -39,6 +69,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
   const [fase, setFase] = useState('listo') // listo | escuchando | practica | resultado
   const [conteo, setConteo] = useState(null)
   const [activa, setActiva] = useState(-1)
+  const [pulso, setPulso] = useState(-1)
   const [resultado, setResultado] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [pulsado, setPulsado] = useState(false)
@@ -73,7 +104,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
     const ok = await motorRef.current.asegurar()
     if (!ok) { setSinAudio(true); return }
     setSinAudio(false)
-    setResultado(null); setAviso(null); setActiva(-1)
+    setResultado(null); setAviso(null); setActiva(-1); setPulso(-1)
     const turno = ++turnoRef.current
     if (!practica) {
       // El ejemplo suena en piano; si todavía no bajó, se espera un momento (si no se puede, suena un tono simple)
@@ -87,9 +118,10 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
     ctlRef.current = motorRef.current.correr(ej, {
       tonos: !practica,
       onConteo: (n) => setConteo(n),
+      onPulso: (b) => setPulso(b),
       onEntrada: (i) => { setConteo(null); setActiva(i) },
       onFin: () => {
-        setActiva(-1); setConteo(null)
+        setActiva(-1); setConteo(null); setPulso(-1)
         if (practica) terminarIntento(ctlRef.current ? ctlRef.current.toques.slice() : [])
         else setFase('listo')
       },
@@ -100,7 +132,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
     turnoRef.current++
     setCargandoPiano(false)
     if (ctlRef.current) ctlRef.current.parar()
-    setFase('listo'); setActiva(-1); setConteo(null)
+    setFase('listo'); setActiva(-1); setConteo(null); setPulso(-1)
   }
 
   const tocar = useCallback((marca) => {
@@ -130,7 +162,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
   const estado = (() => {
     if (fase === 'escuchando' && cargandoPiano) return 'Preparando el sonido de piano…'
     if (fase === 'escuchando') return conteo != null ? `Contá con el pulso… ${conteo || ''}` : '🔊 Escuchá el ejemplo y seguí la partitura'
-    if (fase === 'practica') return conteo != null ? `Contá con el pulso y esperá… ${conteo || ''}` : '¡Ahora vos! Tocá el botón en cada sonido'
+    if (fase === 'practica') return conteo != null ? `Contá con el pulso y esperá… ${conteo || ''}` : '¡Ahora vos! Tocá el botón en cada nota'
     return null
   })()
 
@@ -176,7 +208,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
               <div style={{ fontWeight: 600, color: '#1A1A18', marginBottom: '4px' }}>{nivel.nombre}</div>
               <div style={{ marginBottom: '8px' }}>{nivel.descr}</div>
               <div>1. Tocá <b>Escuchar ejemplo</b> y mirá cómo se escribe.</div>
-              <div>2. Tocá <b>Marcar el ritmo</b>: hay un compás de conteo y después tocás el botón grande justo en cada sonido. En los silencios no toques.</div>
+              <div>2. Tocá <b>Marcar el ritmo</b>: hay un compás de conteo y después tocás el botón grande justo en cada nota. En los silencios no toques.</div>
               <div style={{ marginTop: '8px', color: '#888780', fontSize: '12px' }}>Con auriculares se oye mejor el pulso. Para aprobar necesitás {APROBADO_PCT} %.</div>
             </div>
           )}
@@ -191,7 +223,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
             <div style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {aviso?.sinToques ? (
                 <div style={{ fontSize: '14px', color: '#5F5E5A', lineHeight: 1.5 }}>
-                  No detectamos ningún toque. Tocá el botón grande (o la barra espaciadora) en cada sonido. Este intento no cuenta.
+                  No detectamos ningún toque. Tocá el botón grande (o la barra espaciadora) en cada nota. Este intento no cuenta.
                 </div>
               ) : (
                 <>
@@ -245,6 +277,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
               <button onClick={() => iniciar(true)} style={boton(true)}>🥁 Marcar el ritmo</button>
             </div>
           )}
+          {(fase === 'escuchando' || fase === 'practica') && <ContadorPulsos ej={ej} pulso={pulso} />}
           {fase === 'escuchando' && (
             <button onClick={detener} style={{ ...boton(false), width: '100%' }}>⏹ Detener</button>
           )}
