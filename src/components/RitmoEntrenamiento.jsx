@@ -5,6 +5,7 @@ import {
 } from '../lib/ritmo'
 import { crearMotorRitmo, precargarPiano } from '../lib/ritmoAudio'
 import RitmoPartitura, { COLOR_ESTADO } from './RitmoPartitura'
+import BotonVolver from './BotonVolver'
 
 const VERDE = '#0F6E56'
 const DORADO = '#E9A91B'
@@ -17,13 +18,6 @@ function Estrellas({ n, max = 3, size = 14 }) {
       ))}
     </span>
   )
-}
-
-// Botón "volver": en forma de píldora, con borde y fondo, para que se note
-export const botonVolver = {
-  display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px 8px 12px', marginBottom: '12px',
-  borderRadius: '20px', border: `1px solid ${VERDE}`, background: '#E1F5EE', color: '#04342C',
-  fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(26,26,24,0.08)',
 }
 
 const boton = (primario, extra = {}) => ({
@@ -328,7 +322,7 @@ function ListaEjercicios({ nivelId, prog, onVolver, onElegir }) {
   const info = prog.estado[nivelId - 1]
   return (
     <div>
-      <button onClick={onVolver} style={botonVolver}>← Todos los niveles</button>
+      <BotonVolver texto="Todos los niveles" onClick={onVolver} />
       <div style={{ marginBottom: '12px' }}>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1A1A18' }}>{nivel.id}. {nivel.nombre}</div>
         <div style={{ fontSize: '13px', color: '#888780' }}>{nivel.descr}</div>
@@ -362,7 +356,7 @@ function ListaEjercicios({ nivelId, prog, onVolver, onElegir }) {
   )
 }
 
-export default function RitmoEntrenamiento({ prog }) {
+export default function RitmoEntrenamiento({ prog, onSalir }) {
   const [nivelSel, setNivelSel] = useState(null)
   const [ejercicio, setEjercicio] = useState(null) // { nivel, numero }
 
@@ -379,6 +373,7 @@ export default function RitmoEntrenamiento({ prog }) {
     <div>
       {nivelSel == null ? (
         <>
+          <BotonVolver texto="Entrenamiento" onClick={onSalir} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#FBF3DF', border: '1px solid #E8DBAE', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px' }}>
             <div style={{ fontSize: '13px', color: '#8A6D1D', lineHeight: 1.4 }}>
               Escuchá, mirá la partitura y marcá el ritmo. Aprobando 3 ejercicios se abre el nivel siguiente.

@@ -5,7 +5,8 @@ import EjercicioPlayer from '../../components/EjercicioPlayer'
 import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
 import { usePartituras, usePartitura } from '../../hooks/usePartituras'
 import PartituraPlayer from '../../components/PartituraPlayer'
-import RitmoEntrenamiento, { botonVolver } from '../../components/RitmoEntrenamiento'
+import RitmoEntrenamiento from '../../components/RitmoEntrenamiento'
+import BotonVolver from '../../components/BotonVolver'
 import { useRitmoProgreso } from '../../hooks/useRitmoProgreso'
 
 function useEsMovil() {
@@ -166,7 +167,7 @@ export default function Entrenamiento() {
       {/* En mobile "Buscá tu nota" flota fijo arriba a la derecha, a la misma
           altura que el botón de hamburguesa de AppLayout (fixed, top 12px) —
           así se mantiene la estética que ya tienen los demás coros. */}
-      {esMovil && (
+      {esMovil && !seccion && (
         <div style={{ position: 'fixed', top: '12px', right: '16px', zIndex: 60 }}>
           <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
         </div>
@@ -189,17 +190,13 @@ export default function Entrenamiento() {
               </span>
             </div>
           )}
-          {!esMovil && <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />}
+          {!esMovil && !seccion && <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />}
         </div>
       </div>
 
-      <PianoInteractivo abierto={pianoAbierto} voz={perfil?.voz} />
+      {!seccion && <PianoInteractivo abierto={pianoAbierto} voz={perfil?.voz} />}
 
-      {seccion && (
-        <button onClick={() => setSeccion(null)} style={botonVolver}>
-          ← Entrenamiento
-        </button>
-      )}
+      {(seccion === 'tecnica' || seccion === 'obras') && <BotonVolver texto="Entrenamiento" onClick={() => setSeccion(null)} />}
 
       {/* Inicio: las tres tarjetas */}
       {!seccion && (
@@ -285,7 +282,7 @@ export default function Entrenamiento() {
       )}
 
       {/* Ritmo */}
-      {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} />}
+      {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} onSalir={() => setSeccion(null)} />}
     </div>
   )
 }
