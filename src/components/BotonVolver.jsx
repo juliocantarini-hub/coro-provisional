@@ -26,7 +26,7 @@ export default function BotonVolver({ texto, onClick }) {
     // Contenedor de la altura de la hamburguesa para que el botón quede centrado en su línea
     return (
       <div style={{
-        position: 'fixed', zIndex: 60, right: '16px', height: '40px', display: 'flex', alignItems: 'center',
+        position: 'fixed', zIndex: 30, right: '16px'  /* debajo del menú (40 = fondo oscuro, 50 = menú) */, height: '40px', display: 'flex', alignItems: 'center',
         top: 'calc(12px + env(safe-area-inset-top, 0px))',
       }}>
         <button onClick={onClick} style={base}>← {texto}</button>

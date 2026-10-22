@@ -168,7 +168,7 @@ export default function Entrenamiento() {
           altura que el botón de hamburguesa de AppLayout (fixed, top 12px) —
           así se mantiene la estética que ya tienen los demás coros. */}
       {esMovil && !seccion && (
-        <div style={{ position: 'fixed', top: '12px', right: '16px', zIndex: 60 }}>
+        <div style={{ position: 'fixed', top: '12px', right: '16px', zIndex: 30 }}>
           <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
         </div>
       )}
