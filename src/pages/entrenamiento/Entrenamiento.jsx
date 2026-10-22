@@ -5,6 +5,8 @@ import EjercicioPlayer from '../../components/EjercicioPlayer'
 import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
 import { usePartituras, usePartitura } from '../../hooks/usePartituras'
 import PartituraPlayer from '../../components/PartituraPlayer'
+import RitmoEntrenamiento from '../../components/RitmoEntrenamiento'
+import { useRitmoProgreso } from '../../hooks/useRitmoProgreso'
 
 function useEsMovil() {
   const [esMovil, setEsMovil] = useState(window.innerWidth <= 768)
@@ -23,8 +25,6 @@ const CATEGORIAS = {
 }
 
 const ORDEN_CATEGORIAS = ['respiracion', 'resonancia', 'vocalizacion']
-
-const PRACTICA = 'practica'
 
 function formatoTiempoPartitura(seg) {
   if (!seg || !isFinite(seg)) return ''
@@ -101,28 +101,71 @@ function PartituraCard({ resumen }) {
   )
 }
 
+function TarjetaSeccion({ icono, titulo, descripcion, detalle, color, bg, onClick }) {
+  return (
+    <div onClick={onClick}
+      style={{
+        background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '14px',
+        padding: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px',
+      }}>
+      <div style={{
+        width: '52px', height: '52px', borderRadius: '14px', flexShrink: 0, background: bg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px',
+      }}>{icono}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '17px', color: '#1A1A18', marginBottom: '2px' }}>{titulo}</div>
+        <div style={{ fontSize: '12px', color: '#888780', lineHeight: 1.4 }}>{descripcion}</div>
+        {detalle && <div style={{ fontSize: '12px', fontWeight: 600, color, marginTop: '4px' }}>{detalle}</div>}
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#B4B2A9" style={{ flexShrink: 0 }}>
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+    </div>
+  )
+}
+
+const SECCIONES = {
+  tecnica: { titulo: 'Técnica vocal', subtitulo: 'Respiración, resonancia y vocalización.' },
+  obras:   { titulo: 'Práctica de obras', subtitulo: 'Practicá tu voz en las obras del coro y mirá cómo te fue.' },
+  ritmo:   { titulo: 'Ritmo', subtitulo: 'Aprendé a leer y marcar el ritmo, nivel por nivel.' },
+}
+
+function Esqueleto({ cantidad = 3 }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {Array.from({ length: cantidad }, (_, i) => (
+        <div key={i} style={{ height: '90px', background: '#F1EFE8', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite' }} />
+      ))}
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+    </div>
+  )
+}
+
 export default function Entrenamiento() {
   const { perfil } = useAuth()
-  const { porCategoria, cargando, error, recargar } = useEjerciciosEntrenamiento()
+  const { ejercicios, porCategoria, cargando, error, recargar } = useEjerciciosEntrenamiento()
   const { partituras, cargando: cargandoPartituras } = usePartituras()
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
+  const ritmo = useRitmoProgreso()
+  const [seccion, setSeccion] = useState(null) // null = pantalla de inicio con las tres tarjetas
   const [categoriaActiva, setCategoriaActiva] = useState('respiracion')
   const [pianoAbierto, setPianoAbierto] = useState(false)
   const esMovil = useEsMovil()
 
-  const TABS = [
-    ...ORDEN_CATEGORIAS.map(cat => ({ id: cat, label: CATEGORIAS[cat]?.label || cat, icono: null })),
-    { id: PRACTICA, label: 'Práctica', icono: '🎤' },
-  ]
+  const TABS = ORDEN_CATEGORIAS.map(cat => ({ id: cat, label: CATEGORIAS[cat]?.label || cat }))
+
+  const nivelActual = ritmo.estado.find(n => n.abierto && !n.superado)?.id ?? ritmo.estado.length
+  const detalleRitmo = ritmo.cargando
+    ? null
+    : ritmo.estrellas > 0 || ritmo.filas.length > 0
+      ? `Nivel ${nivelActual} · ★ ${ritmo.estrellas}`
+      : 'Empezá por el nivel 1'
 
   return (
     <div>
       {/* En mobile "Buscá tu nota" flota fijo arriba a la derecha, a la misma
           altura que el botón de hamburguesa de AppLayout (fixed, top 12px) —
-          así se mantiene la estética que ya tienen los demás coros. Antes
-          vivía dentro de esta fila, junto al título, y en pantallas angostas
-          el flexWrap lo mandaba a una fila nueva debajo del título en vez de
-          quedar parejo con el menú. */}
+          así se mantiene la estética que ya tienen los demás coros. */}
       {esMovil && (
         <div style={{ position: 'fixed', top: '12px', right: '16px', zIndex: 60 }}>
           <BotonPiano abierto={pianoAbierto} onClick={() => setPianoAbierto(v => !v)} />
@@ -131,10 +174,10 @@ export default function Entrenamiento() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
-            Entrenamiento
+            {seccion ? SECCIONES[seccion].titulo : 'Entrenamiento'}
           </h2>
           <p style={{ fontSize: '13px', color: '#888780', margin: 0 }}>
-            Ejercicios de técnica vocal y práctica de tu voz en las obras.
+            {seccion ? SECCIONES[seccion].subtitulo : 'Elegí qué querés trabajar hoy.'}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -152,77 +195,84 @@ export default function Entrenamiento() {
 
       <PianoInteractivo abierto={pianoAbierto} voz={perfil?.voz} />
 
-      {/* Menú unificado: una sola fila con el mismo alto y tipografía para las
-          4 pestañas (antes "Practica tu voz" quedaba suelta en una fila aparte,
-          con otro estilo — ahora es una pestaña más del mismo grupo).
-          minWidth:'fit-content' obligaba a cada pestaña a no achicarse nunca
-          por debajo de su texto — con 4 pestañas eso no entraba en una
-          pantalla angosta y aparecía un scroll horizontal feo, con la última
-          pestaña cortada justo en el borde. Con minWidth:0 cada pestaña se
-          achica y trunca su texto si hace falta, así las 4 entran siempre sin
-          necesidad de scrollear. */}
-      <div style={{
-        display: 'flex', gap: '4px', background: '#EAE7DD', borderRadius: '22px',
-        padding: '4px', marginBottom: '16px',
-      }}>
-        {TABS.map(tab => {
-          const activa = categoriaActiva === tab.id
-          return (
-            <button key={tab.id} onClick={() => setCategoriaActiva(tab.id)} style={{
-              flex: '1 1 0', minWidth: 0, padding: '8px 6px', borderRadius: '18px',
-              border: 'none', cursor: 'pointer', fontSize: '12px',
-              fontWeight: activa ? '700' : '500',
-              background: activa ? '#FFFFFF' : 'transparent',
-              color: activa ? '#04342C' : '#5F5E5A',
-              boxShadow: activa ? '0 1px 3px rgba(26,26,24,0.12)' : 'none',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-            }}>
-              {tab.icono && <span style={{ flexShrink: 0 }}>{tab.icono}</span>}
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tab.label}</span>
-            </button>
-          )
-        })}
-      </div>
+      {seccion && (
+        <button onClick={() => setSeccion(null)}
+          style={{ background: 'none', border: 'none', color: '#0F6E56', fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '0 0 12px' }}>
+          ← Entrenamiento
+        </button>
+      )}
 
-      {error && categoriaActiva !== PRACTICA && (
-        <div style={{ background: '#FCEBEB', border: '1px solid #E24B4A', borderRadius: '8px', padding: '12px 14px', fontSize: '13px', color: '#501313', marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
-          {error}
-          <button onClick={recargar} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontWeight: '500', fontSize: '12px' }}>Reintentar</button>
+      {/* Inicio: las tres tarjetas */}
+      {!seccion && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <TarjetaSeccion icono="🌬️" titulo="Técnica vocal" color="#0F6E56" bg="#E1F5EE"
+            descripcion="Respiración, resonancia y vocalización."
+            detalle={!cargando && !error ? `${ejercicios.length} ${ejercicios.length === 1 ? 'ejercicio' : 'ejercicios'}` : null}
+            onClick={() => setSeccion('tecnica')} />
+          <TarjetaSeccion icono="🎤" titulo="Práctica de obras" color="#378ADD" bg="#E6F1FB"
+            descripcion="Practicá tu voz en las obras del coro y mirá tu informe."
+            detalle={!cargandoPartituras ? `${partituras.length} ${partituras.length === 1 ? 'obra' : 'obras'}` : null}
+            onClick={() => setSeccion('obras')} />
+          <TarjetaSeccion icono="🥁" titulo="Ritmo" color="#B5791B" bg="#FBF3DF"
+            descripcion="Escuchá, leé y marcá el ritmo. Se desbloquea nivel por nivel."
+            detalle={detalleRitmo}
+            onClick={() => setSeccion('ritmo')} />
         </div>
       )}
 
-      {categoriaActiva !== PRACTICA && cargando && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[1, 2, 3].map(i => (
-            <div key={i} style={{ height: '90px', background: '#F1EFE8', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-          ))}
-          <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
-        </div>
+      {/* Técnica vocal */}
+      {seccion === 'tecnica' && (
+        <>
+          <div style={{
+            display: 'flex', gap: '4px', background: '#EAE7DD', borderRadius: '22px',
+            padding: '4px', marginBottom: '16px',
+          }}>
+            {TABS.map(tab => {
+              const activa = categoriaActiva === tab.id
+              return (
+                <button key={tab.id} onClick={() => setCategoriaActiva(tab.id)} style={{
+                  flex: '1 1 0', minWidth: 0, padding: '8px 6px', borderRadius: '18px',
+                  border: 'none', cursor: 'pointer', fontSize: '12px',
+                  fontWeight: activa ? '700' : '500',
+                  background: activa ? '#FFFFFF' : 'transparent',
+                  color: activa ? '#04342C' : '#5F5E5A',
+                  boxShadow: activa ? '0 1px 3px rgba(26,26,24,0.12)' : 'none',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tab.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {error && (
+            <div style={{ background: '#FCEBEB', border: '1px solid #E24B4A', borderRadius: '8px', padding: '12px 14px', fontSize: '13px', color: '#501313', marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
+              {error}
+              <button onClick={recargar} style={{ background: 'none', border: 'none', color: '#A32D2D', cursor: 'pointer', fontWeight: '500', fontSize: '12px' }}>Reintentar</button>
+            </div>
+          )}
+
+          {cargando && <Esqueleto />}
+
+          {!cargando && !error && (
+            (porCategoria[categoriaActiva] || []).length === 0 ? (
+              <div style={{ fontSize: '13px', color: '#888780', padding: '30px 0', textAlign: 'center' }}>
+                Todavía no hay ejercicios cargados en esta categoría.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {porCategoria[categoriaActiva].map(ej => (
+                  <EjercicioPlayer key={ej.id} ejercicio={ej} />
+                ))}
+              </div>
+            )
+          )}
+        </>
       )}
 
-      {categoriaActiva !== PRACTICA && !cargando && !error && (
-        (porCategoria[categoriaActiva] || []).length === 0 ? (
-          <div style={{ fontSize: '13px', color: '#888780', padding: '30px 0', textAlign: 'center' }}>
-            Todavía no hay ejercicios cargados en esta categoría.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {porCategoria[categoriaActiva].map(ej => (
-              <EjercicioPlayer key={ej.id} ejercicio={ej} />
-            ))}
-          </div>
-        )
-      )}
-
-      {categoriaActiva === PRACTICA && (
-        cargandoPartituras ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[1, 2].map(i => (
-              <div key={i} style={{ height: '90px', background: '#F1EFE8', borderRadius: '12px', animation: 'pulse 1.5s ease-in-out infinite' }} />
-            ))}
-            <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
-          </div>
-        ) : partituras.length === 0 ? (
+      {/* Práctica de obras */}
+      {seccion === 'obras' && (
+        cargandoPartituras ? <Esqueleto cantidad={2} /> : partituras.length === 0 ? (
           <div style={{ fontSize: '13px', color: '#888780', padding: '30px 0', textAlign: 'center' }}>
             Todavía no hay obras cargadas para practicar por voz.
           </div>
@@ -234,6 +284,9 @@ export default function Entrenamiento() {
           </div>
         )
       )}
+
+      {/* Ritmo */}
+      {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} />}
     </div>
   )
 }

@@ -646,10 +646,16 @@ export default function PartiturasAdmin() {
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: 0 }}>
           Entrenamiento
         </h2>
-        <button onClick={() => navigate('/admin/informes-afinacion')}
-          style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-          🎤 Informes de afinación de los cantantes →
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={() => navigate('/admin/informes-afinacion')}
+            style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
+            🎤 Informes de afinación de los cantantes →
+          </button>
+          <button onClick={() => navigate('/admin/ritmo')}
+            style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
+            🥁 Ritmo de los cantantes →
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
