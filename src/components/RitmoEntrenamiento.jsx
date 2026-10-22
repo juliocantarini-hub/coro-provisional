@@ -36,25 +36,24 @@ function ContadorPulsos({ ej, pulso }) {
   const enCompas = enCurso ? pulso % ppc : -1
   const compas = enCurso ? Math.floor(pulso / ppc) + 1 : null
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '10px' }}>
-      <div style={{ fontSize: '11px', color: '#888780', minWidth: '64px', textAlign: 'right' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '2px' }}>
+      <div style={{ fontSize: '10px', color: '#B4B2A9', minWidth: '70px', textAlign: 'right' }}>
         {compas ? `Compás ${compas} de ${ej.compases.length}` : ' '}
       </div>
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '6px' }}>
         {Array.from({ length: ppc }, (_, i) => {
           const activo = i === enCompas
           return (
             <div key={i} style={{
-              width: '30px', height: '30px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '14px', fontWeight: 700, transition: 'background 60ms',
-              background: activo ? (i === 0 ? '#B5791B' : VERDE) : '#EAE7DD',
-              color: activo ? '#FFFFFF' : '#B4B2A9',
-              transform: activo ? 'scale(1.12)' : 'scale(1)',
+              width: '24px', height: '24px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '12px', fontWeight: 600, transition: 'background 80ms, color 80ms',
+              background: activo ? (i === 0 ? '#F0DDB0' : '#CDE7DC') : '#EFEDE4',
+              color: activo ? (i === 0 ? '#8A6D1D' : VERDE) : '#CFCDC2',
             }}>{i + 1}</div>
           )
         })}
       </div>
-      <div style={{ minWidth: '64px' }} />
+      <div style={{ minWidth: '70px' }} />
     </div>
   )
 }
@@ -202,6 +201,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
           )}
 
           <RitmoPartitura ejercicio={ej} entradaActiva={activa} resultado={resultado} />
+          {(fase === 'escuchando' || fase === 'practica') && <ContadorPulsos ej={ej} pulso={pulso} />}
 
           {fase === 'listo' && !resultado && (
             <div style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '14px 16px', fontSize: '13px', color: '#5F5E5A', lineHeight: 1.55 }}>
@@ -277,7 +277,6 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
               <button onClick={() => iniciar(true)} style={boton(true)}>🥁 Marcar el ritmo</button>
             </div>
           )}
-          {(fase === 'escuchando' || fase === 'practica') && <ContadorPulsos ej={ej} pulso={pulso} />}
           {fase === 'escuchando' && (
             <button onClick={detener} style={{ ...boton(false), width: '100%' }}>⏹ Detener</button>
           )}
