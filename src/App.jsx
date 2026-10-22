@@ -38,6 +38,7 @@ import { ArticulosAdmin, ArticuloForm } from './pages/admin/ArticulosAdmin'
 import EstudioAdmin    from './pages/admin/EstudioAdmin'
 import InformesAfinacionAdmin from './pages/admin/InformesAfinacionAdmin'
 import RitmoAdmin from './pages/admin/RitmoAdmin'
+import AuditivaAdmin from './pages/admin/AuditivaAdmin'
 import PartiturasAdmin from './pages/admin/PartiturasAdmin'
 import EstadisticaAdmin from './pages/admin/EstadisticaAdmin'
 import PagosAdmin from './pages/admin/PagosAdmin'
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="/admin/partituras" element={<Navigate to="/admin/entrenamiento" replace />} />
             <Route path="/admin/informes-afinacion" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><InformesAfinacionAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/ritmo" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><RitmoAdmin /></ConLayout></RutaProtegida>} />
+            <Route path="/admin/auditiva" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><AuditivaAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/estadistica" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><EstadisticaAdmin /></ConLayout></RutaProtegida>} />
 
 

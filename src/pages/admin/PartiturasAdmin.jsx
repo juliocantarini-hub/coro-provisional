@@ -655,6 +655,10 @@ export default function PartiturasAdmin() {
             style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
             🥁 Ritmo de los cantantes →
           </button>
+          <button onClick={() => navigate('/admin/auditiva')}
+            style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
+            👂 Práctica auditiva de los cantantes →
+          </button>
         </div>
       </div>
 

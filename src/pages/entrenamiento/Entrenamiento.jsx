@@ -7,8 +7,10 @@ import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
 import { usePartituras, usePartitura } from '../../hooks/usePartituras'
 import PartituraPlayer from '../../components/PartituraPlayer'
 import RitmoEntrenamiento from '../../components/RitmoEntrenamiento'
+import AuditivaEntrenamiento from '../../components/AuditivaEntrenamiento'
 import BotonVolver from '../../components/BotonVolver'
 import { useRitmoProgreso } from '../../hooks/useRitmoProgreso'
+import { useAuditivaProgreso } from '../../hooks/useAuditivaProgreso'
 
 function useEsMovil() {
   const [esMovil, setEsMovil] = useState(window.innerWidth <= 768)
@@ -130,6 +132,7 @@ const SECCIONES = {
   tecnica: { titulo: 'Técnica vocal', subtitulo: 'Respiración, resonancia y vocalización.' },
   obras:   { titulo: 'Práctica de obras', subtitulo: 'Practicá tu voz en las obras del coro y mirá cómo te fue.' },
   ritmo:   { titulo: 'Ritmo', subtitulo: 'Aprendé a leer y marcar el ritmo, nivel por nivel.' },
+  auditiva: { titulo: 'Práctica auditiva', subtitulo: 'Entrená el oído, nivel por nivel. No hace falta saber música.' },
 }
 
 function Esqueleto({ cantidad = 3 }) {
@@ -149,7 +152,8 @@ export default function Entrenamiento() {
   const { partituras, cargando: cargandoPartituras } = usePartituras()
   const { cantidad: ejerciciosHoy } = useEjerciciosHoy()
   const ritmo = useRitmoProgreso()
-  const [seccion, setSeccion] = useState(null) // null = pantalla de inicio con las tres tarjetas
+  const auditiva = useAuditivaProgreso()
+  const [seccion, setSeccion] = useState(null) // null = pantalla de inicio con las tarjetas
   // Tocar "Entrenamiento" en el menú estando adentro de una sección vuelve a la pantalla de inicio:
   // el menú navega a la misma ruta, que no recarga la página pero sí cambia la clave de la ubicación
   const ubicacion = useLocation()
@@ -165,6 +169,13 @@ export default function Entrenamiento() {
     ? null
     : ritmo.estrellas > 0 || ritmo.filas.length > 0
       ? `Nivel ${nivelActual} · ★ ${ritmo.estrellas}`
+      : 'Empezá por el nivel 1'
+
+  const nivelAuditiva = auditiva.estado.find(n => n.abierto && !n.superado)?.id ?? auditiva.estado.length
+  const detalleAuditiva = auditiva.cargando
+    ? null
+    : auditiva.estrellas > 0 || auditiva.filas.length > 0
+      ? `Nivel ${nivelAuditiva} · ★ ${auditiva.estrellas}`
       : 'Empezá por el nivel 1'
 
   return (
@@ -203,7 +214,7 @@ export default function Entrenamiento() {
 
       {(seccion === 'tecnica' || seccion === 'obras') && <BotonVolver texto="Entrenamiento" onClick={() => setSeccion(null)} />}
 
-      {/* Inicio: las tres tarjetas */}
+      {/* Inicio: las tarjetas */}
       {!seccion && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <TarjetaSeccion icono="🌬️" titulo="Técnica vocal" color="#0F6E56" bg="#E1F5EE"
@@ -218,6 +229,10 @@ export default function Entrenamiento() {
             descripcion="Escuchá, leé y marcá el ritmo. Se desbloquea nivel por nivel."
             detalle={detalleRitmo}
             onClick={() => setSeccion('ritmo')} />
+          <TarjetaSeccion icono="👂" titulo="Práctica auditiva" color="#6B58B8" bg="#EEEAF9"
+            descripcion="Entrená el oído: ¿sube o baja?, eco, saltos, acordes y melodías."
+            detalle={detalleAuditiva}
+            onClick={() => setSeccion('auditiva')} />
         </div>
       )}
 
@@ -288,6 +303,9 @@ export default function Entrenamiento() {
 
       {/* Ritmo */}
       {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} onSalir={() => setSeccion(null)} />}
+
+      {/* Práctica auditiva */}
+      {seccion === 'auditiva' && <AuditivaEntrenamiento prog={auditiva} voz={perfil?.voz} onSalir={() => setSeccion(null)} />}
     </div>
   )
 }
