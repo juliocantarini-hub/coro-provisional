@@ -217,7 +217,8 @@ function preguntaDictado(rnd, { n, max, doInicio }, numero) {
     if (i > 0 && g === grados[i - 1]) g = grados[i - 1] === 0 ? 1 : grados[i - 1] - 1
     grados.push(g)
   }
-  const escala = Array.from({ length: max }, (_, g) => ({ midi: midiDePaso(PASO_DO4 + g), inicio: g * 0.45, duracion: 0.4 }))
+  // La escala de referencia es siempre la de Do mayor completa (Do a Do), aunque la melodía use sólo las primeras notas
+  const escala = Array.from({ length: 8 }, (_, g) => ({ midi: midiDePaso(PASO_DO4 + g), inicio: g * 0.45, duracion: 0.4 }))
   return {
     tipo: 'dictado',
     clave: 'sol',
@@ -226,7 +227,7 @@ function preguntaDictado(rnd, { n, max, doInicio }, numero) {
     max,
     grados,
     escala,
-    grafiaEscala: Array.from({ length: max }, (_, g) => ({ paso: PASO_DO4 + g, alter: 0 })),
+    grafiaEscala: Array.from({ length: 8 }, (_, g) => ({ paso: PASO_DO4 + g, alter: 0 })),
     grafia: grados.map((g) => ({ paso: PASO_DO4 + g, alter: 0 })),
     notas: grados.map((g, i) => ({ midi: midiDePaso(PASO_DO4 + g), inicio: i * 0.9, duracion: 0.8 })),
   }
