@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   NIVELES, EJERCICIOS_POR_NIVEL, EJERCICIOS_PARA_AVANZAR, APROBADO_PCT, ACORDES, INTERVALOS,
-  NOMBRES_GRADO, COLORES_GRADO, armarEjercicio, corregirRespuesta, puntajeEco, porcentajeEjercicio,
-  estrellasPara, nivelPorId, midiDeGrado,
+  COLORES_GRADO, armarEjercicio, corregirRespuesta, puntajeEco, porcentajeEjercicio,
+  estrellasPara, nivelPorId,
 } from '../lib/auditiva'
+import { midiDePaso, nombreDePaso } from '../lib/notacion'
 import { tocarNotas, detener as detenerAudio, precargarPiano } from '../lib/auditivaAudio'
 import { iniciarGrabacion } from '../lib/grabadora'
 import { analizarGrabacion } from '../lib/informeAfinacion'
@@ -99,7 +100,7 @@ const INTRO = {
   eco: ['Escuchás una frase, escrita en el pentagrama, y la cantás con «la».', 'Cantala a la altura que te quede cómoda: no importa si es más grave o más aguda que el piano. Lo que se mira es cuánto sube y cuánto baja cada nota. Buscá un lugar tranquilo.'],
   intervalo: ['Vas a escuchar dos notas.', 'Fijate qué tan grande es el salto entre una y otra. Cada tamaño se parece al comienzo de una canción conocida. Al responder vas a ver cómo se escribe.'],
   acorde: ['Vas a escuchar tres notas sonando juntas.', 'Decidí qué sensación te dan: ¿alegre, triste o tensa? Al responder vas a ver cómo se escribe el acorde.'],
-  dictado: ['Escuchás primero la escala (los escalones) y después una melodía.', 'Armala en el pentagrama, nota por nota, en el orden en que suenan. Podés oír cada nota al tocarla.'],
+  dictado: ['Escuchás primero la escala de Do (Do, Re, Mi, Fa, Sol, La, Si, Do) y después una melodía.', 'Armala en el pentagrama, nota por nota, en el orden en que suenan. Podés oír cada nota al tocarla.'],
 }
 
 // ─── Pantalla de un ejercicio ──────────────────────────────────────────────
@@ -187,7 +188,7 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
     ++turnoRef.current
     limpiarTemporizadores()
     setSonando(false)
-    tocarNotas([{ midi: midiDeGrado(pRef.current.raiz, g), inicio: 0, duracion: 0.55 }], { cola: 0.1 }).catch(() => setSinAudio(true))
+    tocarNotas([{ midi: midiDePaso(pRef.current.grafiaEscala[g].paso), inicio: 0, duracion: 0.55 }], { cola: 0.1 }).catch(() => setSinAudio(true))
   }
 
   // La primera respuesta de cada pregunta es la que suma; después se puede practicar de nuevo sin cambiar el puntaje
@@ -445,10 +446,10 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
     const columnasEntrada = p.grados.map((gc, i) => {
       const g = ingreso[i]
       if (g == null) return { vacia: true, seleccionada: enPentagrama && !revelado && seleccion === i, notas: [] }
-      const color = revelado ? (g === gc ? '#2F9E6F' : '#D04A43') : (enPentagrama ? undefined : COLORES_GRADO[g % 8])
+      const color = revelado ? (g === gc ? '#2F9E6F' : '#D04A43') : (enPentagrama ? undefined : COLORES_GRADO[(grafiaDe(g).paso % 7 + 7) % 7])
       return {
         notas: [{ ...grafiaDe(g), figura: 'negra', color, estado: enPentagrama && !revelado && seleccion === i ? 'sel' : 'normal' }],
-        etiqueta: NOMBRES_GRADO[g],
+        etiqueta: nombreDePaso(grafiaDe(g).paso),
       }
     })
     const colocar = (g, casillero) => {
@@ -481,7 +482,7 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
           {revelado ? 'Tu respuesta' : enPentagrama ? 'Ubicá cada nota en el pentagrama' : 'Armá la melodía, nota por nota'}
         </div>
         <div style={{ ...tarjeta, padding: '6px 6px' }}>
-          <Pentagrama clave={p.clave} armadura={p.armadura} ls={enPentagrama && !revelado ? 15 : 12} descripcion="Tu melodía en el pentagrama"
+          <Pentagrama clave={p.clave} ls={enPentagrama && !revelado ? 15 : 12} descripcion="Tu melodía en el pentagrama"
             pasoVacio={pasoTonica} pasoMin={enPentagrama && !revelado ? pasoTonica : undefined} pasoMax={enPentagrama && !revelado ? pasoTonica + p.max - 1 : undefined}
             onColumna={enPentagrama && !revelado ? tocarPentagrama : undefined}
             columnas={columnasEntrada} />
@@ -490,8 +491,8 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
           <>
             <div style={{ textAlign: 'center', fontSize: '15px', color: '#1A1A18', fontWeight: 600 }}>La melodía era</div>
             <div style={{ ...tarjeta, padding: '6px 6px' }}>
-              <Pentagrama clave={p.clave} armadura={p.armadura} ls={12} descripcion="La melodía correcta"
-                columnas={p.grados.map((g) => ({ notas: [{ ...grafiaDe(g), figura: 'negra' }], etiqueta: NOMBRES_GRADO[g] }))} />
+              <Pentagrama clave={p.clave} ls={12} descripcion="La melodía correcta"
+                columnas={p.grados.map((g) => ({ notas: [{ ...grafiaDe(g), figura: 'negra' }], etiqueta: nombreDePaso(grafiaDe(g).paso) }))} />
             </div>
           </>
         )}
@@ -516,10 +517,10 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
                 }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-                    background: COLORES_GRADO[g % 8], color: '#FFFFFF', fontSize: '15px', fontWeight: 700, marginLeft: `${g * 4}px`,
+                    background: COLORES_GRADO[(grafiaDe(g).paso % 7 + 7) % 7], color: '#FFFFFF', fontSize: '15px', fontWeight: 700, marginLeft: `${g * 4}px`,
                   }}>
-                  <span style={{ width: '22px', textAlign: 'center' }}>{g + 1}</span>
-                  <span style={{ fontWeight: 600, opacity: 0.95 }}>{NOMBRES_GRADO[g]}</span>
+                  <span style={{ fontWeight: 700 }}>{nombreDePaso(grafiaDe(g).paso)}</span>
+                  {g >= 7 && <span style={{ fontWeight: 500, opacity: 0.9, fontSize: '12px' }}>(agudo)</span>}
                 </button>
               ))}
             </div>
@@ -551,10 +552,10 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
           {hecho ? 'Así te salió' : 'Escuchá la frase y cantala con «la»'}
         </div>
         <div style={{ ...tarjeta, padding: '6px 6px' }}>
-          <Pentagrama clave={p.clave} armadura={p.armadura} ls={12} activa={notaActiva} descripcion="La frase escrita en el pentagrama"
+          <Pentagrama clave={p.clave} ls={12} activa={notaActiva} descripcion="La frase escrita en el pentagrama"
             columnas={p.grafia.map((g, i) => ({
               notas: [{ ...g, figura: 'negra', color: estados ? (COLOR_ECO[estados[i]] || '#B4B2A9') : undefined }],
-              etiqueta: NOMBRES_GRADO[p.grados[i]],
+              etiqueta: nombreDePaso(g.paso),
             }))} />
         </div>
         {estadoEco === 'listo' && !errEco && (

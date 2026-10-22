@@ -7,6 +7,7 @@ import { getPianoSampler } from './pianoSampler'
 
 let sintetizador = null
 let activo = null // { cancelar }
+let generacion = 0 // sube cada vez que se corta el sonido: lo que estaba preparándose se descarta
 
 /** Empieza a bajar las muestras de piano (llamar al abrir un ejercicio, así están listas al escuchar). */
 export function precargarPiano() {
@@ -40,8 +41,9 @@ async function obtenerInstrumento() {
   }
 }
 
-/** Corta lo que esté sonando. */
+/** Corta lo que esté sonando (y lo que todavía se está preparando para sonar). */
 export function detener() {
+  generacion++
   if (activo) {
     const a = activo
     activo = null
@@ -52,22 +54,27 @@ export function detener() {
 /**
  * Toca notas: [{ midi, inicio, duracion }] (segundos desde el comienzo). Resuelve true cuando termina
  * o false si se cortó antes. Falla (reject) si el navegador no deja activar el audio.
+ * Cada nota se dispara en su momento (no se programan por adelantado), así cortar el sonido las cancela todas.
  */
 export async function tocarNotas(notas, { vel = 0.8, cola = 0.3 } = {}) {
   detener()
+  const mia = generacion
   const instrumento = await obtenerInstrumento()
+  if (mia !== generacion) return false // se salió o se pidió otro sonido mientras se preparaba
   if (!instrumento) throw new Error('No se pudo activar el sonido.')
-  const t0 = Tone.now() + 0.08
+  const temporizadores = []
   let fin = 0
   for (const n of notas) {
-    instrumento.tocar(n.midi, Math.max(0.15, n.duracion * 0.95), t0 + n.inicio, n.vel ?? vel)
+    temporizadores.push(setTimeout(() => {
+      instrumento.tocar(n.midi, Math.max(0.15, n.duracion * 0.95), Tone.now() + 0.01, n.vel ?? vel)
+    }, Math.max(0, n.inicio * 1000)))
     fin = Math.max(fin, n.inicio + n.duracion)
   }
   return new Promise((resolve) => {
-    const temporizador = setTimeout(() => { activo = null; resolve(true) }, (fin + cola + 0.08) * 1000)
+    temporizadores.push(setTimeout(() => { activo = null; resolve(true) }, (fin + cola + 0.08) * 1000))
     activo = {
       cancelar() {
-        clearTimeout(temporizador)
+        temporizadores.forEach(clearTimeout)
         instrumento.soltarTodo()
         resolve(false)
       },

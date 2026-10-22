@@ -10,7 +10,7 @@
 // Cada ejercicio se genera al azar cada vez que se hace (no se puede memorizar), dentro de los límites del nivel.
 
 import { midiANombre } from './afinacion'
-import { pasoNatural, midiDePaso, TONALIDADES, tonalidadDeMidi, grafiaDeGrado, claveSegun } from './notacion'
+import { pasoNatural, midiDePaso } from './notacion'
 import { APROBADO_PCT, EJERCICIOS_PARA_AVANZAR, EJERCICIOS_POR_NIVEL, ESTRELLAS_MAX, estrellasPara } from './ritmo'
 
 export { APROBADO_PCT, EJERCICIOS_PARA_AVANZAR, EJERCICIOS_POR_NIVEL, ESTRELLAS_MAX, estrellasPara }
@@ -183,36 +183,30 @@ function gradosDeFrase(rnd, n, pasos, maxGrado) {
   return g
 }
 
-/** Elige la tónica entre las notas de [lo, hi] que dan una tonalidad con pocas alteraciones (Do, Sol, Re, Fa, Si♭). */
-function elegirTonica(rnd, lo, hi) {
-  const candidatas = []
-  for (let m = lo; m <= hi; m++) if (tonalidadDeMidi(m)) candidatas.push(m)
-  if (!candidatas.length) for (let m = lo; m <= lo + 12; m++) if (tonalidadDeMidi(m)) candidatas.push(m)
-  return elegir(rnd, candidatas)
-}
+// Las frases del eco y las melodías del dictado usan solo teclas blancas (escala de Do mayor), siempre en clave de sol.
+// Así los nombres (Do, Re, Mi…) coinciden con las notas escritas y no hacen falta alteraciones.
+const PASO_DO4 = 28
+
+/** Los hombres cantan una octava más grave de lo que se escribe en clave de sol: el piano suena una octava abajo. */
+const octavaGrave = (voz) => /ten|baj|bar/i.test(String(voz || ''))
 
 function preguntaEco(rnd, { n, pasos }, voz) {
-  const [lo, hi] = rangoDeVoz(voz)
-  const raiz = elegirTonica(rnd, lo, Math.max(lo + 5, hi - 12))
-  const ton = tonalidadDeMidi(raiz)
+  const base = entero(rnd, PASO_DO4, PASO_DO4 + 4) // de Do4 a Sol4
   const grados = gradosDeFrase(rnd, n, pasos, 7)
-  const midis = grados.map((g) => midiDeGrado(raiz, g))
+  const escritas = grados.map((g) => ({ paso: base + g, alter: 0 }))
+  const bajar = octavaGrave(voz) ? 12 : 0
+  const midis = escritas.map((e) => midiDePaso(e.paso) - bajar)
   return {
     tipo: 'eco',
-    tonalidad: ton,
-    armadura: TONALIDADES[ton].armadura,
-    clave: claveSegun(midis),
-    raiz,
-    notas: grados.map((g, i) => ({ midi: midis[i], inicio: i * SEP, duracion: DUR_NOTA, nombre: midiANombre(midis[i]), pulsoSeg: SEP })),
-    grafia: grados.map((g) => grafiaDeGrado(ton, raiz, g)),
+    clave: 'sol',
+    notas: escritas.map((e, i) => ({ midi: midis[i], inicio: i * SEP, duracion: DUR_NOTA, nombre: midiANombre(midis[i]), pulsoSeg: SEP })),
+    grafia: escritas,
     grados,
   }
 }
 
 function preguntaDictado(rnd, { n, max, doInicio }, numero) {
   const maxGrado = max - 1
-  const raiz = elegirTonica(rnd, 53, 62)
-  const ton = tonalidadDeMidi(raiz)
   const grados = []
   for (let i = 0; i < n; i++) {
     let g
@@ -223,22 +217,18 @@ function preguntaDictado(rnd, { n, max, doInicio }, numero) {
     if (i > 0 && g === grados[i - 1]) g = grados[i - 1] === 0 ? 1 : grados[i - 1] - 1
     grados.push(g)
   }
-  const escala = Array.from({ length: max }, (_, g) => ({ midi: midiDeGrado(raiz, g), inicio: g * 0.45, duracion: 0.4 }))
-  const todos = [...Array(max).keys()].map((g) => midiDeGrado(raiz, g))
+  const escala = Array.from({ length: max }, (_, g) => ({ midi: midiDePaso(PASO_DO4 + g), inicio: g * 0.45, duracion: 0.4 }))
   return {
     tipo: 'dictado',
-    tonalidad: ton,
-    armadura: TONALIDADES[ton].armadura,
-    clave: claveSegun(todos),
+    clave: 'sol',
     // Los primeros ejercicios de cada nivel se arman con la escalera de colores; los últimos, ubicando las notas en el pentagrama
     entrada: numero >= 4 ? 'pentagrama' : 'escalera',
-    raiz,
     max,
     grados,
     escala,
-    grafiaEscala: Array.from({ length: max }, (_, g) => grafiaDeGrado(ton, raiz, g)),
-    grafia: grados.map((g) => grafiaDeGrado(ton, raiz, g)),
-    notas: grados.map((g, i) => ({ midi: midiDeGrado(raiz, g), inicio: i * 0.9, duracion: 0.8 })),
+    grafiaEscala: Array.from({ length: max }, (_, g) => ({ paso: PASO_DO4 + g, alter: 0 })),
+    grafia: grados.map((g) => ({ paso: PASO_DO4 + g, alter: 0 })),
+    notas: grados.map((g, i) => ({ midi: midiDePaso(PASO_DO4 + g), inicio: i * 0.9, duracion: 0.8 })),
   }
 }
 
