@@ -54,35 +54,47 @@ function tono(ctx, t, dur, nodos) {
   nodos.push(osc, g)
 }
 
-// Respuesta al toque del cantante: "pop" de madera, brillante y fuerte (se oye bien aun en el parlante del teléfono),
-// distinto del clic del pulso y del piano del ejemplo.
+// Respuesta al toque del cantante: "tok" de palillo en el aro del tambor (rim click). Seco, agudo y fuerte,
+// bien distinto del clic del pulso y del piano del ejemplo, y se oye aun en el parlante del teléfono.
 function sonidoToque(ctx) {
   const t = ctx.currentTime + 0.003
-  // Cuerpo: triángulo con caída rápida de altura
-  const osc = ctx.createOscillator()
-  const g = ctx.createGain()
-  osc.type = 'triangle'
-  osc.frequency.setValueAtTime(1500, t)
-  osc.frequency.exponentialRampToValueAtTime(700, t + 0.07)
-  g.gain.setValueAtTime(0.0001, t)
-  g.gain.exponentialRampToValueAtTime(0.9, t + 0.004)
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13)
-  osc.connect(g).connect(ctx.destination)
-  osc.start(t)
-  osc.stop(t + 0.16)
-  // Golpe: ruido filtrado muy corto
-  const largo = Math.floor(ctx.sampleRate * 0.04)
+  const salida = ctx.createGain()
+  salida.gain.value = 0.6
+  salida.connect(ctx.destination)
+
+  // Resonancias metálicas del aro: dos tonos agudos que caen enseguida
+  const tono = (tipo, f0, f1, pico, dur) => {
+    const o = ctx.createOscillator()
+    const g = ctx.createGain()
+    o.type = tipo
+    o.frequency.setValueAtTime(f0, t)
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur)
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(pico, t + 0.002)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    o.connect(g).connect(salida)
+    o.start(t)
+    o.stop(t + dur + 0.02)
+  }
+  tono('sine', 1850, 1650, 0.55, 0.09)
+  tono('triangle', 3100, 2800, 0.3, 0.05)
+  // Cuerpo del golpe: un "toc" grave y cortísimo (el palillo sobre el parche)
+  tono('sine', 330, 200, 0.5, 0.05)
+
+  // Chasquido: ruido filtrado en agudos, muy corto
+  const largo = Math.floor(ctx.sampleRate * 0.035)
   const buf = ctx.createBuffer(1, largo, ctx.sampleRate)
   const datos = buf.getChannelData(0)
-  for (let i = 0; i < largo; i++) datos[i] = (Math.random() * 2 - 1) * (1 - i / largo)
+  for (let i = 0; i < largo; i++) datos[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / largo, 2)
   const ruido = ctx.createBufferSource()
   ruido.buffer = buf
   const filtro = ctx.createBiquadFilter()
   filtro.type = 'bandpass'
-  filtro.frequency.value = 2500
+  filtro.frequency.value = 4200
+  filtro.Q.value = 1.2
   const gr = ctx.createGain()
-  gr.gain.value = 0.7
-  ruido.connect(filtro).connect(gr).connect(ctx.destination)
+  gr.gain.value = 0.9
+  ruido.connect(filtro).connect(gr).connect(salida)
   ruido.start(t)
 }
 

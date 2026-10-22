@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 
-// Botón "volver" del entrenamiento. En el celular flota arriba, en la misma línea que el botón
-// del menú (hamburguesa), justo a su derecha; en pantallas grandes (donde no hay hamburguesa)
-// queda en línea, arriba del contenido. Mismo verde y bordes redondeados que el resto de la app.
+// Botón "volver" del entrenamiento. En el celular flota arriba a la derecha, en la misma línea que el
+// botón del menú (hamburguesa); en pantallas grandes (donde no hay hamburguesa) queda en línea,
+// arriba del contenido. Mismo tamaño y forma que las pestañas (Respiración, Resonancia…), sin borde.
 
 function useEsMovil() {
   const [esMovil, setEsMovil] = useState(window.innerWidth <= 768)
@@ -15,22 +15,22 @@ function useEsMovil() {
 }
 
 const base = {
-  display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px 8px 12px',
-  borderRadius: '20px', border: '1px solid #0F6E56', background: '#E1F5EE', color: '#04342C',
-  fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(26,26,24,0.08)',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '8px 16px',
+  borderRadius: '18px', border: 'none', background: '#E1F5EE', color: '#04342C',
+  fontSize: '12px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(26,26,24,0.12)',
 }
 
 export default function BotonVolver({ texto, onClick }) {
   const esMovil = useEsMovil()
   if (esMovil) {
+    // Contenedor de la altura de la hamburguesa para que el botón quede centrado en su línea
     return (
-      <button onClick={onClick}
-        style={{
-          ...base, position: 'fixed', zIndex: 60, left: '60px', height: '40px', boxSizing: 'border-box',
-          top: 'calc(12px + env(safe-area-inset-top, 0px))', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        }}>
-        ← {texto}
-      </button>
+      <div style={{
+        position: 'fixed', zIndex: 60, right: '16px', height: '40px', display: 'flex', alignItems: 'center',
+        top: 'calc(12px + env(safe-area-inset-top, 0px))',
+      }}>
+        <button onClick={onClick} style={base}>← {texto}</button>
+      </div>
     )
   }
   return <button onClick={onClick} style={{ ...base, marginBottom: '12px' }}>← {texto}</button>
