@@ -3,7 +3,7 @@ import {
   NIVELES, EJERCICIOS_POR_NIVEL, EJERCICIOS_PARA_AVANZAR, APROBADO_PCT,
   armarEjercicio, corregir, estrellasPara, nivelPorId,
 } from '../lib/ritmo'
-import { crearMotorRitmo } from '../lib/ritmoAudio'
+import { crearMotorRitmo, precargarPiano } from '../lib/ritmoAudio'
 import RitmoPartitura, { COLOR_ESTADO } from './RitmoPartitura'
 
 const VERDE = '#0F6E56'
@@ -17,6 +17,13 @@ function Estrellas({ n, max = 3, size = 14 }) {
       ))}
     </span>
   )
+}
+
+// Botón "volver": en forma de píldora, con borde y fondo, para que se note
+export const botonVolver = {
+  display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px 8px 12px', marginBottom: '12px',
+  borderRadius: '20px', border: `1px solid ${VERDE}`, background: '#E1F5EE', color: '#04342C',
+  fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(26,26,24,0.08)',
 }
 
 const boton = (primario, extra = {}) => ({
@@ -43,7 +50,11 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
   const [pulsado, setPulsado] = useState(false)
   const [sinAudio, setSinAudio] = useState(false)
 
-  useEffect(() => () => { if (motorRef.current) motorRef.current.parar() }, [])
+  const turnoRef = useRef(0)
+  const [cargandoPiano, setCargandoPiano] = useState(false)
+
+  useEffect(() => { precargarPiano() }, [])
+  useEffect(() => () => { turnoRef.current++; if (motorRef.current) motorRef.current.parar() }, [])
 
   const terminarIntento = (toques) => {
     const r = corregir(ej, toques)
@@ -69,6 +80,14 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
     if (!ok) { setSinAudio(true); return }
     setSinAudio(false)
     setResultado(null); setAviso(null); setActiva(-1)
+    const turno = ++turnoRef.current
+    if (!practica) {
+      // El ejemplo suena en piano; si todavía no bajó, se espera un momento (si no se puede, suena un tono simple)
+      setFase('escuchando'); setConteo(null); setCargandoPiano(true)
+      await motorRef.current.prepararPiano()
+      setCargandoPiano(false)
+      if (turno !== turnoRef.current) return
+    }
     setConteo(0) // 0 = esperando el primer clic del conteo
     setFase(practica ? 'practica' : 'escuchando')
     ctlRef.current = motorRef.current.correr(ej, {
@@ -84,6 +103,8 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
   }
 
   const detener = () => {
+    turnoRef.current++
+    setCargandoPiano(false)
     if (ctlRef.current) ctlRef.current.parar()
     setFase('listo'); setActiva(-1); setConteo(null)
   }
@@ -113,6 +134,7 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
   })()
 
   const estado = (() => {
+    if (fase === 'escuchando' && cargandoPiano) return 'Preparando el sonido de piano…'
     if (fase === 'escuchando') return conteo != null ? `Contá con el pulso… ${conteo || ''}` : '🔊 Escuchá el ejemplo y seguí la partitura'
     if (fase === 'practica') return conteo != null ? `Contá con el pulso y esperá… ${conteo || ''}` : '¡Ahora vos! Tocá el botón en cada sonido'
     return null
@@ -306,7 +328,7 @@ function ListaEjercicios({ nivelId, prog, onVolver, onElegir }) {
   const info = prog.estado[nivelId - 1]
   return (
     <div>
-      <button onClick={onVolver} style={{ background: 'none', border: 'none', color: VERDE, fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '0 0 10px' }}>← Todos los niveles</button>
+      <button onClick={onVolver} style={botonVolver}>← Todos los niveles</button>
       <div style={{ marginBottom: '12px' }}>
         <div style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1A1A18' }}>{nivel.id}. {nivel.nombre}</div>
         <div style={{ fontSize: '13px', color: '#888780' }}>{nivel.descr}</div>

@@ -237,7 +237,9 @@ export function corregir(ej, toques, { latenciaMs = 0 } = {}) {
   // Desfase constante (latencia del dispositivo o del que toca): se quita para juzgar el ritmo, y se avisa si es grande
   const errores = []
   parejas.forEach((tj, k) => { if (tj != null) errores.push(taps[tj] - esperados[k]) })
-  const desfase = errores.length >= 3 ? Math.max(-0.25, Math.min(0.25, mediana(errores))) : 0
+  // Con 2 toques solo se corrige si los dos erraron parecido (si no, no hay forma de saber qué es desfase y qué es error)
+  const consistentes = errores.length === 2 && Math.abs(errores[0] - errores[1]) <= tol
+  const desfase = errores.length >= 3 || consistentes ? Math.max(-0.25, Math.min(0.25, mediana(errores))) : 0
 
   const notas = esperados.map((te, k) => {
     const tj = parejas[k]

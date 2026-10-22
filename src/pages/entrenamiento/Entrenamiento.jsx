@@ -5,7 +5,7 @@ import EjercicioPlayer from '../../components/EjercicioPlayer'
 import PianoInteractivo, { BotonPiano } from '../../components/PianoInteractivo'
 import { usePartituras, usePartitura } from '../../hooks/usePartituras'
 import PartituraPlayer from '../../components/PartituraPlayer'
-import RitmoEntrenamiento from '../../components/RitmoEntrenamiento'
+import RitmoEntrenamiento, { botonVolver } from '../../components/RitmoEntrenamiento'
 import { useRitmoProgreso } from '../../hooks/useRitmoProgreso'
 
 function useEsMovil() {
@@ -196,8 +196,7 @@ export default function Entrenamiento() {
       <PianoInteractivo abierto={pianoAbierto} voz={perfil?.voz} />
 
       {seccion && (
-        <button onClick={() => setSeccion(null)}
-          style={{ background: 'none', border: 'none', color: '#0F6E56', fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '0 0 12px' }}>
+        <button onClick={() => setSeccion(null)} style={botonVolver}>
           ← Entrenamiento
         </button>
       )}

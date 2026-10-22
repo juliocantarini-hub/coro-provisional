@@ -5,7 +5,15 @@
 // la convierte al reloj del audio con getOutputTimestamp(), que ya descuenta la latencia de salida.
 // Lo que quede de diferencia constante lo absorbe la corrección (corregir() en ritmo.js).
 
+import * as Tone from 'tone'
+import { getPianoSampler } from './pianoSampler'
+
 let contextoCompartido = null
+
+/** Empieza a bajar las muestras de piano (llamar al abrir un ejercicio, así están listas al escuchar). */
+export function precargarPiano() {
+  try { getPianoSampler().listo.catch(() => {}) } catch { /* sin piano: suena el tono simple */ }
+}
 
 function obtenerContexto() {
   if (!contextoCompartido || contextoCompartido.state === 'closed') {
@@ -46,25 +54,42 @@ function tono(ctx, t, dur, nodos) {
   nodos.push(osc, g)
 }
 
-// Respuesta al toque del cantante: "tum" grave y seco, distinto del clic del pulso
+// Respuesta al toque del cantante: "pop" de madera, brillante y fuerte (se oye bien aun en el parlante del teléfono),
+// distinto del clic del pulso y del piano del ejemplo.
 function sonidoToque(ctx) {
   const t = ctx.currentTime + 0.003
+  // Cuerpo: triángulo con caída rápida de altura
   const osc = ctx.createOscillator()
   const g = ctx.createGain()
-  osc.type = 'sine'
-  osc.frequency.setValueAtTime(220, t)
-  osc.frequency.exponentialRampToValueAtTime(140, t + 0.09)
+  osc.type = 'triangle'
+  osc.frequency.setValueAtTime(1500, t)
+  osc.frequency.exponentialRampToValueAtTime(700, t + 0.07)
   g.gain.setValueAtTime(0.0001, t)
-  g.gain.exponentialRampToValueAtTime(0.5, t + 0.006)
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12)
+  g.gain.exponentialRampToValueAtTime(0.9, t + 0.004)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13)
   osc.connect(g).connect(ctx.destination)
   osc.start(t)
-  osc.stop(t + 0.15)
+  osc.stop(t + 0.16)
+  // Golpe: ruido filtrado muy corto
+  const largo = Math.floor(ctx.sampleRate * 0.04)
+  const buf = ctx.createBuffer(1, largo, ctx.sampleRate)
+  const datos = buf.getChannelData(0)
+  for (let i = 0; i < largo; i++) datos[i] = (Math.random() * 2 - 1) * (1 - i / largo)
+  const ruido = ctx.createBufferSource()
+  ruido.buffer = buf
+  const filtro = ctx.createBiquadFilter()
+  filtro.type = 'bandpass'
+  filtro.frequency.value = 2500
+  const gr = ctx.createGain()
+  gr.gain.value = 0.7
+  ruido.connect(filtro).connect(gr).connect(ctx.destination)
+  ruido.start(t)
 }
 
 export function crearMotorRitmo() {
   const ctx = obtenerContexto()
   let actual = null // { parar }
+  let piano = null  // { sampler } una vez cargado
 
   const latencia = () => {
     const l = Number.isFinite(ctx.outputLatency) ? ctx.outputLatency : 0
@@ -90,6 +115,21 @@ export function crearMotorRitmo() {
     return ctx.state === 'running'
   }
 
+  /** Baja (si hace falta) y activa el piano del ejemplo. Devuelve false si no se pudo: entonces suena el tono simple. */
+  async function prepararPiano() {
+    if (piano) return true
+    try {
+      const { sampler, listo } = getPianoSampler()
+      await Promise.race([listo, new Promise((_, rechazar) => setTimeout(() => rechazar(new Error('piano no cargó')), 6000))])
+      await Tone.start()
+      if (Tone.getContext().state !== 'running') return false
+      piano = { sampler }
+      return true
+    } catch {
+      return false
+    }
+  }
+
   function parar() {
     if (actual) { actual.parar(); actual = null }
   }
@@ -111,9 +151,17 @@ export function crearMotorRitmo() {
     for (let k = 0; k < nConteo; k++) clic(ctx, t0 + k * p, { acento: k === 0, volumen: 0.32 }, nodos)
     const nPulsos = Math.ceil(ej.duracionPulsos - 1e-6)
     for (let b = 0; b < nPulsos; b++) {
-      clic(ctx, inicio + b * p, { acento: b % ej.pulsosPorCompas === 0, volumen: tonos ? 0.14 : 0.26 }, nodos)
+      clic(ctx, inicio + b * p, { acento: b % ej.pulsosPorCompas === 0, volumen: tonos ? 0.1 : 0.26 }, nodos)
     }
-    if (tonos) {
+    if (tonos && piano) {
+      // Piano: se programa en el reloj de Tone, desplazado para que coincida con el del conteo
+      const dif = Tone.getContext().currentTime - ctx.currentTime
+      for (const e of ej.notas) {
+        const dur = Math.max(0.1, e.durSeg * 0.95)
+        try { piano.sampler.triggerAttackRelease('B4', dur, inicio + e.inicioSeg + dif, 0.85) } catch { /* se pierde esa nota */ }
+      }
+      nodos.push({ stop() { try { piano.sampler.releaseAll() } catch { /* nada que soltar */ } } })
+    } else if (tonos) {
       for (const e of ej.notas) tono(ctx, inicio + e.inicioSeg, Math.max(0.1, Math.min(e.durSeg * 0.9, e.durSeg - 0.04)), nodos)
     }
 
@@ -165,5 +213,5 @@ export function crearMotorRitmo() {
     return control
   }
 
-  return { asegurar, correr, parar }
+  return { asegurar, prepararPiano, correr, parar }
 }
