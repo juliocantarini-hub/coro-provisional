@@ -60,6 +60,7 @@ export default function InformesVocalizacionAdmin() {
   const [actividad, setActividad] = useState([])
   const [personas, setPersonas] = useState({})
   const [totalCantantes, setTotalCantantes] = useState(0)
+  const [diag, setDiag] = useState(null) // cuántas prácticas hay en el coro (sin filtrar por fecha) y cuántas son del usuario
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [categoria, setCategoria] = useState('vocalizacion')
@@ -105,6 +106,15 @@ export default function InformesVocalizacionAdmin() {
     setPersonas(mapa)
     setTotalCantantes((per.data || []).length)
     setActividad(filas)
+    // Diagnóstico para cuando no aparece nada: ¿no se guardó ninguna práctica, o hay prácticas fuera del período, o no tenés permiso para verlas?
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const [todas, propias] = await Promise.all([
+        supabase.from('actividad_entrenamiento').select('cantante_id', { count: 'exact', head: true }).eq('coro_id', coro.id),
+        user ? supabase.from('actividad_entrenamiento').select('cantante_id', { count: 'exact', head: true }).eq('cantante_id', user.id) : Promise.resolve({ count: null }),
+      ])
+      setDiag({ coro: todas.count, propias: propias.count, errorCoro: todas.error?.message || '', errorPropias: propias.error?.message || '' })
+    } catch { setDiag(null) }
     setCargando(false)
   }, [periodo])
 
@@ -200,6 +210,21 @@ export default function InformesVocalizacionAdmin() {
           {datos.total === 0 && (
             <div style={{ fontSize: '13px', color: '#888780', padding: '28px 0', textAlign: 'center' }}>
               Nadie practicó ejercicios de {cat.label.toLowerCase()} en este período.
+            </div>
+          )}
+
+          {datos.total === 0 && diag && (
+            <div style={{ fontSize: '12px', color: '#5F5E5A', background: '#FFFFFF', border: '1px dashed #D3D1C7', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px', lineHeight: 1.5 }}>
+              <b>Diagnóstico:</b>{' '}
+              {diag.errorCoro || diag.errorPropias
+                ? `no se pudo contar la práctica (${diag.errorCoro || diag.errorPropias}).`
+                : diag.coro > 0 && actividad.length === 0
+                  ? `hay ${diag.coro} prácticas registradas en total en este coro, pero ninguna en este período: probá con "Todo".`
+                  : diag.coro > 0
+                    ? `hay ${diag.coro} prácticas registradas en el coro, pero ninguna es de ${cat.label.toLowerCase()} en este período (probá otra categoría o "Todo").`
+                    : diag.propias > 0
+                      ? `vos tenés ${diag.propias} prácticas registradas pero esta pantalla no las ve: falta correr actividad_entrenamiento_directores.sql en Supabase (o el coro de esas prácticas es otro).`
+                      : 'todavía no hay ninguna práctica guardada en este coro. Un ejercicio solo cuenta cuando se completa hasta el final (no si lo frenás antes). Si ya completaste alguno y sigue en cero, el guardado está fallando.'}
             </div>
           )}
 

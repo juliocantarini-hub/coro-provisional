@@ -60,6 +60,7 @@ export async function registrarActividadEntrenamiento(ejercicioId, duracionRealS
       metadata,
     }])
 
+  if (error) console.error('[entrenamiento] No se pudo registrar la práctica:', error.message, error)
   return { ok: !error, error: error?.message }
 }
 
