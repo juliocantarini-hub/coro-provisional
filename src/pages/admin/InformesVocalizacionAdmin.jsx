@@ -120,7 +120,12 @@ export default function InformesVocalizacionAdmin() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  const cat = CATEGORIAS.find((c) => c.id === categoria)
+  // Además de las tres de siempre, cualquier otra categoría que tenga ejercicios cargados (así no queda práctica sin mostrar)
+  const categorias = useMemo(() => {
+    const extra = [...new Set(ejercicios.map((e) => e.categoria).filter((c) => c && !CATEGORIAS.some((b) => b.id === c)))].sort()
+    return [...CATEGORIAS, ...extra.map((id) => ({ id, label: id.charAt(0).toUpperCase() + id.slice(1).replace(/_/g, ' '), color: '#6B58B8', bg: '#EEEAF9' }))]
+  }, [ejercicios])
+  const cat = categorias.find((c) => c.id === categoria) || CATEGORIAS[0]
 
   // Todo lo de la categoría elegida: por ejercicio y por cantante
   const datos = useMemo(() => {
@@ -159,6 +164,20 @@ export default function InformesVocalizacionAdmin() {
     }
   }, [ejercicios, actividad, categoria])
 
+  // Cuántas prácticas hay de cada categoría en el período (para los números de las pestañas) y cuál fue la última
+  const resumen = useMemo(() => {
+    const catDe = new Map(ejercicios.map((e) => [e.id, e]))
+    const porCategoria = {}
+    for (const a of actividad) {
+      const e = catDe.get(a.ejercicio_id)
+      const k = e?.categoria || 'otra'
+      porCategoria[k] = (porCategoria[k] || 0) + 1
+    }
+    const ult = actividad[0] // vienen ordenadas de la más reciente a la más vieja
+    const eUlt = ult ? catDe.get(ult.ejercicio_id) : null
+    return { porCategoria, ultima: ult ? { cuando: ult.completado_en, nombre: eUlt?.nombre || 'un ejercicio que ya no está', categoria: eUlt?.categoria || null } : null }
+  }, [ejercicios, actividad])
+
   const q = busqueda.trim().toLowerCase()
   const persona = (id) => personas[id] || { nombre: 'Cantante' }
   const coincide = (id) => !q || (persona(id).nombre || '').toLowerCase().includes(q) || (persona(id).voz || '').toLowerCase().includes(q)
@@ -183,7 +202,7 @@ export default function InformesVocalizacionAdmin() {
       </p>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-        {CATEGORIAS.map((c) => <Pastilla key={c.id} activa={categoria === c.id} color={c.color} onClick={() => { setCategoria(c.id); setAbierto(null) }}>{c.label}</Pastilla>)}
+        {categorias.map((c) => <Pastilla key={c.id} activa={categoria === c.id} color={c.color} onClick={() => { setCategoria(c.id); setAbierto(null) }}>{c.label} · {resumen.porCategoria[c.id] || 0}</Pastilla>)}
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
         {PERIODOS.map((p) => <Pastilla key={p.id} activa={periodo === p.id} onClick={() => setPeriodo(p.id)}>{p.label}</Pastilla>)}
@@ -221,7 +240,7 @@ export default function InformesVocalizacionAdmin() {
                 : diag.coro > 0 && actividad.length === 0
                   ? `hay ${diag.coro} prácticas registradas en total en este coro, pero ninguna en este período: probá con "Todo".`
                   : diag.coro > 0
-                    ? `hay ${diag.coro} prácticas registradas en el coro, pero ninguna es de ${cat.label.toLowerCase()} en este período (probá otra categoría o "Todo").`
+                    ? `hay ${diag.coro} prácticas registradas en el coro, pero ninguna es de ${cat.label.toLowerCase()} en este período (probá otra categoría o "Todo").${resumen.ultima ? ` La última práctica registrada fue «${resumen.ultima.nombre}»${resumen.ultima.categoria ? ` (${(categorias.find((c) => c.id === resumen.ultima.categoria)?.label || resumen.ultima.categoria).toLowerCase()})` : ''}, el ${fechaCorta(resumen.ultima.cuando)}.` : ''}`
                     : diag.propias > 0
                       ? `vos tenés ${diag.propias} prácticas registradas pero esta pantalla no las ve: falta correr actividad_entrenamiento_directores.sql en Supabase (o el coro de esas prácticas es otro).`
                       : 'todavía no hay ninguna práctica guardada en este coro. Un ejercicio solo cuenta cuando se completa hasta el final (no si lo frenás antes). Si ya completaste alguno y sigue en cero, el guardado está fallando.'}
