@@ -10,7 +10,7 @@ import { VERDE, Estrellas, boton, ContadorPulsos } from './RitmoUI'
 import PantallaDictadoRitmo from './RitmoDictado'
 import RitmoCalibrar from './RitmoCalibrar'
 import { leerLatencia, aprenderDeIntento } from '../lib/ritmoLatencia'
-import { NIVELES_DICTADO, nivelDictado, modoDeEjercicio } from '../lib/ritmoDictado'
+import { NIVELES_DICTADO, nivelDictado } from '../lib/ritmoDictado'
 
 // ─── Pantalla de un ejercicio ──────────────────────────────────────────────
 
@@ -331,7 +331,6 @@ function ListaEjercicios({ nivelId, prog, onVolver, onElegir, dictado = false })
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '14px', fontWeight: 500, color: '#1A1A18' }}>
                   Ejercicio {n}
-                  {dictado && <span style={{ fontWeight: 400, color: '#888780' }}>{modoDeEjercicio(n) === 'oido' ? ' · 👂 escuchar y tocar' : ' · ✍️ escuchar y escribir'}</span>}
                 </div>
                 <div style={{ fontSize: '12px', color: '#888780' }}>
                   {fila ? `Mejor: ${fila.mejor_pct} % · ${fila.intentos} ${fila.intentos === 1 ? 'intento' : 'intentos'}` : 'Todavía no lo hiciste'}
@@ -393,7 +392,7 @@ export default function RitmoEntrenamiento({ prog, progDictado = null, onSalir }
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#FBF3DF', border: '1px solid #E8DBAE', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px' }}>
             <div style={{ fontSize: '13px', color: '#8A6D1D', lineHeight: 1.4 }}>
               {dictado
-                ? 'Escuchá un ritmo y repetilo: tocándolo de oído o escribiéndolo con figuras. Aprobando 3 ejercicios se abre el nivel siguiente.'
+                ? 'Escuchá un ritmo y tocalo con el botón, a tiempo con el pulso. Aprobando 3 ejercicios se abre el nivel siguiente.'
                 : 'Escuchá, mirá la partitura y marcá el ritmo. Aprobando 3 ejercicios se abre el nivel siguiente.'}
             </div>
             <div style={{ fontSize: '14px', fontWeight: 700, color: '#8A6D1D', whiteSpace: 'nowrap' }}>★ {pg.estrellas}</div>

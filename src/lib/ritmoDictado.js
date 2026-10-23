@@ -1,6 +1,4 @@
-// Dictados rítmicos: el cantante escucha un ritmo y lo reproduce de dos maneras.
-//   · Ejercicios 1 y 2 de cada nivel ("de oído"): lo escucha sin ver la partitura y lo toca con el botón.
-//   · Ejercicios 3, 4 y 5 ("armar"): lo escucha y lo escribe compás por compás eligiendo figuras.
+// Dictados rítmicos: el cantante escucha un ritmo y lo toca con el botón, con un compás de conteo; la partitura aparece al terminar, marcada con lo que tocó.
 // Los ritmos se generan al azar (cada intento es uno nuevo) con las figuras que corresponden al nivel.
 // No depende de React ni de la red: se puede probar en Node.
 
@@ -35,9 +33,15 @@ export const NIVELES_DICTADO = [
 ]
 export const nivelDictado = (id) => NIVELES_DICTADO.find((n) => n.id === id)
 
-/** 'oido' (ejercicios 1 y 2: escuchar y tocar) o 'armar' (3 a 5: escuchar y escribir). */
-export const modoDeEjercicio = (numero) => (numero <= 2 ? 'oido' : 'armar')
-const COMPASES_POR_EJERCICIO = [2, 2, 2, 3, 4]
+/** Todos los dictados se resuelven igual: escuchar el ritmo y tocarlo con conteo. */
+export const modoDeEjercicio = () => 'tocar'
+// Compases de los cinco ejercicios de un nivel. Cuanto más difícil el nivel, más corto el ejercicio (cuesta más retener el ritmo).
+const COMPASES_POR_NIVEL = {
+  facil: [2, 2, 2, 3, 4],   // niveles 1 a 3
+  medio: [1, 2, 2, 2, 3],   // niveles 4 y 5 (corcheas, semicorcheas)
+  dificil: [1, 1, 2, 2, 2], // niveles 6 a 8 (puntillos, 3/4, mezcla)
+}
+const compasesPorEjercicio = (nivelId, numero) => (nivelId <= 3 ? COMPASES_POR_NIVEL.facil : nivelId <= 5 ? COMPASES_POR_NIVEL.medio : COMPASES_POR_NIVEL.dificil)[numero - 1]
 const TEMPOS = [60, 60, 60, 66, 72]
 
 // ─── Generación ────────────────────────────────────────────────────────
@@ -80,7 +84,7 @@ export function armarDictado(nivelId, numero, rnd = Math.random) {
   let compas = nivel.compas
   let pool = nivel.pool
   if (nivel.pool34 && numero % 2 === 0) { compas = [3, 4]; pool = nivel.pool34 }
-  const n = COMPASES_POR_EJERCICIO[numero - 1]
+  const n = compasesPorEjercicio(nivelId, numero)
   let compases = null
   for (let intento = 0; intento < 40; intento++) {
     compases = Array.from({ length: n }, () => compasAlAzar(rnd, pool, compas[0]))
