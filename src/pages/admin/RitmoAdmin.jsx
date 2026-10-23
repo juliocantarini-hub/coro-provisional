@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import BotonVolver from '../../components/BotonVolver'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 import { NIVELES, EJERCICIOS_POR_NIVEL, APROBADO_PCT, estadoNiveles, estrellasPara } from '../../lib/ritmo'
@@ -133,10 +134,10 @@ export default function RitmoAdmin() {
   })
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 6px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: 0 }}>🥁 Ritmo de los cantantes</h2>
-        <button onClick={() => navigate('/admin/entrenamiento')} style={btn(false)}>← Entrenamiento</button>
+        <BotonVolver texto="Entrenamiento" onClick={() => navigate('/admin/entrenamiento')} />
       </div>
       <p style={{ fontSize: '13px', color: '#888780', margin: '0 0 14px' }}>
         Cada cantante avanza nivel por nivel (aprobando {3} ejercicios con {APROBADO_PCT} % o más). Acá podés abrirle todos los niveles o reiniciar su progreso.

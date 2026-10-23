@@ -661,9 +661,9 @@ export default function PartiturasAdmin() {
     { ruta: '/admin/vocalizacion', icono: '🎶', titulo: 'Técnica vocal', texto: 'Qué ejercicios de respiración, resonancia y vocalización practican y cuántas veces.' },
   ]
   const pestanas = [
-    { id: 'informes', label: 'Informes de los cantantes' },
+    { id: 'informes', label: 'Informes' },
     { id: 'ejercicios', label: 'Ejercicios', n: cargandoEjercicios ? null : ejercicios.length },
-    { id: 'obras', label: 'Obras para practicar', n: cargando ? null : partituras.length },
+    { id: 'obras', label: 'Obras', n: cargando ? null : partituras.length },
   ]
 
   return (
@@ -676,7 +676,7 @@ export default function PartiturasAdmin() {
         {pestanas.map(p => (
           <button key={p.id} onClick={() => setTab(p.id)}
             style={{
-              padding: '10px 14px', fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap', background: 'none', border: 'none',
+              padding: '10px 12px', fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap', background: 'none', border: 'none',
               borderBottom: tab === p.id ? '2px solid #0F6E56' : '2px solid transparent', marginBottom: '-1px',
               color: tab === p.id ? '#0F6E56' : '#5F5E5A', fontWeight: tab === p.id ? 600 : 400,
             }}>

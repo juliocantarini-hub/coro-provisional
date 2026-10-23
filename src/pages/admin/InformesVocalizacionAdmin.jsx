@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import BotonVolver from '../../components/BotonVolver'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 
@@ -210,12 +211,9 @@ export default function InformesVocalizacionAdmin() {
   const nPractican = datos.cantantes.length
 
   return (
-    <div>
-      <button onClick={() => navigate('/admin/entrenamiento')}
-        style={{ background: 'none', border: 'none', padding: 0, marginBottom: '10px', fontSize: '13px', color: VERDE, cursor: 'pointer', fontWeight: 500 }}>
-        ← Volver a Entrenamiento
-      </button>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '10px' }}>
+    <div style={{ position: 'relative' }}>
+      <BotonVolver texto="Entrenamiento" onClick={() => navigate('/admin/entrenamiento')} />
+      <div style={{ paddingRight: window.innerWidth > 768 ? '150px' : 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: 0 }}>🎶 Técnica vocal de los cantantes</h2>
         <button onClick={cargar} style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: VERDE, fontWeight: 500 }}>↻ Actualizar</button>
       </div>

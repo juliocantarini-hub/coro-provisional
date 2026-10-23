@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import BotonVolver from '../../components/BotonVolver'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 
@@ -118,12 +119,9 @@ export default function InformesAfinacionAdmin() {
   }
 
   return (
-    <div>
-      <button onClick={() => navigate('/admin/entrenamiento')}
-        style={{ background: 'none', border: 'none', padding: 0, marginBottom: '10px', fontSize: '13px', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-        ← Volver a Entrenamiento
-      </button>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+    <div style={{ position: 'relative' }}>
+      <BotonVolver texto="Entrenamiento" onClick={() => navigate('/admin/entrenamiento')} />
+      <div style={{ paddingRight: window.innerWidth > 768 ? '150px' : 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>Informes de afinación</h2>
           <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
