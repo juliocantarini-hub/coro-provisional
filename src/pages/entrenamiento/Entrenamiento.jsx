@@ -12,6 +12,7 @@ import BotonVolver from '../../components/BotonVolver'
 import { useRitmoProgreso } from '../../hooks/useRitmoProgreso'
 import { useRitmoDictadoProgreso } from '../../hooks/useRitmoDictadoProgreso'
 import { useAuditivaProgreso } from '../../hooks/useAuditivaProgreso'
+import { MOSTRAR_PRACTICA_AUDITIVA, MOSTRAR_DICTADO_RITMICO } from '../../lib/funcionesEntrenamiento'
 
 function useEsMovil() {
   const [esMovil, setEsMovil] = useState(window.innerWidth <= 768)
@@ -231,10 +232,12 @@ export default function Entrenamiento() {
             descripcion="Escuchá, leé y marcá el ritmo. Se desbloquea nivel por nivel."
             detalle={detalleRitmo}
             onClick={() => setSeccion('ritmo')} />
-          <TarjetaSeccion icono="👂" titulo="Práctica auditiva" color="#6B58B8" bg="#EEEAF9"
-            descripcion="Entrená el oído con el pentagrama: ¿cuál sonó?, eco, saltos, acordes y melodías."
-            detalle={detalleAuditiva}
-            onClick={() => setSeccion('auditiva')} />
+          {MOSTRAR_PRACTICA_AUDITIVA && (
+            <TarjetaSeccion icono="👂" titulo="Práctica auditiva" color="#6B58B8" bg="#EEEAF9"
+              descripcion="Entrená el oído con el pentagrama: ¿cuál sonó?, eco, saltos, acordes y melodías."
+              detalle={detalleAuditiva}
+              onClick={() => setSeccion('auditiva')} />
+          )}
         </div>
       )}
 
@@ -304,10 +307,10 @@ export default function Entrenamiento() {
       )}
 
       {/* Ritmo */}
-      {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} progDictado={ritmoDictado} onSalir={() => setSeccion(null)} />}
+      {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} progDictado={MOSTRAR_DICTADO_RITMICO ? ritmoDictado : null} onSalir={() => setSeccion(null)} />}
 
       {/* Práctica auditiva */}
-      {seccion === 'auditiva' && <AuditivaEntrenamiento prog={auditiva} voz={perfil?.voz} onSalir={() => setSeccion(null)} />}
+      {MOSTRAR_PRACTICA_AUDITIVA && seccion === 'auditiva' && <AuditivaEntrenamiento prog={auditiva} voz={perfil?.voz} onSalir={() => setSeccion(null)} />}
     </div>
   )
 }

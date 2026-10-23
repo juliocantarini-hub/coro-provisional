@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import JSZip from 'jszip'
 import { parsearMusicXML, parsearPatronVocalizacion } from '../../lib/musicxml'
+import { MOSTRAR_PRACTICA_AUDITIVA, MOSTRAR_DICTADO_RITMICO } from '../../lib/funcionesEntrenamiento'
 import {
   usePartiturasAdmin, crearPartitura, publicarPartitura, eliminarPartitura, actualizarPartitura,
 } from '../../hooks/usePartituras'
@@ -655,14 +656,18 @@ export default function PartiturasAdmin() {
             style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
             🥁 Ritmo de los cantantes →
           </button>
-          <button onClick={() => navigate('/admin/ritmo-dictado')}
-            style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-            👂 Dictados rítmicos de los cantantes →
-          </button>
-          <button onClick={() => navigate('/admin/auditiva')}
-            style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-            👂 Práctica auditiva de los cantantes →
-          </button>
+          {MOSTRAR_DICTADO_RITMICO && (
+            <button onClick={() => navigate('/admin/ritmo-dictado')}
+              style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
+              👂 Dictados rítmicos de los cantantes →
+            </button>
+          )}
+          {MOSTRAR_PRACTICA_AUDITIVA && (
+            <button onClick={() => navigate('/admin/auditiva')}
+              style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
+              👂 Práctica auditiva de los cantantes →
+            </button>
+          )}
           <button onClick={() => navigate('/admin/vocalizacion')}
             style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
             🎶 Técnica vocal de los cantantes →
