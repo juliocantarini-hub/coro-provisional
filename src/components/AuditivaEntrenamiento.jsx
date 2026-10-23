@@ -85,8 +85,6 @@ const estadoDeBoton = (valor, correcto, elegido, revelado) => {
   return 'apagada'
 }
 
-const leerAyuda = () => { try { return localStorage.getItem('auditiva_ayuda') !== '0' } catch { return true } }
-const guardarAyuda = (v) => { try { localStorage.setItem('auditiva_ayuda', v ? '1' : '0') } catch { /* sin almacenamiento */ } }
 
 const mensajeMic = (e) => {
   const nombre = e?.name || ''
@@ -98,7 +96,7 @@ const mensajeMic = (e) => {
 const INTRO = {
   cual: ['En el pentagrama hay dos notas.', 'Cuanto más arriba está una nota, más aguda suena. Va a sonar una sola: tocá la que escuchaste. Si querés, podés escuchar las dos antes de decidir.'],
   eco: ['Escuchás una frase, escrita en el pentagrama, y la cantás con «la».', 'Cantala a la altura que te quede cómoda: no importa si es más grave o más aguda que el piano. Lo que se mira es cuánto sube y cuánto baja cada nota. Buscá un lugar tranquilo.'],
-  intervalo: ['Vas a escuchar dos notas.', 'Fijate qué tan grande es el salto entre una y otra. Cada tamaño se parece al comienzo de una canción conocida. Al responder vas a ver cómo se escribe.'],
+  intervalo: ['Vas a escuchar dos notas.', 'Fijate qué tan grande es el salto entre una y otra. Cuanto más separadas suenan, más grande es el salto. Al responder vas a ver cómo se escribe.'],
   acorde: ['Vas a escuchar tres notas sonando juntas.', 'Decidí qué sensación te dan: ¿alegre, triste o tensa? Al responder vas a ver cómo se escribe el acorde.'],
   dictado: ['Escuchás primero la escala de Do (Do, Re, Mi, Fa, Sol, La, Si, Do) y después una melodía.', 'Armala en el pentagrama, nota por nota, en el orden en que suenan. Podés oír cada nota al tocarla.'],
 }
@@ -125,7 +123,6 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
   const [rotulo, setRotulo] = useState(null) // 'Escala' | 'Melodía' mientras suena esa parte del dictado
   const [notaActiva, setNotaActiva] = useState(-1)
   const [sinAudio, setSinAudio] = useState(false)
-  const [ayuda, setAyuda] = useState(leerAyuda)
   const [estadoEco, setEstadoEco] = useState('listo') // listo | grabando | analizando | hecho
   const [informeEco, setInformeEco] = useState(null)
   const [errEco, setErrEco] = useState(null)
@@ -419,7 +416,7 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
       return (
         <>
           {veredicto && <Banner ok={veredicto.ok} titulo={veredicto.ok ? (reintento ? '¡Ahora sí!' : '¡Correcto!') : 'No era ese'}
-            texto={`Era un ${correcto.corto} (${correcto.etiqueta})${p.conDireccion ? (p.correcta.baja ? ' que baja' : ' que sube') : ''}, como el comienzo de «${correcto.pista}».${veredicto.ok ? '' : ' Podés probar de nuevo o seguir.'}`} />}
+            texto={`Era un ${correcto.corto} (${correcto.etiqueta})${p.conDireccion ? (p.correcta.baja ? ' que baja' : ' que sube') : ''}${veredicto.ok ? '.' : '. Podés probar de nuevo o seguir.'}`} />}
           <div style={{ textAlign: 'center', fontSize: '15px', color: '#1A1A18', fontWeight: 600 }}>
             {p.conDireccion ? '¿Sube o baja? ¿Qué tan grande es el salto?' : 'Las notas suben. ¿Qué tan grande es el salto?'}
           </div>
@@ -438,14 +435,10 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
             <BotonRespuesta key={it.id} deshabilitado={revelado}
               onClick={() => responder({ id: it.id, baja: p.conDireccion ? dirSel === 'baja' : false })}
               estado={revelado ? (it.id === p.correcta.id && dirOk ? 'correcta' : it.id === p.correcta.id ? 'correcta' : it.id === elegido ? 'mala' : 'apagada') : 'normal'}
-              sub={ayuda ? `como el comienzo de «${it.pista}»` : null}>
+              >
               {it.etiqueta} · {it.corto}
             </BotonRespuesta>
           ))}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', fontSize: '12px', color: '#5F5E5A', cursor: 'pointer' }}>
-            <input type="checkbox" checked={ayuda} onChange={(e) => { setAyuda(e.target.checked); guardarAyuda(e.target.checked) }} />
-            Mostrar la canción de ayuda
-          </label>
           {revelado && pentagramaGrafia(p, 'negra', `Así se escribe: un salto de ${correcto.etiqueta}${p.conDireccion ? (p.correcta.baja ? ' hacia abajo' : ' hacia arriba') : ''}`)}
         </>
       )

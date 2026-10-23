@@ -35,11 +35,11 @@ export const COLORES_GRADO = ['#E8756B', '#E99A55', '#E9BF45', '#7DBE6B', '#3FAE
 export const midiDeGrado = (raiz, g) => raiz + 12 * Math.floor(g / 7) + ESCALA[((g % 7) + 7) % 7]
 
 export const INTERVALOS = [
-  { id: '2', semitonos: 2, etiqueta: '2ª', corto: 'salto chico', pista: 'Martinillo' },
-  { id: '3', semitonos: 4, etiqueta: '3ª', corto: 'salto mediano', pista: 'Cuando los santos' },
-  { id: '4', semitonos: 5, etiqueta: '4ª', corto: 'salto medio', pista: 'Marcha nupcial' },
-  { id: '5', semitonos: 7, etiqueta: '5ª', corto: 'salto grande', pista: 'Estrellita, ¿dónde estás?' },
-  { id: '8', semitonos: 12, etiqueta: '8ª', corto: 'salto muy grande', pista: 'Over the rainbow' },
+  { id: '2', semitonos: 2, etiqueta: '2ª', corto: 'salto chico' },
+  { id: '3', semitonos: 4, etiqueta: '3ª', corto: 'salto mediano' },
+  { id: '4', semitonos: 5, etiqueta: '4ª', corto: 'salto medio' },
+  { id: '5', semitonos: 7, etiqueta: '5ª', corto: 'salto grande' },
+  { id: '8', semitonos: 12, etiqueta: '8ª', corto: 'salto muy grande' },
 ]
 
 export const ACORDES = {
@@ -63,7 +63,7 @@ export const NIVELES = [
     ejercicios: [{ n: 3, pasos: [1, 1] }, { n: 3, pasos: [1, 2] }, { n: 3, pasos: [1, 2] }, { n: 3, pasos: [1, 3] }, { n: 3, pasos: [2, 3] }] },
   { id: 5, tipo: 'eco', nombre: 'Eco: cuatro notas', descr: 'Frases más largas, con algún salto.',
     ejercicios: [{ n: 4, pasos: [1, 2] }, { n: 4, pasos: [1, 2] }, { n: 4, pasos: [1, 3] }, { n: 4, pasos: [2, 4] }, { n: 4, pasos: [2, 4] }] },
-  { id: 6, tipo: 'intervalo', nombre: 'Reconocé el salto', descr: 'Dos notas que suben: ¿qué tan grande es el salto? Hay canciones que te ayudan.', baja: false,
+  { id: 6, tipo: 'intervalo', nombre: 'Reconocé el salto', descr: 'Dos notas que suben: ¿qué tan grande es el salto?', baja: false,
     ejercicios: [{ pool: ['2', '5'] }, { pool: ['3', '5', '8'] }, { pool: ['2', '3', '5'] }, { pool: ['2', '3', '4', '5'] }, { pool: ['2', '3', '4', '5', '8'] }] },
   { id: 7, tipo: 'intervalo', nombre: 'Saltos que suben y bajan', descr: 'Ahora el salto puede subir o bajar: decí hacia dónde y cuánto.', baja: true,
     ejercicios: [{ pool: ['2', '5'] }, { pool: ['3', '5', '8'] }, { pool: ['2', '3', '5'] }, { pool: ['2', '3', '4', '5'] }, { pool: ['2', '3', '4', '5', '8'] }] },
