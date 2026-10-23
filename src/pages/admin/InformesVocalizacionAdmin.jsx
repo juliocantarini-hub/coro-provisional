@@ -68,6 +68,9 @@ export default function InformesVocalizacionAdmin() {
   const [vista, setVista] = useState('ejercicio') // 'ejercicio' | 'cantante'
   const [busqueda, setBusqueda] = useState('')
   const [abierto, setAbierto] = useState(null)
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false)
+  const [borrando, setBorrando] = useState(false)
+  const [aviso, setAviso] = useState('')
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -119,6 +122,25 @@ export default function InformesVocalizacionAdmin() {
   }, [periodo])
 
   useEffect(() => { cargar() }, [cargar])
+
+  // Borra el historial de la categoría elegida (de todos los cantantes y de todo el tiempo, no solo del período que se está viendo)
+  const borrarHistorial = async () => {
+    const coro = await getCoroActual()
+    const ids = ejercicios.filter((e) => e.categoria === categoria).map((e) => e.id)
+    if (!coro || !ids.length) { setConfirmandoBorrado(false); return }
+    setBorrando(true)
+    setAviso('')
+    const { count, error: err } = await supabase.from('actividad_entrenamiento')
+      .delete({ count: 'exact' })
+      .eq('coro_id', coro.id)
+      .in('ejercicio_id', ids)
+    setBorrando(false)
+    setConfirmandoBorrado(false)
+    if (err) { setError('No se pudo borrar el historial: ' + err.message); return }
+    if (!count) { setError('No se borró nada. Si ya hay prácticas, falta correr actividad_entrenamiento_directores.sql en Supabase (agrega el permiso para borrar).'); return }
+    setAviso(`Listo: se borraron ${plural(count, 'práctica', 'prácticas')} de ${cat.label.toLowerCase()}.`)
+    cargar()
+  }
 
   // Además de las tres de siempre, cualquier otra categoría que tenga ejercicios cargados (así no queda práctica sin mostrar)
   const categorias = useMemo(() => {
@@ -202,13 +224,14 @@ export default function InformesVocalizacionAdmin() {
       </p>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-        {categorias.map((c) => <Pastilla key={c.id} activa={categoria === c.id} color={c.color} onClick={() => { setCategoria(c.id); setAbierto(null) }}>{c.label} · {resumen.porCategoria[c.id] || 0}</Pastilla>)}
+        {categorias.map((c) => <Pastilla key={c.id} activa={categoria === c.id} color={c.color} onClick={() => { setCategoria(c.id); setAbierto(null); setConfirmandoBorrado(false) }}>{c.label} · {resumen.porCategoria[c.id] || 0}</Pastilla>)}
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
         {PERIODOS.map((p) => <Pastilla key={p.id} activa={periodo === p.id} onClick={() => setPeriodo(p.id)}>{p.label}</Pastilla>)}
       </div>
 
       {error && <div style={{ background: '#FCEBEB', border: '1px solid #E24B4A', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#501313', marginBottom: '12px' }}>{error}</div>}
+      {aviso && !error && <div style={{ background: '#E1F5EE', border: '1px solid #9FD6C3', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#0B4F3F', marginBottom: '12px' }}>{aviso}</div>}
       {cargando && <div style={{ fontSize: '13px', color: '#888780' }}>Cargando…</div>}
 
       {!cargando && !error && (
@@ -319,6 +342,33 @@ export default function InformesVocalizacionAdmin() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {(resumen.porCategoria[categoria] || 0) > 0 && (
+            <div style={{ marginTop: '24px', paddingTop: '14px', borderTop: '1px solid #E8E6DF' }}>
+              {!confirmandoBorrado ? (
+                <button onClick={() => { setAviso(''); setConfirmandoBorrado(true) }}
+                  style={{ padding: '7px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #E5B5B2', background: '#FFFFFF', color: '#C0392B', cursor: 'pointer', fontWeight: 500 }}>
+                  🗑 Borrar historial de {cat.label.toLowerCase()}…
+                </button>
+              ) : (
+                <div style={{ background: '#FCEBEB', border: '1px solid #E24B4A', borderRadius: '10px', padding: '12px 14px' }}>
+                  <div style={{ fontSize: '13px', color: '#501313', lineHeight: 1.5, marginBottom: '10px' }}>
+                    Vas a borrar las <b>{plural(resumen.porCategoria[categoria], 'práctica', 'prácticas')}</b> de {cat.label.toLowerCase()} de todos los cantantes, de todo el tiempo (no solo del período que estás viendo). No se puede deshacer.
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button onClick={borrarHistorial} disabled={borrando}
+                      style={{ padding: '7px 14px', fontSize: '13px', borderRadius: '8px', border: 'none', background: '#C0392B', color: '#FFFFFF', cursor: 'pointer', fontWeight: 600, opacity: borrando ? 0.6 : 1 }}>
+                      {borrando ? 'Borrando…' : 'Sí, borrar'}
+                    </button>
+                    <button onClick={() => setConfirmandoBorrado(false)} disabled={borrando}
+                      style={{ padding: '7px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', cursor: 'pointer' }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
