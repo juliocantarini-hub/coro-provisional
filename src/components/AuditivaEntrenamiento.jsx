@@ -462,7 +462,7 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
     const columnasEntrada = p.grados.map((gc, i) => {
       const g = ingreso[i]
       if (g == null) return { vacia: true, seleccionada: enPentagrama && !revelado && seleccion === i, notas: [] }
-      const color = revelado ? (g === gc ? '#2F9E6F' : '#D04A43') : (enPentagrama ? undefined : COLORES_GRADO[(grafiaDe(g).paso % 7 + 7) % 7])
+      const color = revelado ? (g === gc ? '#2F9E6F' : '#D04A43') : COLORES_GRADO[(grafiaDe(g).paso % 7 + 7) % 7]
       return {
         notas: [{ ...grafiaDe(g), figura: 'negra', color, estado: enPentagrama && !revelado && seleccion === i ? 'sel' : 'normal' }],
         etiqueta: nombreDePaso(grafiaDe(g).paso),
@@ -526,6 +526,14 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
         )}
         {!revelado && enPentagrama && (
           <>
+            <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+              {Array.from({ length: p.max }, (_, g) => (
+                <span key={g} style={{
+                  flex: '1 1 0', minWidth: 0, textAlign: 'center', padding: '4px 0', borderRadius: '9px', fontSize: '12px', fontWeight: 700, color: '#FFFFFF',
+                  background: COLORES_GRADO[(grafiaDe(g).paso % 7 + 7) % 7],
+                }}>{nombreDePaso(grafiaDe(g).paso)}</span>
+              ))}
+            </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => mover(1)} style={boton(false)}>▲ Más aguda</button>
               <button onClick={() => mover(-1)} style={boton(false)}>▼ Más grave</button>
