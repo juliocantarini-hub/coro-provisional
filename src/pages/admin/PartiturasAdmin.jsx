@@ -802,7 +802,7 @@ export default function PartiturasAdmin() {
       <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 14px', flexWrap: 'wrap', gap: '12px' }}>
         <p style={{ fontSize: '13px', color: '#888780', margin: 0 }}>
-          {cargando ? 'Cargando...' : `${partituras.length} obra${partituras.length !== 1 ? 's' : ''} para que los cantantes practiquen su afinación`}
+          {cargando ? 'Cargando...' : `${partituras.length} práctica${partituras.length !== 1 ? 's' : ''} de afinación para los cantantes`}
         </p>
         <button onClick={() => setMostrarForm(true)}
           style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>

@@ -226,7 +226,7 @@ export default function Entrenamiento() {
             onClick={() => setSeccion('tecnica')} />
           <TarjetaSeccion icono="🎤" titulo="Practicá tu afinación" color="#378ADD" bg="#E6F1FB"
             descripcion="Cantá, grabate y mirá tu informe."
-            detalle={!cargandoPartituras ? `${partituras.length} ${partituras.length === 1 ? 'obra' : 'obras'}` : null}
+            detalle={!cargandoPartituras ? `${partituras.length} ${partituras.length === 1 ? 'práctica' : 'prácticas'}` : null}
             onClick={() => setSeccion('obras')} />
           <TarjetaSeccion icono="🥁" titulo="Ritmo" color="#B5791B" bg="#FBF3DF"
             descripcion="Escuchá, leé y marcá el ritmo. Se desbloquea nivel por nivel."
@@ -295,7 +295,7 @@ export default function Entrenamiento() {
       {seccion === 'obras' && (
         cargandoPartituras ? <Esqueleto cantidad={2} /> : partituras.length === 0 ? (
           <div style={{ fontSize: '13px', color: '#888780', padding: '30px 0', textAlign: 'center' }}>
-            Todavía no hay obras cargadas para practicar por voz.
+            Todavía no hay prácticas de afinación cargadas.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
