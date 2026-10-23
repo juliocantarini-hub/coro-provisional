@@ -132,7 +132,7 @@ function TarjetaSeccion({ icono, titulo, descripcion, detalle, color, bg, onClic
 
 const SECCIONES = {
   tecnica: { titulo: 'Técnica vocal', subtitulo: 'Respiración, resonancia y vocalización.' },
-  obras:   { titulo: 'Práctica de obras', subtitulo: 'Practicá tu voz en las obras del coro y mirá cómo te fue.' },
+  obras:   { titulo: 'Practicá tu afinación', subtitulo: 'Cantá, grabate y mirá tu informe.' },
   ritmo:   { titulo: 'Ritmo', subtitulo: 'Aprendé a leer y marcar el ritmo, nivel por nivel.' },
   auditiva: { titulo: 'Práctica auditiva', subtitulo: 'Entrená el oído, nivel por nivel. No hace falta saber música.' },
 }
@@ -224,8 +224,8 @@ export default function Entrenamiento() {
             descripcion="Respiración, resonancia y vocalización."
             detalle={!cargando && !error ? `${ejercicios.length} ${ejercicios.length === 1 ? 'ejercicio' : 'ejercicios'}` : null}
             onClick={() => setSeccion('tecnica')} />
-          <TarjetaSeccion icono="🎤" titulo="Práctica de obras" color="#378ADD" bg="#E6F1FB"
-            descripcion="Practicá tu voz en las obras del coro y mirá tu informe."
+          <TarjetaSeccion icono="🎤" titulo="Practicá tu afinación" color="#378ADD" bg="#E6F1FB"
+            descripcion="Cantá, grabate y mirá tu informe."
             detalle={!cargandoPartituras ? `${partituras.length} ${partituras.length === 1 ? 'obra' : 'obras'}` : null}
             onClick={() => setSeccion('obras')} />
           <TarjetaSeccion icono="🥁" titulo="Ritmo" color="#B5791B" bg="#FBF3DF"
