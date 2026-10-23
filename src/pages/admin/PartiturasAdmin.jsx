@@ -610,6 +610,18 @@ export default function PartiturasAdmin() {
   const [procesandoEjercicio, setProcesandoEjercicio] = useState(null)
   const [confirmEliminarEjercicio, setConfirmEliminarEjercicio] = useState(null)
   const [editandoEjercicio, setEditandoEjercicio] = useState(null)
+  // Pestañas del panel: Informes de los cantantes | Ejercicios | Obras para practicar (?tab=ejercicios / ?tab=obras)
+  const [tab, setTabState] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return t === 'ejercicios' || t === 'obras' ? t : 'informes'
+  })
+  const setTab = (t) => {
+    setTabState(t)
+    const url = new URL(window.location.href)
+    if (t === 'informes') url.searchParams.delete('tab'); else url.searchParams.set('tab', t)
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+  }
+  const [filtroCat, setFiltroCat] = useState('todas')
 
   async function togglePublicar(p) {
     setProcesando(p.id)
@@ -641,48 +653,70 @@ export default function PartiturasAdmin() {
     setProcesandoEjercicio(null)
   }
 
+  const tarjetas = [
+    { ruta: '/admin/informes-afinacion', icono: '🎤', titulo: 'Afinación', texto: 'Cómo afinan los cantantes y en qué notas fallan.' },
+    { ruta: '/admin/ritmo', icono: '🥁', titulo: 'Ritmo', texto: 'Cómo les va con los ejercicios de ritmo.' },
+    ...(MOSTRAR_DICTADO_RITMICO ? [{ ruta: '/admin/ritmo-dictado', icono: '✍️', titulo: 'Dictados rítmicos', texto: 'Resultados de los dictados rítmicos.' }] : []),
+    ...(MOSTRAR_PRACTICA_AUDITIVA ? [{ ruta: '/admin/auditiva', icono: '👂', titulo: 'Práctica auditiva', texto: 'Resultados de la práctica auditiva.' }] : []),
+    { ruta: '/admin/vocalizacion', icono: '🎶', titulo: 'Técnica vocal', texto: 'Qué ejercicios de respiración, resonancia y vocalización practican y cuántas veces.' },
+  ]
+  const pestanas = [
+    { id: 'informes', label: 'Informes de los cantantes' },
+    { id: 'ejercicios', label: 'Ejercicios', n: cargandoEjercicios ? null : ejercicios.length },
+    { id: 'obras', label: 'Obras para practicar', n: cargando ? null : partituras.length },
+  ]
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 20px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: 0 }}>
-          Entrenamiento
-        </h2>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/admin/informes-afinacion')}
-            style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-            🎤 Informes de afinación de los cantantes →
+      <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 14px' }}>
+        Entrenamiento
+      </h2>
+
+      <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', borderBottom: '1px solid #E8E6DF', marginBottom: '20px' }}>
+        {pestanas.map(p => (
+          <button key={p.id} onClick={() => setTab(p.id)}
+            style={{
+              padding: '10px 14px', fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap', background: 'none', border: 'none',
+              borderBottom: tab === p.id ? '2px solid #0F6E56' : '2px solid transparent', marginBottom: '-1px',
+              color: tab === p.id ? '#0F6E56' : '#5F5E5A', fontWeight: tab === p.id ? 600 : 400,
+            }}>
+            {p.label}{p.n != null ? <span style={{ color: '#B4B2A9', fontWeight: 400 }}> · {p.n}</span> : null}
           </button>
-          <button onClick={() => navigate('/admin/ritmo')}
-            style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-            🥁 Ritmo de los cantantes →
-          </button>
-          {MOSTRAR_DICTADO_RITMICO && (
-            <button onClick={() => navigate('/admin/ritmo-dictado')}
-              style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-              👂 Dictados rítmicos de los cantantes →
-            </button>
-          )}
-          {MOSTRAR_PRACTICA_AUDITIVA && (
-            <button onClick={() => navigate('/admin/auditiva')}
-              style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-              👂 Práctica auditiva de los cantantes →
-            </button>
-          )}
-          <button onClick={() => navigate('/admin/vocalizacion')}
-            style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '8px', border: '1px solid #0F6E56', background: '#FFFFFF', color: '#0F6E56', cursor: 'pointer', fontWeight: 500 }}>
-            🎶 Técnica vocal de los cantantes →
-          </button>
-        </div>
+        ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
+      {tab === 'informes' && (
         <div>
-          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
-            Ejercicios
-          </h3>
-          <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
-            {cargandoEjercicios ? 'Cargando...' : `${ejercicios.length} en total`}
+          <p style={{ fontSize: '13px', color: '#888780', margin: '0 0 14px' }}>
+            Cómo practican tus cantantes. Elegí un informe para ver el detalle por ejercicio y por cantante.
           </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
+            {tarjetas.map(t => (
+              <button key={t.ruta} onClick={() => navigate(t.ruta)}
+                style={{ textAlign: 'left', background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>{t.icono}</span>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#1A1A18' }}>{t.titulo} <span style={{ color: '#0F6E56' }}>→</span></span>
+                <span style={{ fontSize: '12px', color: '#888780', lineHeight: 1.4 }}>{t.texto}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'ejercicios' && (
+      <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {['todas', ...categoriasAMostrar].map(c => {
+            const activa = filtroCat === c
+            const n = c === 'todas' ? ejercicios.length : ejercicios.filter(e => e.categoria === c).length
+            return (
+              <button key={c} onClick={() => setFiltroCat(c)}
+                style={{ padding: '6px 14px', fontSize: '13px', borderRadius: '999px', cursor: 'pointer', fontWeight: 500, border: `1px solid ${activa ? '#0F6E56' : '#D3D1C7'}`, background: activa ? '#0F6E56' : '#FFFFFF', color: activa ? '#FFFFFF' : '#5F5E5A' }}>
+                {c === 'todas' ? 'Todos' : (CATEGORIA_LABEL[c] || c)} · {n}
+              </button>
+            )
+          })}
         </div>
         <button onClick={() => setMostrarFormEjercicio(true)}
           style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -695,7 +729,7 @@ export default function PartiturasAdmin() {
 
       {cargandoEjercicios && <div style={{ color: '#888780', fontSize: '13px' }}>Cargando...</div>}
 
-      {!cargandoEjercicios && categoriasAMostrar.map(categoria => {
+      {!cargandoEjercicios && categoriasAMostrar.filter(c => filtroCat === 'todas' || c === filtroCat).map(categoria => {
         const items = ejercicios.filter(e => e.categoria === categoria)
         return (
           <div key={categoria} style={{ marginBottom: '24px' }}>
@@ -761,15 +795,15 @@ export default function PartiturasAdmin() {
         )
       })}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '32px 0 14px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>
-            Práctica
-          </h3>
-          <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
-            {cargando ? 'Cargando...' : `${partituras.length} obra${partituras.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
+      </div>
+      )}
+
+      {tab === 'obras' && (
+      <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 14px', flexWrap: 'wrap', gap: '12px' }}>
+        <p style={{ fontSize: '13px', color: '#888780', margin: 0 }}>
+          {cargando ? 'Cargando...' : `${partituras.length} obra${partituras.length !== 1 ? 's' : ''} para que los cantantes practiquen su voz`}
+        </p>
         <button onClick={() => setMostrarForm(true)}
           style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -831,6 +865,8 @@ export default function PartiturasAdmin() {
           </div>
         ))}
       </div>
+      </div>
+      )}
 
       {mostrarForm && (
         <ModalNuevaPartitura
