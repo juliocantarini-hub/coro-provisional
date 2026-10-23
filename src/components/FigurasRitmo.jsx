@@ -68,19 +68,18 @@ const ancho = (f, m) => Math.max(m.w + 260, 430 + 760 * Math.sqrt(f.dur))
  * Un compás escrito: figuras repartidas según su duración.
  * estados: arreglo de true/false por figura (verde / rojo) o null. onFigura(i): tocar una figura.
  */
-export function CompasRitmo({ figuras, pulsos, estados = null, onFigura = null, vacio = 'Compás vacío', seleccionado = false }) {
+export function CompasRitmo({ figuras, pulsos, estados = null, onFigura = null, vacio = 'Compás vacío', seleccionado = false, alto = 66 }) {
   const ms = figuras.map(medir)
   let x = MARGEN
   const lugares = figuras.map((f, i) => { const l = { x, w: ancho(f, ms[i]) }; x += l.w; return l })
-  const total = Math.max(x, pulsos * 1000 + MARGEN)
+  const total = Math.max(x + 120, pulsos * 900 + MARGEN)
   const viewH = Y_MAX - Y_MIN
   return (
     <svg role="img" aria-label={figuras.length ? figuras.map(nombre).join(', ') : vacio} viewBox={`0 ${Y_MIN} ${total} ${viewH}`}
-      style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '120px', background: seleccionado ? '#F5F1FC' : 'transparent', borderRadius: '8px' }} preserveAspectRatio="xMinYMid meet">
+      style={{ display: 'block', width: `${Math.round((alto * total) / viewH)}px`, maxWidth: '100%', height: 'auto', background: seleccionado ? '#F5F1FC' : 'transparent', borderRadius: '8px' }}>
       <line x1={0} y1={0} x2={total} y2={0} stroke="#B4B2A9" strokeWidth={26} />
       <line x1={14} y1={-420} x2={14} y2={420} stroke="#5F5E5A" strokeWidth={34} />
       <line x1={total - 14} y1={-420} x2={total - 14} y2={420} stroke="#5F5E5A" strokeWidth={34} />
-      {!figuras.length && <text x={total / 2} y={90} textAnchor="middle" fontSize={300} fill="#B4B2A9" style={{ fontFamily: 'system-ui, sans-serif' }}>{vacio}</text>}
       {figuras.map((f, i) => {
         const color = estados ? (estados[i] ? VERDE_OK : ROJO_MAL) : NEGRO
         const l = lugares[i]

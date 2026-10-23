@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   NIVELES_DICTADO, EJERCICIOS_POR_NIVEL, APROBADO_PCT, estrellasPara, nivelDictado,
-  armarDictado, corregir, corregirDictado, ejercicioDeRespuesta, duracionCompas, nombreFigura,
+  armarDictado, corregir, corregirDictado, ejercicioDeRespuesta, duracionCompas, nombreFigura, transcribirToques,
 } from '../lib/ritmoDictado'
 import { crearMotorRitmo, precargarPiano } from '../lib/ritmoAudio'
 import RitmoPartitura, { COLOR_ESTADO } from './RitmoPartitura'
 import { CompasRitmo, FiguraIcono } from './FigurasRitmo'
 import { VERDE, Estrellas, boton, ContadorPulsos } from './RitmoUI'
+import { leerLatencia, aprenderDeIntento } from '../lib/ritmoLatencia'
 
 const NUM_NIVELES = NIVELES_DICTADO.length
 const EPS = 1e-6
@@ -45,6 +46,11 @@ export default function PantallaDictadoRitmo({ nivelId, numero, prog, onCerrar, 
   const [resultado, setResultado] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [sonandoRespuesta, setSonandoRespuesta] = useState(false)
+  const [escribiendo, setEscribiendo] = useState(false) // escribir tocando (tiempo libre)
+  const [nMarcas, setNMarcas] = useState(0)
+  const [conFiguras, setConFiguras] = useState(false)   // mostrar las figuras para escribir o corregir a mano
+  const marcasRef = useRef([])
+  const previaRef = useRef(null)
 
   useEffect(() => { precargarPiano() }, [])
   useEffect(() => () => { turnoRef.current++; if (motorRef.current) motorRef.current.parar() }, [])
@@ -54,6 +60,7 @@ export default function PantallaDictadoRitmo({ nivelId, numero, prog, onCerrar, 
     turnoRef.current++
     if (ctlRef.current) ctlRef.current.parar()
     setFase('listo'); setConteo(null); setPulso(-1); setResultado(null); setAviso(null); setEscuchado(false); setSonandoRespuesta(false)
+    setEscribiendo(false); setNMarcas(0); setConFiguras(false); marcasRef.current = []
   }, [])
   useEffect(() => { setRespuesta(ej.compases.map(() => [])); reiniciar() }, [ej, reiniciar])
 
@@ -117,7 +124,9 @@ export default function PantallaDictadoRitmo({ nivelId, numero, prog, onCerrar, 
     const ok = await correr(ej, {
       tonos: false,
       alTerminar: (toques) => {
-        const r = corregir(ej, toques)
+        const usada = leerLatencia()
+        const r = corregir(ej, toques, { latenciaMs: usada })
+        aprenderDeIntento(r, usada)
         setResultado(r)
         setFase('resultado')
         if (toques.length === 0) { setAviso({ sinToques: true }); return }
@@ -168,6 +177,52 @@ export default function PantallaDictadoRitmo({ nivelId, numero, prog, onCerrar, 
       return ult == null ? r : r.map((c, i) => (i === ult ? c.slice(0, -1) : c))
     })
   }
+  // ── Escribir tocando: sin conteo ni metrónomo, a tu ritmo; cada toque se escribe en la partitura ──
+  const empezarEscribir = async () => {
+    if (!motorRef.current) motorRef.current = crearMotorRitmo()
+    const ok = await motorRef.current.asegurar()
+    if (!ok) { setSinAudio(true); return }
+    setSinAudio(false)
+    turnoRef.current++
+    if (ctlRef.current) ctlRef.current.parar()
+    setConteo(null); setPulso(-1)
+    previaRef.current = respuesta
+    marcasRef.current = []
+    setNMarcas(0)
+    setRespuesta(ej.compases.map(() => []))
+    setEscribiendo(true)
+  }
+  const marcar = useCallback((silencio, marcaMs) => {
+    if (!escribiendo) return
+    marcasRef.current.push({ t: marcaMs / 1000, silencio })
+    if (!silencio && motorRef.current) motorRef.current.toque()
+    setNMarcas(marcasRef.current.length)
+    const r = transcribirToques(marcasRef.current, { pulsosPorCompas: ej.pulsosPorCompas, nCompases: ej.compases.length, pulsoSeg: ej.pulsoSeg, paleta: ej.paleta })
+    setRespuesta(r.compases)
+    setPulsado(true)
+    setTimeout(() => setPulsado(false), 90)
+  }, [escribiendo, ej])
+  const terminarEscribir = () => {
+    setEscribiendo(false)
+    if (!marcasRef.current.length) { setRespuesta(previaRef.current || ej.compases.map(() => [])); return }
+    setConFiguras(true) // por si hay algo para corregir
+  }
+  const cancelarEscribir = () => {
+    setEscribiendo(false)
+    marcasRef.current = []; setNMarcas(0)
+    setRespuesta(previaRef.current || ej.compases.map(() => []))
+  }
+  useEffect(() => {
+    if (!escribiendo) return undefined
+    const alTeclear = (e) => {
+      if (e.repeat) return
+      if (e.code === 'Space') { e.preventDefault(); marcar(false, e.timeStamp) }
+      else if (e.code === 'KeyS') { e.preventDefault(); marcar(true, e.timeStamp) }
+    }
+    window.addEventListener('keydown', alTeclear)
+    return () => window.removeEventListener('keydown', alTeclear)
+  }, [escribiendo, marcar])
+
   const comprobar = () => {
     if (!completo) return
     if (ctlRef.current) ctlRef.current.parar()
@@ -242,7 +297,7 @@ export default function PantallaDictadoRitmo({ nivelId, numero, prog, onCerrar, 
           )}
 
           {/* Intro */}
-          {fase === 'listo' && !resultado && (deOido || !hayAlgo) && (
+          {fase === 'listo' && !resultado && deOido && (
             <div style={{ ...tarjeta, fontSize: '13px', color: '#5F5E5A', lineHeight: 1.55 }}>
               <div style={{ fontWeight: 600, color: '#1A1A18', marginBottom: '4px' }}>{nivel.nombre}</div>
               <div style={{ marginBottom: '8px' }}>{nivel.descr}</div>
@@ -268,59 +323,42 @@ export default function PantallaDictadoRitmo({ nivelId, numero, prog, onCerrar, 
             </div>
           )}
 
-          {/* Armar: los compases escritos */}
+          {/* Armar: lo que se va escribiendo */}
           {!deOido && (
-            <div style={{ ...tarjeta, padding: '10px 10px 8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#5F5E5A', padding: '0 4px' }}>{enResultado ? 'Lo que escribiste' : 'Tu ritmo'}</div>
-              {respuesta.map((c, ci) => {
-                const falta = ej.pulsosPorCompas - duracionCompas(c)
-                const lleno = falta < EPS
-                return (
-                  <div key={ci}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888780', padding: '0 4px' }}>
-                      <span>Compás {ci + 1}</span>
-                      <span style={{ color: lleno ? VERDE : ci === activo ? '#B5791B' : '#B4B2A9', fontWeight: 600 }}>
-                        {enResultado ? '' : lleno ? '✓ completo' : `faltan ${tiempos(falta)}`}
-                      </span>
-                    </div>
-                    <CompasRitmo figuras={c} pulsos={ej.pulsosPorCompas} seleccionado={!enResultado && ci === activo}
-                      estados={enResultado ? resultado.porCompas[ci] : null}
-                      onFigura={enResultado ? null : (fi) => quitarDesde(ci, fi)} vacio={`Compás ${ci + 1}`} />
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Armar: figuras para elegir */}
-          {!deOido && !enResultado && (
-            <div>
-              <div style={{ fontSize: '12px', color: '#888780', textAlign: 'center', marginBottom: '6px' }}>
-                {completo ? 'Todos los compases están completos.' : `Elegí la figura para el compás ${activo + 1}`}
+            <>
+              {!enResultado && (
+                <div style={{ textAlign: 'center', fontSize: '13px', color: '#5F5E5A', lineHeight: 1.45, padding: '0 6px' }}>
+                  {escribiendo
+                    ? <>Tocá <b>SONIDO</b> cuando suena algo y <b>SILENCIO</b> cuando hay una pausa. Sin conteo: a tu ritmo.{nMarcas > 0 ? ` (${nMarcas} ${nMarcas === 1 ? 'marca' : 'marcas'})` : ''}</>
+                    : !hayAlgo
+                      ? <>Escuchá el ritmo y después <b>escribilo tocando</b>: un botón para cada sonido y otro para cada silencio.</>
+                      : completo
+                        ? <>Revisá tu ritmo. Podés escucharlo, tocar de nuevo o corregirlo con figuras.</>
+                        : <>Falta completar el compás {activo + 1}. Tocá de nuevo o completalo con figuras.</>}
+                </div>
+              )}
+              <div style={{ ...tarjeta, padding: '10px 12px 6px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#5F5E5A', marginBottom: '4px' }}>{enResultado ? 'Lo que escribiste' : 'Tu ritmo'}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px', alignItems: 'flex-end' }}>
+                  {respuesta.map((c, ci) => {
+                    const falta = ej.pulsosPorCompas - duracionCompas(c)
+                    const lleno = falta < EPS
+                    return (
+                      <div key={ci} style={{ flex: '0 1 auto', minWidth: 0, maxWidth: '100%', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '10px', color: '#888780', padding: '0 2px' }}>
+                          <span>{ci + 1}</span>
+                          {!enResultado && !lleno && c.length > 0 && <span style={{ color: '#B5791B', fontWeight: 600 }}>faltan {tiempos(falta)}</span>}
+                        </div>
+                        <CompasRitmo figuras={c} pulsos={ej.pulsosPorCompas} alto={84} seleccionado={!enResultado && !escribiendo && ci === activo && hayAlgo}
+                          estados={enResultado ? resultado.porCompas[ci] : null}
+                          onFigura={enResultado || escribiendo ? null : (fi) => quitarDesde(ci, fi)} vacio={`Compás ${ci + 1}`} />
+                      </div>
+                    )
+                  })}
+                </div>
+                {!enResultado && !escribiendo && hayAlgo && <div style={{ fontSize: '10px', color: '#B4B2A9', textAlign: 'center' }}>Tocá una figura para borrarla</div>}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(78px, 1fr))', gap: '8px' }}>
-                {ej.paleta.map((f) => {
-                  const cabe = !completo && f.dur <= restante + EPS
-                  return (
-                    <button key={`${f.silencio ? 'r' : ''}${f.dur}`} onClick={() => agregar(f)} disabled={!cabe || ocupado}
-                      aria-label={nombreFigura(f)}
-                      style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', padding: '6px 4px', borderRadius: '12px', cursor: cabe && !ocupado ? 'pointer' : 'default',
-                        border: '1px solid #D3D1C7', background: '#FFFFFF', opacity: cabe && !ocupado ? 1 : 0.35,
-                      }}>
-                      <FiguraIcono fig={f} alto={46} />
-                      <span style={{ fontSize: '10px', color: '#5F5E5A', lineHeight: 1.15, textAlign: 'center' }}>{nombreFigura(f)}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <div style={{ textAlign: 'center', marginTop: '8px' }}>
-                <button onClick={borrarUltima} disabled={!hayAlgo || ocupado}
-                  style={{ background: 'none', border: 'none', color: hayAlgo ? VERDE : '#B4B2A9', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>
-                  Borrar la última
-                </button>
-              </div>
-            </div>
+            </>
           )}
 
           {/* Resultado */}
@@ -390,13 +428,69 @@ export default function PantallaDictadoRitmo({ nivelId, numero, prog, onCerrar, 
               <button onClick={tocarElRitmo} disabled={!escuchado} style={boton(escuchado, { opacity: escuchado ? 1 : 0.45 })}>🥁 Tocar el ritmo</button>
             </div>
           )}
-          {fase === 'listo' && !enResultado && !deOido && (
+          {fase === 'listo' && !enResultado && !deOido && !escribiendo && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={escuchar} style={boton(!escuchado)}>🔊 Escuchar el ritmo</button>
-                <button onClick={escucharRespuesta} disabled={!completo} style={boton(false, { opacity: completo ? 1 : 0.45 })}>🔊 Mi respuesta</button>
+              {conFiguras && (
+                <div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
+                    {ej.paleta.map((f) => {
+                      const cabe = !completo && f.dur <= restante + EPS
+                      return (
+                        <button key={`${f.silencio ? 'r' : ''}${f.dur}`} onClick={() => agregar(f)} disabled={!cabe}
+                          aria-label={nombreFigura(f)} title={nombreFigura(f)}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 8px 3px', borderRadius: '10px', cursor: cabe ? 'pointer' : 'default', border: '1px solid #D3D1C7', background: '#FFFFFF', opacity: cabe ? 1 : 0.35 }}>
+                          <FiguraIcono fig={f} alto={36} />
+                        </button>
+                      )
+                    })}
+                    <button onClick={borrarUltima} disabled={!hayAlgo} aria-label="Borrar la última" title="Borrar la última"
+                      style={{ padding: '4px 10px', borderRadius: '10px', border: '1px solid #D3D1C7', background: '#FFFFFF', fontSize: '16px', color: '#5F5E5A', cursor: hayAlgo ? 'pointer' : 'default', opacity: hayAlgo ? 1 : 0.35 }}>⌫</button>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#888780', textAlign: 'center', marginTop: '3px', lineHeight: 1.3 }}>
+                    {ej.paleta.slice(0, 12).map((f) => nombreFigura(f)).join(' · ')}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={escuchar} style={boton(!escuchado && !hayAlgo, { padding: '12px 6px', fontSize: '13px' })}>🔊 Escuchar el ritmo</button>
+                <button onClick={empezarEscribir} style={boton(escuchado || hayAlgo, { padding: '12px 6px', fontSize: '13px' })}>🥁 {hayAlgo ? 'Tocar de nuevo' : 'Escribir tocando'}</button>
               </div>
-              <button onClick={comprobar} disabled={!completo} style={{ ...boton(true), width: '100%', opacity: completo ? 1 : 0.45 }}>Comprobar</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={escucharRespuesta} disabled={!completo} style={boton(false, { padding: '12px 6px', fontSize: '13px', opacity: completo ? 1 : 0.4 })}>🔊 Mi respuesta</button>
+                <button onClick={comprobar} disabled={!completo} style={boton(true, { padding: '12px 6px', fontSize: '13px', opacity: completo ? 1 : 0.4 })}>✓ Comprobar</button>
+              </div>
+              <button onClick={() => setConFiguras((v) => !v)}
+                style={{ background: 'none', border: 'none', color: VERDE, fontSize: '12px', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+                {conFiguras ? 'Ocultar las figuras' : '✏️ Escribir o corregir con figuras'}
+              </button>
+            </div>
+          )}
+          {escribiendo && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch' }}>
+                <button
+                  onPointerDown={(e) => { e.preventDefault(); marcar(false, e.nativeEvent.timeStamp) }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  style={{
+                    flex: '2 1 0', height: '84px', borderRadius: '18px', border: 'none', cursor: 'pointer', fontSize: '17px', fontWeight: 700,
+                    background: pulsado ? '#0A5441' : VERDE, color: '#FFFFFF', transform: pulsado ? 'scale(0.98)' : 'scale(1)', transition: 'transform 60ms',
+                    boxShadow: pulsado ? 'inset 0 3px 8px rgba(0,0,0,0.3)' : '0 4px 12px rgba(15,110,86,0.3)',
+                    touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent',
+                  }}>🥁 SONIDO</button>
+                <button
+                  onPointerDown={(e) => { e.preventDefault(); marcar(true, e.nativeEvent.timeStamp) }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  style={{
+                    flex: '1 1 0', height: '84px', borderRadius: '18px', cursor: 'pointer', fontSize: '15px', fontWeight: 700,
+                    border: '2px solid #B4B2A9', background: '#FFFFFF', color: '#5F5E5A',
+                    touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent',
+                  }}>⏸ SILENCIO</button>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={cancelarEscribir} style={boton(false, { padding: '11px 6px', fontSize: '13px' })}>Cancelar</button>
+                <button onClick={terminarEscribir} style={boton(true, { padding: '11px 6px', fontSize: '13px' })}>✓ Listo</button>
+              </div>
+              <div style={{ fontSize: '10px', color: '#888780', textAlign: 'center' }}>En la compu: barra espaciadora = sonido, tecla S = silencio</div>
             </div>
           )}
           {fase === 'escuchando' && <button onClick={detener} style={{ ...boton(false), width: '100%' }}>⏹ Detener</button>}

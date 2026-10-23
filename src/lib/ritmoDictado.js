@@ -128,27 +128,155 @@ export function ejercicioDeRespuesta(ej, respuesta) {
 
 // ─── Corrección del dictado escrito ─────────────────────────────────────
 
-const clavesDe = (compases) => compases.map((c, ci) => {
-  let pos = 0
-  return c.map((f) => { const k = `${ci}:${pos}:${f.silencio ? 'r' : 'n'}:${f.dur}`; pos += f.dur; return k })
-})
+// Silencios seguidos dentro de un compás se juntan (un silencio de blanca vale lo mismo que dos de negra),
+// así no se penaliza una forma distinta de escribir lo mismo.
+function agrupar(compases) {
+  return compases.map((c, ci) => {
+    const grupos = []
+    let pos = 0
+    c.forEach((f, fi) => {
+      const ult = grupos[grupos.length - 1]
+      if (f.silencio && ult && ult.silencio) { ult.dur += f.dur; ult.figuras.push(fi) } else grupos.push({ silencio: !!f.silencio, dur: f.dur, inicio: pos, figuras: [fi] })
+      pos += f.dur
+    })
+    return grupos.map((g) => ({ ...g, clave: `${ci}:${g.inicio}:${g.silencio ? 'r' : 'n'}:${g.dur}` }))
+  })
+}
 
 /**
  * Compara lo escrito con el ritmo. Una figura cuenta si está en el mismo lugar, con la misma duración y siendo
  * sonido o silencio como corresponde. Devuelve { pct, aprobado, porCompas: [[bool]], correctas, total, mensajes }.
  */
 export function corregirDictado(ej, respuesta) {
-  const esperadas = clavesDe(ej.compases)
-  const dadas = clavesDe(respuesta)
-  const setEsp = new Set(esperadas.flat())
+  const esperadas = agrupar(ej.compases)
+  const dadas = agrupar(respuesta)
+  const setEsp = new Set(esperadas.flat().map((g) => g.clave))
   const total = esperadas.flat().length
   const cantDadas = dadas.flat().length
-  const porCompas = dadas.map((c) => c.map((k) => setEsp.has(k)))
-  const correctas = porCompas.flat().filter(Boolean).length
+  const porCompas = respuesta.map((c) => c.map(() => false))
+  let correctas = 0
+  dadas.forEach((grupos, ci) => grupos.forEach((g) => {
+    const ok = setEsp.has(g.clave)
+    if (ok) correctas++
+    for (const fi of g.figuras) porCompas[ci][fi] = ok
+  }))
   const base = Math.max(total, cantDadas)
   const pct = base ? Math.round((correctas / base) * 100) : 0
-  const compasesMal = porCompas.map((c, i) => (c.every(Boolean) && c.length === esperadas[i].length ? null : i + 1)).filter((x) => x != null)
+  const compasesMal = dadas.map((grupos, i) => (grupos.every((g) => setEsp.has(g.clave)) && grupos.length === esperadas[i].length ? null : i + 1)).filter((x) => x != null)
   const mensajes = []
   if (compasesMal.length) mensajes.push(compasesMal.length === 1 ? `Revisá el compás ${compasesMal[0]}.` : `Revisá los compases ${compasesMal.join(', ')}.`)
   return { pct, aprobado: pct >= APROBADO_PCT, porCompas, correctas, total, mensajes }
+}
+
+// ─── Escribir tocando: de los toques a las figuras ─────────────────────────
+
+const LAMBDA = 0.12
+const DURACIONES = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25]
+
+// Parte "d" tiempos en figuras de la lista "permitidas" (de la más larga a la más corta). null si no se puede.
+function partir(d, permitidas) {
+  const out = []
+  let resto = d
+  for (let guarda = 0; guarda < 32 && resto > EPS; guarda++) {
+    const f = permitidas.find((x) => x <= resto + EPS)
+    if (f == null) return null
+    out.push(f)
+    resto -= f
+  }
+  return resto > EPS ? null : out
+}
+
+/**
+ * Convierte toques en tiempo libre en compases escritos.
+ * marcas: [{ t, silencio }] con t en segundos (cualquier origen: se usan los intervalos entre toques).
+ * Cada marca abre una figura (sonido o silencio) que dura hasta la marca siguiente; la última llega hasta el final.
+ * Para cada intervalo se elige una figura del nivel (sonidos) o un silencio, de modo que ninguna cruce una barra de
+ * compás, y el tempo del cantante se estima a partir de los mismos toques (parte del tempo del ejemplo).
+ * Devuelve { compases: [[{ dur, silencio }]], pulsoSeg }.
+ */
+export function transcribirToques(marcas, { pulsosPorCompas, nCompases, pulsoSeg, paleta }) {
+  const vacios = Array.from({ length: nCompases }, () => [])
+  if (!marcas.length) return { compases: vacios, pulsoSeg }
+  const total = nCompases * pulsosPorCompas
+  const grilla = Math.min(...paleta.map((f) => f.dur))
+  const idxTotal = Math.round(total / grilla)
+  const paso = (d) => Math.round(d / grilla)
+  const idxCompas = Math.round(pulsosPorCompas / grilla)
+  const sonidos = [...new Set(paleta.filter((f) => !f.silencio).map((f) => f.dur))].sort((a, b) => b - a)
+  const multiplo = (x) => x >= grilla - EPS && Math.abs(x / grilla - Math.round(x / grilla)) < EPS
+  const silencios = [...new Set([...paleta.filter((f) => f.silencio).map((f) => f.dur), ...DURACIONES.filter(multiplo)])].sort((a, b) => b - a)
+  const permitidas = (m) => (m.silencio ? silencios : (sonidos.length ? sonidos : DURACIONES)).filter((d) => d <= pulsosPorCompas + EPS)
+  const rel = marcas.map((m) => m.t - marcas[0].t)
+
+  // Un compás, a lo sumo: una figura no puede pasar de la barra
+  const cabe = (s, ds) => Math.floor((s + ds - 1) / idxCompas) === Math.floor(s / idxCompas)
+
+  // Mejor camino para un tempo "b" y las primeras "n" marcas: costo y figura elegida para cada una
+  function camino(b, n, guardar) {
+    const INF = 1e9
+    let actual = new Array(idxTotal + 1).fill(INF)
+    actual[0] = 0
+    const atras = guardar ? [] : null
+    for (let i = 0; i < n - 1; i++) {
+      const sig = new Array(idxTotal + 1).fill(INF)
+      const vino = guardar ? new Array(idxTotal + 1).fill(null) : null
+      const intervalo = rel[i + 1] - rel[i]
+      const opciones = permitidas(marcas[i])
+      for (let st = 0; st < idxTotal; st++) {
+        if (actual[st] >= INF) continue
+        for (const d of opciones) {
+          const ds = paso(d)
+          if (st + ds > idxTotal || !cabe(st, ds)) continue
+          const e = Math.log(Math.max(intervalo, 1e-3) / (b * d)) / 0.25
+          const c = actual[st] + Math.min(e * e, 4)
+          if (c < sig[st + ds]) { sig[st + ds] = c; if (guardar) vino[st + ds] = { desde: st, d } }
+        }
+      }
+      if (guardar) atras.push(vino)
+      actual = sig
+    }
+    let mejor = INF
+    let fin = -1
+    for (let st = 0; st < idxTotal; st++) if (actual[st] < mejor) { mejor = actual[st]; fin = st }
+    return { costo: mejor, fin, atras }
+  }
+
+  // Si hay más toques de los que caben, se descartan los últimos
+  for (let n = marcas.length; n >= 1; n--) {
+    let mejorB = pulsoSeg
+    let mejorCosto = 1e9
+    if (n >= 2) {
+      for (let k = -20; k <= 20; k++) {
+        const b = pulsoSeg * Math.pow(2, (k / 20) * 0.8) // de ~0,57x a ~1,74x
+        const { costo } = camino(b, n, false)
+        const total = costo + LAMBDA * n * Math.abs(Math.log2(b / pulsoSeg))
+        if (total < mejorCosto) { mejorCosto = total; mejorB = b }
+      }
+      if (mejorCosto >= 1e8) continue
+    } else { mejorCosto = 0 }
+
+    // Reconstruir las figuras del mejor camino
+    const figuras = new Array(n) // { st, d }
+    let fin = 0
+    if (n >= 2) {
+      const r = camino(mejorB, n, true)
+      fin = r.fin
+      let st = fin
+      for (let i = n - 2; i >= 0; i--) { const v = r.atras[i][st]; figuras[i] = { st: v.desde, d: v.d }; st = v.desde }
+    }
+    figuras[n - 1] = { st: fin, d: null }
+    const compases = vacios.map(() => [])
+    const poner = (st, d, silencio) => compases[Math.min(nCompases - 1, Math.floor(st / idxCompas))].push({ dur: d, silencio })
+    figuras.forEach((f, i) => {
+      if (f.d != null) { poner(f.st, f.d, marcas[i].silencio); return }
+      // La última marca llega hasta el final de su compás; los compases que siguen quedan vacíos para completarlos
+      const a = f.st
+      const b2 = Math.min((Math.floor(a / idxCompas) + 1) * idxCompas, idxTotal)
+      const lista = marcas[i].silencio ? silencios : (sonidos.length ? sonidos : DURACIONES)
+      const partes = partir((b2 - a) * grilla, lista) || partir((b2 - a) * grilla, DURACIONES) || [(b2 - a) * grilla]
+      partes.forEach((d, k) => poner(a, d, marcas[i].silencio || k > 0))
+    })
+    return { compases, pulsoSeg: mejorB }
+  }
+  return { compases: vacios, pulsoSeg }
 }

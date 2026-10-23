@@ -8,6 +8,8 @@ import RitmoPartitura, { COLOR_ESTADO } from './RitmoPartitura'
 import BotonVolver from './BotonVolver'
 import { VERDE, Estrellas, boton, ContadorPulsos } from './RitmoUI'
 import PantallaDictadoRitmo from './RitmoDictado'
+import RitmoCalibrar from './RitmoCalibrar'
+import { leerLatencia, aprenderDeIntento } from '../lib/ritmoLatencia'
 import { NIVELES_DICTADO, nivelDictado, modoDeEjercicio } from '../lib/ritmoDictado'
 
 // ─── Pantalla de un ejercicio ──────────────────────────────────────────────
@@ -33,7 +35,9 @@ function PantallaEjercicio({ nivelId, numero, prog, onCerrar, onIr }) {
   useEffect(() => () => { turnoRef.current++; if (motorRef.current) motorRef.current.parar() }, [])
 
   const terminarIntento = (toques) => {
-    const r = corregir(ej, toques)
+    const usada = leerLatencia()
+    const r = corregir(ej, toques, { latenciaMs: usada })
+    aprenderDeIntento(r, usada)
     setResultado(r)
     setFase('resultado')
     if (toques.length === 0) { setAviso({ sinToques: true }); return }
@@ -359,6 +363,7 @@ export default function RitmoEntrenamiento({ prog, progDictado = null, onSalir }
   const [modo, setModo] = useState('tocar') // 'tocar' (marcar el ritmo) | 'dictado'
   const [nivelSel, setNivelSel] = useState(null)
   const [ejercicio, setEjercicio] = useState(null) // { nivel, numero }
+  const [calibrando, setCalibrando] = useState(false)
   const dictado = modo === 'dictado' && progDictado != null
   const pg = dictado ? progDictado : prog
   const niveles = dictado ? NIVELES_DICTADO : NIVELES
@@ -398,6 +403,12 @@ export default function RitmoEntrenamiento({ prog, progDictado = null, onSalir }
               <FilaNivel key={n.id} nivel={n} info={pg.estado[i]} anterior={niveles[i - 1]} onAbrir={() => setNivelSel(n.id)} />
             ))}
           </div>
+          <div style={{ marginTop: '14px', textAlign: 'center' }}>
+            <button onClick={() => setCalibrando(true)}
+              style={{ background: 'none', border: 'none', color: VERDE, fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
+              ⏱ ¿Sentís que tus toques llegan con retraso? Ajustalo acá{leerLatencia() ? ` (ahora: ${leerLatencia()} ms)` : ''}
+            </button>
+          </div>
           {pg.soloLocal && (
             <div style={{ marginTop: '12px', fontSize: '11px', color: '#888780', textAlign: 'center' }}>
               Tu progreso se está guardando en este dispositivo.
@@ -408,6 +419,7 @@ export default function RitmoEntrenamiento({ prog, progDictado = null, onSalir }
         <ListaEjercicios nivelId={nivelSel} prog={pg} dictado={dictado} onVolver={() => setNivelSel(null)} onElegir={(n) => setEjercicio({ nivel: nivelSel, numero: n })} />
       )}
 
+      {calibrando && <RitmoCalibrar onCerrar={() => setCalibrando(false)} />}
       {ejercicio && !dictado && (
         <PantallaEjercicio
           key={`${ejercicio.nivel}-${ejercicio.numero}`}

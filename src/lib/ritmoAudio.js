@@ -227,5 +227,8 @@ export function crearMotorRitmo() {
     return control
   }
 
-  return { asegurar, prepararPiano, correr, parar }
+  /** Sonido corto de un toque del cantante (para escribir tocando, sin pulso). */
+  function toque() { try { sonidoToque(ctx) } catch { /* sin sonido */ } }
+
+  return { asegurar, prepararPiano, correr, parar, toque }
 }
