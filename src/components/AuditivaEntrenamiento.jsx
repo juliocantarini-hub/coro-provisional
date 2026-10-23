@@ -94,11 +94,11 @@ const mensajeMic = (e) => {
 }
 
 const INTRO = {
-  cual: ['En el pentagrama hay dos notas.', 'Cuanto más arriba está una nota, más aguda suena. Va a sonar una sola: tocá la que escuchaste. Si querés, podés escuchar las dos antes de decidir.'],
-  eco: ['Escuchás una frase, escrita en el pentagrama, y la cantás con «la».', 'Cantala a la altura que te quede cómoda: no importa si es más grave o más aguda que el piano. Lo que se mira es cuánto sube y cuánto baja cada nota. Buscá un lugar tranquilo.'],
-  intervalo: ['Vas a escuchar dos notas.', 'Fijate qué tan grande es el salto entre una y otra. Cuanto más separadas suenan, más grande es el salto. Al responder vas a ver cómo se escribe.'],
-  acorde: ['Vas a escuchar tres notas sonando juntas.', 'Decidí qué sensación te dan: ¿alegre, triste o tensa? Al responder vas a ver cómo se escribe el acorde.'],
-  dictado: ['Escuchás primero la escala de Do (Do, Re, Mi, Fa, Sol, La, Si, Do) y después una melodía.', 'Armala en el pentagrama, nota por nota, en el orden en que suenan. Podés oír cada nota al tocarla.'],
+  cual: 'En el pentagrama hay dos notas. Cuanto más arriba está una nota, más aguda suena. Va a sonar una sola: tocá la que escuchaste. Si querés, podés escuchar las dos antes de decidir.',
+  eco: 'Escuchás una frase, escrita en el pentagrama, y la cantás con «la». Cantala a la altura que te quede cómoda: no importa si es más grave o más aguda que el piano. Lo que se mira es cuánto sube y cuánto baja cada nota. Buscá un lugar tranquilo.',
+  intervalo: 'Vas a escuchar dos notas. Cuanto más separadas suenan, más grande es el salto. Al responder vas a ver cómo se escribe.',
+  acorde: 'Vas a escuchar tres notas sonando juntas. Decidí qué sensación te dan. Al responder vas a ver cómo se escribe el acorde.',
+  dictado: 'Escuchás primero la escala de Do (Do, Re, Mi, Fa, Sol, La, Si, Do) y después una melodía. Armala nota por nota, en el orden en que suenan. Podés oír cada nota al tocarla.',
 }
 
 // ─── Pantalla de un ejercicio ──────────────────────────────────────────────
@@ -756,8 +756,7 @@ function PantallaEjercicio({ nivelId, numero, prog, voz, onCerrar, onIr }) {
             <div style={{ ...tarjeta, fontSize: '13px', color: '#5F5E5A', lineHeight: 1.55 }}>
               <div style={{ fontWeight: 600, color: '#1A1A18', marginBottom: '4px' }}>{ICONO[tipo]} {nivel.nombre}</div>
               <div style={{ marginBottom: '8px' }}>{nivel.descr}</div>
-              <div style={{ fontWeight: 600, color: '#1A1A18' }}>{INTRO[tipo][0]}</div>
-              <div>{INTRO[tipo][1]}</div>
+              <div>{INTRO[tipo]}</div>
               <div style={{ marginTop: '8px', color: '#888780', fontSize: '12px' }}>
                 Con auriculares se oye mejor. Equivocarse no pasa nada: se aprende escuchando, y podés probar de nuevo cada pregunta. Para aprobar necesitás {APROBADO_PCT} %.
               </div>
