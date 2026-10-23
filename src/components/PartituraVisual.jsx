@@ -15,6 +15,12 @@ import { useEffect, useRef, useState } from 'react'
 // alineado con lo que se escucha, pulso a pulso (no solo compás a compás), sin
 // importar si la partitura tiene repeticiones escritas.
 
+// Se ven todas las voces de la obra (coro a 4 voces, a 1 voz, etc.), con la voz del cantante en verde y las demás
+// más claras para que la suya resalte. Si queda mal: ponerlo en false y vuelve a mostrar solo la voz propia.
+const MOSTRAR_OTRAS_VOCES = true
+const COLOR_VOZ_PROPIA = '#0F6E56'
+const COLOR_OTRAS_VOCES = '#B9B7AC'
+
 export default function PartituraVisual({ musicxml, tiempos, divisions, vozNombre, tiempoActual, velocidad, reproduciendo, onClickCompas }) {
   const containerRef = useRef(null)
   const osmdRef = useRef(null)
@@ -245,8 +251,12 @@ function aplicarVozYVisibilidad(osmd, vozNombre) {
     const instrumento = vozNombre && osmd.sheet.Instruments.find(i => i.Name === vozNombre)
 
     osmd.sheet.Instruments.forEach(inst => {
-      inst.Visible = instrumento ? inst.Id === instrumento.Id : true
+      inst.Visible = instrumento && !MOSTRAR_OTRAS_VOCES ? inst.Id === instrumento.Id : true
     })
+    // Que plicas, barras y corchetes tomen el mismo color que la cabeza de la nota
+    osmd.EngravingRules.ColorStemsLikeNoteheads = true
+    osmd.EngravingRules.ColorBeams = true
+    osmd.EngravingRules.ColorFlags = true
 
     const cursor = osmd.cursor
     cursor.reset()
@@ -255,7 +265,9 @@ function aplicarVozYVisibilidad(osmd, vozNombre) {
       for (const ve of iterator.CurrentVoiceEntries) {
         for (const note of ve.Notes) {
           const esDestacada = instrumento && note.ParentStaff?.ParentInstrument?.Id === instrumento.Id
-          note.NoteheadColor = esDestacada ? '#0F6E56' : '#1A1A18'
+          const color = esDestacada ? COLOR_VOZ_PROPIA : (instrumento && MOSTRAR_OTRAS_VOCES ? COLOR_OTRAS_VOCES : '#1A1A18')
+          note.NoteheadColor = color
+          note.StemColorXml = color
         }
       }
       iterator.moveToNext()
