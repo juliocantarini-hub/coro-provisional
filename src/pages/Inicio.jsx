@@ -10,6 +10,16 @@ import EncuestaDashboard from '../components/EncuestaDashboard'
 import MensajeSorpresa from '../components/MensajeSorpresa'
 import { useMensajeSorpresa } from '../hooks/useMensajeSorpresa'
 
+function useMovil() {
+  const [movil, setMovil] = useState(window.innerWidth <= 768)
+  useEffect(() => {
+    const handler = () => setMovil(window.innerWidth <= 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return movil
+}
+
 const ORDEN_ESTADO = { concierto: 0, activo: 1, estudio: 2 }
 
 export default function Inicio() {
@@ -20,6 +30,7 @@ export default function Inicio() {
   const { avisos, noLeidos } = useAvisos()
   const { articulos } = useArticulos({ limite: 3 })
   const { mensaje: mensajeSorpresa, cerrar: cerrarSorpresa } = useMensajeSorpresa(perfil, eventos, cargandoEventos)
+  const movil = useMovil()
 
   const proximoEvento = eventos[0]
   const avisosRecientes = avisos.slice(0, 3)
@@ -92,7 +103,7 @@ export default function Inicio() {
       {/* Encuesta activa — solo aparece si hay una encuesta abierta */}
       <EncuestaDashboard esAdmin={false} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : '1fr 1fr', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: '16px' }}>
         <Seccion titulo="Estudia esta semana" linkLabel="Ver todo" onLink={() => navigate('/repertorio')}>
           {obrasEstudio.length === 0 ? <Vacio texto="No hay obras activas." /> : obrasEstudio.map(obra => (
             <ItemObra key={obra.id} obra={obra} onClick={() => navigate(`/repertorio/${obra.id}`)} vozUsuario={perfil?.voz} />
@@ -130,7 +141,7 @@ export default function Inicio() {
 
 function StatCard({ val, label, color, bg, onClick }) {
   return (
-    <div onClick={onClick} style={{ background: bg, borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'transform 0.12s' }}
+    <div onClick={onClick} style={{ background: bg, borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'transform 0.12s', minWidth: 0, overflow: 'hidden' }}
       onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
       onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
       <div style={{ fontSize: '28px', fontWeight: '600', color, lineHeight: 1 }}>{val}</div>
