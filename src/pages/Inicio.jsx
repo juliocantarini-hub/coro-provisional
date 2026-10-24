@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useEventos, formatHora, diasRestantes } from '../hooks/useEventos'
 import { useObras } from '../hooks/useObras'
@@ -12,6 +12,10 @@ import { useMensajeSorpresa } from '../hooks/useMensajeSorpresa'
 
 function useMovil() {
   const [movil, setMovil] = useState(window.innerWidth <= 768)
+  const location = useLocation()
+  useEffect(() => {
+    setMovil(window.innerWidth <= 768)
+  }, [location.pathname])
   useEffect(() => {
     const handler = () => setMovil(window.innerWidth <= 768)
     window.addEventListener('resize', handler)
