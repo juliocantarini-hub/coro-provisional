@@ -94,7 +94,7 @@ export default function Inicio() {
       <MensajeSorpresa mensaje={mensajeSorpresa} onCerrar={cerrarSorpresa} />
 
       {/* Stats rápidas */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
         <StatCard val={obras.length} label="Obras en repertorio" color="#0F6E56" bg="#E1F5EE" onClick={() => navigate('/repertorio')} />
         <StatCard val={noLeidos} label={noLeidos === 1 ? 'Aviso sin leer' : 'Avisos sin leer'} color={noLeidos > 0 ? '#D85A30' : '#888780'} bg={noLeidos > 0 ? '#FAECE7' : '#F1EFE8'} onClick={() => navigate('/avisos')} />
         <StatCard val={eventos.length} label="Eventos próximos" color="#378ADD" bg="#E6F1FB" onClick={() => navigate('/calendario')} />
