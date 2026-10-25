@@ -98,7 +98,7 @@ export default function Inicio() {
       <MensajeSorpresa mensaje={mensajeSorpresa} onCerrar={cerrarSorpresa} />
 
       {/* Stats rápidas */}
-      <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: movil ? '8px' : '12px', marginBottom: '16px' }}>
         <StatCard val={obras.length} label="Obras en repertorio" color="#0F6E56" bg="#E1F5EE" onClick={() => navigate('/repertorio')} />
         <StatCard val={noLeidos} label={noLeidos === 1 ? 'Aviso sin leer' : 'Avisos sin leer'} color={noLeidos > 0 ? '#D85A30' : '#888780'} bg={noLeidos > 0 ? '#FAECE7' : '#F1EFE8'} onClick={() => navigate('/avisos')} />
         <StatCard val={eventos.length} label="Eventos próximos" color="#378ADD" bg="#E6F1FB" onClick={() => navigate('/calendario')} />
@@ -107,7 +107,7 @@ export default function Inicio() {
       {/* Encuesta activa — solo aparece si hay una encuesta abierta */}
       <EncuestaDashboard esAdmin={false} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: movil ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
         <Seccion titulo="Estudia esta semana" linkLabel="Ver todo" onLink={() => navigate('/repertorio')}>
           {obrasEstudio.length === 0 ? <Vacio texto="No hay obras activas." /> : obrasEstudio.map(obra => (
             <ItemObra key={obra.id} obra={obra} onClick={() => navigate(`/repertorio/${obra.id}`)} vozUsuario={perfil?.voz} />
@@ -145,7 +145,7 @@ export default function Inicio() {
 
 function StatCard({ val, label, color, bg, onClick }) {
   return (
-    <div onClick={onClick} style={{ background: bg, borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'transform 0.12s', minWidth: 0, overflow: 'hidden' }}
+    <div onClick={onClick} style={{ background: bg, borderRadius: '12px', padding: '14px 12px', cursor: 'pointer', transition: 'transform 0.12s', minWidth: 0, overflow: 'hidden' }}
       onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
       onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
       <div style={{ fontSize: '28px', fontWeight: '600', color, lineHeight: 1 }}>{val}</div>
@@ -156,7 +156,7 @@ function StatCard({ val, label, color, bg, onClick }) {
 
 function Seccion({ titulo, linkLabel, onLink, children }) {
   return (
-    <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '18px', border: '1px solid #E8E6DF' }}>
+    <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '18px', border: '1px solid #E8E6DF', minWidth: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
         <h3 style={{ fontSize: '13px', fontWeight: '600', color: '#5F5E5A', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>{titulo}</h3>
         <button onClick={onLink} style={{ fontSize: '12px', color: '#0F6E56', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>{linkLabel} →</button>
