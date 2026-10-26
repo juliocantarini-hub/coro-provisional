@@ -122,14 +122,16 @@ export default function EstudioAdmin() {
             {cargando ? 'Cargando...' : `${datos.length} cantante${datos.length !== 1 ? 's' : ''} · ${totalObras} obras en repertorio`}
           </p>
         </div>
-        <button onClick={cargar}
-          style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
-          ↻ Actualizar
-        </button>
-        <button onClick={abrirReinicio} disabled={cargando || (!coroId)}
-          style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #E5B5A8', background: 'none', cursor: 'pointer', color: '#A32D2D', fontWeight: '500' }}>
-          Reiniciar estudio
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={cargar}
+            style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
+            ↻ Actualizar
+          </button>
+          <button onClick={abrirReinicio} disabled={cargando || (!coroId)}
+            style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #E5B5A8', background: 'none', cursor: 'pointer', color: '#A32D2D', fontWeight: '500' }}>
+            Reiniciar estudio
+          </button>
+        </div>
       </div>
 
       {avisoReinicio && (
