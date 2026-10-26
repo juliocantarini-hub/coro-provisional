@@ -3,7 +3,7 @@
 // No hace falta configurar claves: SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY las trae Supabase.
 //
 // Seguridad: solo puede llamarla alguien con sesión iniciada que sea director o admin DEL MISMO coro al que
-// quiere agregar el cantante. (La versión anterior no lo verificaba: cualquiera con la clave pública de la
+// quiere agregar el cantante (se mira su perfil en ese coro). (La versión anterior no lo verificaba: cualquiera con la clave pública de la
 // app podía crear cuentas en cualquier coro.)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -43,9 +43,10 @@ Deno.serve(async (req) => {
       return responder({ error: 'Faltan datos: nombre, email y contraseña son obligatorios.' }, 400)
     }
 
+    // (En algunos proyectos una misma persona tiene un perfil por coro, así que se busca el de ESTE coro)
     const { data: quien } = await supabase
-      .from('perfiles').select('rol, coro_id').eq('id', sesion.user.id).single()
-    if (!quien || !['director', 'admin'].includes(quien.rol) || quien.coro_id !== coro_id) {
+      .from('perfiles').select('rol').eq('id', sesion.user.id).eq('coro_id', coro_id).maybeSingle()
+    if (!quien || !['director', 'admin'].includes(quien.rol)) {
       return responder({ error: 'No tenés permiso para agregar cantantes a este coro.' }, 403)
     }
 
@@ -61,20 +62,22 @@ Deno.serve(async (req) => {
     const userId = authData.user.id
 
     // 3. Completar el perfil (el trigger ya lo crea al dar de alta el usuario; si no, se crea acá)
-    const { error: perfilError } = await supabase
-      .from('perfiles')
-      .upsert({
-        id: userId,
-        nombre,
-        mail: email,
-        voz: voz || null,
-        telefono: telefono || null,
-        fecha_nacimiento: fecha_nacimiento || null,
-        dni: dni || null,
-        coro_id,
-        rol: 'cantante',
-        estado: 'activo',
-      }, { onConflict: 'id' })
+    const datosPerfil = {
+      nombre,
+      mail: email,
+      voz: voz || null,
+      telefono: telefono || null,
+      fecha_nacimiento: fecha_nacimiento || null,
+      dni: dni || null,
+      coro_id,
+      rol: 'cantante',
+      estado: 'activo',
+    }
+    let { data: actualizados, error: perfilError } = await supabase
+      .from('perfiles').update(datosPerfil).eq('id', userId).select('id')
+    if (!perfilError && (!actualizados || actualizados.length === 0)) {
+      ;({ error: perfilError } = await supabase.from('perfiles').insert({ id: userId, ...datosPerfil }))
+    }
 
     if (perfilError) {
       await supabase.auth.admin.deleteUser(userId)
