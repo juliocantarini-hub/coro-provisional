@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useObras } from '../../hooks/useObras'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
-import { getCoroActual } from '../../lib/coro'
-import { leerEstudioDesde } from '../../lib/estudioPeriodo'
 
 const ESTADOS = [
   { valor: '',          label: 'Todas' },
@@ -59,17 +57,12 @@ function useDedicacion(usuarioId, obras) {
     const obraIds = obras.map(o => o.id)
     const totalObras = obraIds.length
     async function cargar() {
-      // Si el director empezó un nuevo período de estudio, solo cuenta lo de ese período en adelante
-      const coro = await getCoroActual()
-      const desde = coro ? await leerEstudioDesde(coro.id) : null
-      let q = supabase
+      const { data } = await supabase
         .from('actividad_estudio')
         .select('obra_id')
         .eq('usuario_id', usuarioId)
         .eq('tipo', 'apertura')
         .in('obra_id', obraIds)
-      if (desde) q = q.gte('created_at', desde)
-      const { data } = await q
       if (!data) return
       const obrasUnicas      = new Set(data.map(a => a.obra_id))
       const pctCobertura      = (obrasUnicas.size / totalObras) * 100

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCoroActual } from '../lib/coro'
-import { leerEstudioDesde } from '../lib/estudioPeriodo'
 import { clasificarRuta } from '../lib/actividad'
 import {
   MENSAJES_SECCION, MAX_MENSAJES_POR_SESION,
@@ -60,13 +59,9 @@ async function cargarDedicacion(perfilId, coroId) {
     const ids = (obras || []).map(o => o.id)
     if (!ids.length) return null
 
-    // Si el director empezó un nuevo período de estudio, solo cuenta lo de ese período en adelante
-    const desde = await leerEstudioDesde(coroId)
-    let q = supabase
+    const { data, error: e2 } = await supabase
       .from('actividad_estudio').select('obra_id')
       .eq('usuario_id', perfilId).eq('tipo', 'apertura').in('obra_id', ids)
-    if (desde) q = q.gte('created_at', desde)
-    const { data, error: e2 } = await q
     if (e2) throw e2
     return calcularDedicacion(ids.length, (data || []).map(a => a.obra_id))
   } catch (err) {
