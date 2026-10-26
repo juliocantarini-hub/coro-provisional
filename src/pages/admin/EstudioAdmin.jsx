@@ -11,6 +11,12 @@ export default function EstudioAdmin() {
   const [cargando, setCargando] = useState(true)
   const [totalObras, setTotalObras] = useState(0)
   const [busqueda, setBusqueda] = useState('')
+  const [coroId, setCoroId] = useState(null)
+  const [reiniciando, setReiniciando] = useState(false)
+  const [abiertaReinicio, setAbiertaReinicio] = useState(false)
+  const [textoReinicio, setTextoReinicio] = useState('')
+  const [errorReinicio, setErrorReinicio] = useState('')
+  const [avisoReinicio, setAvisoReinicio] = useState('')
   const esMovil = useEsMovil()
 
   const cargar = useCallback(async () => {
@@ -18,6 +24,8 @@ export default function EstudioAdmin() {
 
     const coro = await getCoroActual()
     if (!coro) { setCargando(false); return }
+
+    setCoroId(coro.id)
 
     const { count: countObras } = await supabase
       .from('obras')
@@ -74,6 +82,31 @@ export default function EstudioAdmin() {
 
   useEffect(() => { cargar() }, [cargar])
 
+  const totalRegistros = datos.reduce((n, d) => n + (d.totalEntradas || 0), 0)
+  const PALABRA_REINICIO = 'REINICIAR'
+  const puedeReiniciar = textoReinicio.trim().toUpperCase() === PALABRA_REINICIO && !reiniciando
+
+  function abrirReinicio() {
+    setTextoReinicio('')
+    setErrorReinicio('')
+    setAvisoReinicio('')
+    setAbiertaReinicio(true)
+  }
+
+  async function reiniciar() {
+    setReiniciando(true)
+    setErrorReinicio('')
+    const { data, error: err } = await supabase.rpc('reiniciar_actividad_estudio', { p_coro_id: coroId })
+    setReiniciando(false)
+    if (err) {
+      setErrorReinicio('No se pudo reiniciar el estudio. Si el error sigue, corré estudio_reiniciar.sql en Supabase. (' + err.message + ')')
+      return
+    }
+    setAbiertaReinicio(false)
+    setAvisoReinicio('Listo: se borraron ' + (data ?? 0) + ' registros de estudio. Todos empiezan de cero.')
+    cargar()
+  }
+
   const filtrados = datos.filter(d =>
     !busqueda ||
     d.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -93,7 +126,50 @@ export default function EstudioAdmin() {
           style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
           ↻ Actualizar
         </button>
+        <button onClick={abrirReinicio} disabled={cargando || (!coroId)}
+          style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #E5B5A8', background: 'none', cursor: 'pointer', color: '#A32D2D', fontWeight: '500' }}>
+          Reiniciar estudio
+        </button>
       </div>
+
+      {avisoReinicio && (
+        <div style={{ background: '#E1F5EE', border: '1px solid #9FD6C3', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#0B4F3F', marginBottom: '16px' }}>{avisoReinicio}</div>
+      )}
+
+      {abiertaReinicio && (
+        <div onClick={() => !reiniciando && setAbiertaReinicio(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true"
+            style={{ background: '#FFFFFF', borderRadius: '14px', padding: '22px', maxWidth: '430px', width: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 10px' }}>
+              ¿Reiniciar el estudio?
+            </h3>
+            <p style={{ fontSize: '13px', color: '#5F5E5A', lineHeight: 1.6, margin: '0 0 10px' }}>
+              Se va a borrar el historial de estudio de <b>todos los cantantes</b>: las veces que abrieron cada obra. El porcentaje de estudio de todos vuelve a cero, tanto el que ves acá como el que ven ellos en Repertorio.
+              {totalRegistros > 0 && <> Hoy hay <b>{totalRegistros}</b> entradas registradas.</>} <b>Esta acción no se puede deshacer.</b>
+            </p>
+            <p style={{ fontSize: '13px', color: '#5F5E5A', margin: '0 0 6px' }}>
+              Para confirmar, escribí <b>{PALABRA_REINICIO}</b>:
+            </p>
+            <input value={textoReinicio} onChange={e => setTextoReinicio(e.target.value)} autoFocus placeholder={PALABRA_REINICIO}
+              style={{ width: '100%', height: '38px', border: '1px solid #D3D1C7', borderRadius: '8px', padding: '0 12px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+            {errorReinicio && (
+              <p style={{ fontSize: '12px', color: '#A32D2D', background: '#FCEBEB', borderRadius: '8px', padding: '8px 10px', lineHeight: 1.5, margin: '12px 0 0' }}>{errorReinicio}</p>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '18px' }}>
+              <button onClick={() => setAbiertaReinicio(false)} disabled={reiniciando}
+                style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#5F5E5A' }}>
+                Cancelar
+              </button>
+              <button onClick={reiniciar} disabled={!puedeReiniciar}
+                style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', border: 'none', fontWeight: '600',
+                  background: puedeReiniciar ? '#A32D2D' : '#E8E6DF', color: puedeReiniciar ? '#FFFFFF' : '#B4B2A9', cursor: puedeReiniciar ? 'pointer' : 'not-allowed' }}>
+                {reiniciando ? 'Borrando...' : 'Reiniciar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ position: 'relative', marginBottom: '16px', maxWidth: '320px' }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="#B4B2A9" style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)' }}>
