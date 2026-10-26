@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 import { usePresenciaDetalle } from '../../hooks/usePresencia'
@@ -127,6 +128,7 @@ function IndicadorPush({ cantidad }) {
 }
 
 export default function Usuarios() {
+  const navigate = useNavigate()
   const [usuarios, setUsuarios]     = useState([])
   const [cargando, setCargando]     = useState(true)
   const [busqueda, setBusqueda]     = useState('')
@@ -305,10 +307,16 @@ export default function Usuarios() {
             )}
           </p>
         </div>
-        <button onClick={() => setMostrarImprimir(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
-          🖨 Imprimir listado
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={() => navigate('/admin/cantantes/nuevo')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: 'none', background: '#0F6E56', color: '#FFFFFF', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+            + Nuevo cantante
+          </button>
+          <button onClick={() => setMostrarImprimir(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', border: '1px solid #D3D1C7', background: '#FFFFFF', color: '#5F5E5A', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+            🖨 Imprimir listado
+          </button>
+        </div>
       </div>
 
       {mensaje && (
