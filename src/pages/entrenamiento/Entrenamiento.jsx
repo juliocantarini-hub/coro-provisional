@@ -229,18 +229,18 @@ export default function Entrenamiento() {
             descripcion="Respiración, resonancia y vocalización."
             detalle={!cargando && !error ? `${ejercicios.length} ${ejercicios.length === 1 ? 'ejercicio' : 'ejercicios'}` : null}
             onClick={() => setSeccion('tecnica')} />
-          <TarjetaSeccion icono="🎤" titulo="Practicá tu afinación" color="#378ADD" bg="#E6F1FB"
-            descripcion="Cantá, grabate y mirá tu informe."
-            detalle={!cargandoPartituras ? `${partituras.length} ${partituras.length === 1 ? 'práctica' : 'prácticas'}` : null}
-            onClick={() => setSeccion('obras')} />
-          <TarjetaSeccion icono="🥁" titulo="Ritmo" color="#B5791B" bg="#FBF3DF"
-            descripcion="Escuchá, leé y marcá el ritmo. Se desbloquea nivel por nivel."
-            detalle={detalleRitmo}
-            onClick={() => setSeccion('ritmo')} />
           <TarjetaSeccion icono="🎼" titulo="Entendé la partitura" color={COLOR_TEORIA} bg={FONDO_TEORIA}
             descripcion="Tu voz, los signos y las notas, paso a paso."
             detalle={teoria.vistas.length > 0 ? `${teoria.vistas.length} de ${teoria.total} lecciones` : 'Empezá por la lección 1'}
             onClick={() => setSeccion('teoria')} />
+          <TarjetaSeccion icono="🥁" titulo="Ritmo" color="#B5791B" bg="#FBF3DF"
+            descripcion="Escuchá, leé y marcá el ritmo. Se desbloquea nivel por nivel."
+            detalle={detalleRitmo}
+            onClick={() => setSeccion('ritmo')} />
+          <TarjetaSeccion icono="🎤" titulo="Practicá tu afinación" color="#378ADD" bg="#E6F1FB"
+            descripcion="Cantá, grabate y mirá tu informe."
+            detalle={!cargandoPartituras ? `${partituras.length} ${partituras.length === 1 ? 'práctica' : 'prácticas'}` : null}
+            onClick={() => setSeccion('obras')} />
           {MOSTRAR_PRACTICA_AUDITIVA && (
             <TarjetaSeccion icono="👂" titulo="Práctica auditiva" color="#6B58B8" bg="#EEEAF9"
               descripcion="Entrená el oído con el pentagrama: ¿cuál sonó?, eco, saltos, acordes y melodías."
