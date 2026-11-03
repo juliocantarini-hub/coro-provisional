@@ -25,7 +25,7 @@ function useTocarRitmo() {
   const { sonando, tocar, parar } = useReproduccion()
   const [pulso, setPulso] = useState(null)
   const sonar = (clave, figuras, pulsos, clic = true) => tocar(clave, (fin) => tocarPulsos({
-    tempo: TEMPO, pulsos, acento: (i) => (i % 4 === 0 ? 'fuerte' : 'debil'), eventos: eventosDe(figuras), clic,
+    tempo: TEMPO, pulsos, acento: (i) => (i % 4 === 0 ? 'fuerte' : 'debil'), eventos: eventosDe(figuras), clic, sonido: 'tono',
     onPulso: setPulso, onFin: fin,
   }), () => setPulso(null))
   return { sonando, sonar, parar: () => { parar(); setPulso(null) }, pulso }
@@ -148,7 +148,7 @@ function PasoLigadura() {
   const sonar = (clave, lista) => tocar(clave, (fin) => {
     let t = 0
     const eventos = lista.map(({ m, d }) => { const e = { t, midis: [midiDe(m)], dur: d, vel: 0.7 }; t += d; return e })
-    return tocarPulsos({ tempo: TEMPO, pulsos: 8, acento: (i) => (i % 4 === 0 ? 'fuerte' : 'debil'), eventos, onFin: fin })
+    return tocarPulsos({ tempo: TEMPO, pulsos: 8, acento: (i) => (i % 4 === 0 ? 'fuerte' : 'debil'), eventos, onFin: fin, sonido: 'tono' })
   })
   return (
     <>
