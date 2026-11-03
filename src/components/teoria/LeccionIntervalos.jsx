@@ -44,14 +44,21 @@ const INTERVALOS = [
   {
     n: 2, nombre: 'Segunda', ej: 'Do → Re', ref: 'Es un paso. Como el comienzo de «Martinillo» (Frère Jacques).',
     ejemplo: [{ notas: conLetra('C5:1 D5:1 E5:1 C5:1', ['Frè-', 're', 'Jac-', 'ques']), barra: 'final' }],
+    intervalo: [{ compas: 0, i: 0 }, { compas: 0, i: 1 }],
   },
   {
     n: 3, nombre: 'Tercera', ej: 'Do → Mi', ref: 'El comienzo de «When the saints go marching in».',
     ejemplo: [{ notas: conLetra('C5:1 E5:1 F5:1 G5:1', ['Oh', 'when', 'the', 'saints']), barra: 'final' }],
+    intervalo: [{ compas: 0, i: 0 }, { compas: 0, i: 1 }],
   },
   {
     n: 4, nombre: 'Cuarta', ej: 'Do → Fa', ref: 'El comienzo de «Arroz con leche».',
-    ejemplo: [{ notas: conLetra('C5:0.5 F5:1 F5:0.5 A5:1 F5:0.5', ['A-', 'rroz', 'con', 'le-', 'che']), barra: 'final' }],
+    // En 3/4, empieza en anacrusa: (silencio de corchea) Do | Fa La | Fa Fa
+    ejemplo: [
+      { notas: conLetra('C4:0.5 F4:1 A4:1', ['A-', 'rroz', 'con']) },
+      { notas: conLetra('F4:1 F4:0.5', ['le-', 'che']), barra: 'final' },
+    ],
+    intervalo: [{ compas: 0, i: 0 }, { compas: 0, i: 1 }],
   },
   {
     n: 5, nombre: 'Quinta', ej: 'Do → Sol', ref: 'El comienzo de «Estrellita, ¿dónde estás?» (Twinkle, twinkle).',
@@ -59,6 +66,7 @@ const INTERVALOS = [
       { notas: conLetra('C5:1 C5:1 G5:1 G5:1', ['Twin-', 'kle,', 'twin-', 'kle,']) },
       { notas: conLetra('A5:1 A5:1 G5:2', ['lit-', 'tle', 'star']), barra: 'final' },
     ],
+    intervalo: [{ compas: 0, i: 1 }, { compas: 0, i: 2 }],
   },
   {
     n: 8, nombre: 'Octava', ej: 'Do → Do', ref: 'La misma nota, más aguda. Es lo que pasa cuando hombres y mujeres cantan juntos la misma melodía.',
@@ -71,9 +79,15 @@ function Intervalo({ it }) {
   const [abierto, setAbierto] = useState(false)
   const [activa, setActiva] = useState(null)
   const b = DO + it.n - 1
+  // Con ejemplo, el intervalo suena a la altura en que está escrito y sus dos notas se iluminan al sonar
+  const notaDe = (m) => it.ejemplo[m.compas].notas[m.i]
   const tocarIntervalo = () => {
     if (it.ejemplo) setAbierto(true)
-    tocar('i', (fin) => tocarNotas({ notas: [{ midi: midiDePaso(DO), dur: 1 }, { midi: midiDePaso(b), dur: 2 }], tempo: 76, onFin: fin }))
+    const midis = it.ejemplo ? it.intervalo.map((m) => midiDe(notaDe(m))) : [midiDePaso(DO), midiDePaso(b)]
+    tocar('i', (fin) => tocarNotas({
+      notas: [{ midi: midis[0], dur: 1 }, { midi: midis[1], dur: 2 }], tempo: 76,
+      onNota: it.ejemplo ? (k) => setActiva(it.intervalo[k]) : undefined, onFin: fin,
+    }), () => setActiva(null))
   }
   const plano = it.ejemplo ? it.ejemplo.flatMap((c, ci) => c.notas.map((n, k) => ({ ...n, ci, k }))) : []
   const tocarEjemplo = () => tocar('e', (fin) => tocarNotas({
@@ -88,15 +102,16 @@ function Intervalo({ it }) {
           <div style={{ fontSize: '14px', fontWeight: 600, color: '#1A1A18' }}>{it.nombre} <span style={{ fontWeight: 400, color: '#888780' }}>· {it.ej}</span></div>
           <div style={{ fontSize: '12px', color: '#5F5E5A', lineHeight: 1.4 }}>{it.ref}</div>
         </div>
-        <Boton activo={sonando === 'i'} onClick={() => (sonando === 'i' ? parar() : tocarIntervalo())}>{sonando === 'i' ? '■' : '▶'}</Boton>
+        <Boton activo={sonando === 'i'} onClick={() => (sonando === 'i' ? (parar(), setActiva(null)) : tocarIntervalo())}>{sonando === 'i' ? '■' : '▶'}</Boton>
       </div>
       {abierto && it.ejemplo && (
         <div style={{ marginTop: '10px' }}>
-          <MapaObra compases={it.ejemplo} sinNumeros notaActiva={activa} descripcion={`Ejemplo de ${it.nombre.toLowerCase()}`} />
+          <MapaObra compases={it.ejemplo} sinNumeros notaActiva={activa} marcadas={it.intervalo} descripcion={`Ejemplo de ${it.nombre.toLowerCase()}`} />
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
             {sonando === 'e'
               ? <Boton onClick={() => { parar(); setActiva(null) }}>■ Parar</Boton>
               : <Boton onClick={tocarEjemplo}>▶ Escuchar el ejemplo</Boton>}
+            <Boton onClick={() => { parar(); setActiva(null); setAbierto(false) }}>✕ Cerrar</Boton>
           </div>
         </div>
       )}

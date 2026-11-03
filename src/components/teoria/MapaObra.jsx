@@ -63,7 +63,8 @@ const espacioDe = (n, sig) => Math.max(n.dur * PULSO, 14, n.letra ? (anchoLetra(
 
 // sinNumeros: sin el número de compás (para ejemplos sueltos). notaActiva: { compas, i } se pinta de color.
 // Cada nota puede llevar letra (n.letra): se escribe debajo del pentagrama.
-export default function MapaObra({ compases, actual = null, colores = {}, onCompas, sinNumeros = false, notaActiva = null, descripcion = 'Partitura con signos de repetición' }) {
+// marcadas: [{ compas, i }] notas con un círculo lila (por ejemplo, las dos de un intervalo).
+export default function MapaObra({ compases, actual = null, colores = {}, onCompas, sinNumeros = false, notaActiva = null, marcadas = [], descripcion = 'Partitura con signos de repetición' }) {
   // Posición de cada compás
   // Ancho de cada compás: normalmente fijo, pero se agranda si las notas llevan letra y no entra
   const anchos = compases.map((c) => {
@@ -171,6 +172,7 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
               const xCab = figura === 'redonda' && c.notas.length === 1 ? xm + (anchos[i] - GLIFOS.redonda.ancho * K) / 2 + (c.inicioRep ? 6 : 0) : xm + off + px + extra
               px += espacioDe(n, c.notas[j + 1])
               const activa = notaActiva && notaActiva.compas === i && notaActiva.i === j
+              const marcada = marcadas.some((m) => m.compas === i && m.i === j)
               const tinta = activa ? '#8E3E7C' : TINTA
               const y = yDe(n.paso)
               const arriba = n.paso < BASE + 4
@@ -185,7 +187,8 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
                   {adicionales.map((p) => (
                     <line key={p} x1={xCab - 3.5} x2={xCab + anchoFig + 3.5} y1={yDe(p)} y2={yDe(p)} stroke={LINEA} strokeWidth={0.9} />
                   ))}
-                  {activa && <circle cx={xc} cy={y} r={10} fill="#8E3E7C" opacity={0.15} />}
+                  {marcada && <circle cx={xc} cy={y} r={11} fill="none" stroke="#8E3E7C" strokeWidth={1.6} />}
+                  {activa && <circle cx={xc} cy={y} r={10} fill="#8E3E7C" opacity={0.18} />}
                   {figura !== 'redonda' && (
                     <line x1={arriba ? xCab + ANCHO_CABEZA - 0.6 : xCab + 0.6} x2={arriba ? xCab + ANCHO_CABEZA - 0.6 : xCab + 0.6}
                       y1={y} y2={arriba ? y - 34 : y + 34} stroke={tinta} strokeWidth={1.1} />
