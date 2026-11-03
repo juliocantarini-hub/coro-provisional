@@ -12,11 +12,13 @@ export default function TeoriaEntrenamiento({ prog, voz, onSalir }) {
   if (abierta) {
     const Leccion = COMPONENTES[abierta]
     const n = LECCIONES.findIndex((l) => l.id === abierta) + 1
+    const siguiente = LECCIONES[n] || null
     return (
       <div>
         <BotonVolver texto="Lecciones" onClick={() => setAbierta(null)} />
         <div style={{ fontSize: '12px', fontWeight: 600, color: COLOR_TEORIA, marginBottom: '6px' }}>Lección {n}</div>
-        <Leccion voz={voz} onCompletar={() => prog.marcar(abierta)} />
+        <Leccion key={abierta} voz={voz} onCompletar={() => prog.marcar(abierta)}
+          siguiente={siguiente} onSiguiente={() => siguiente && setAbierta(siguiente.id)} onVolver={() => setAbierta(null)} />
       </div>
     )
   }

@@ -89,12 +89,14 @@ function useReproduccion() {
   return { sonando, tocar, parar }
 }
 
-export default function LeccionTuVoz({ voz, onCompletar }) {
+export default function LeccionTuVoz({ voz, onCompletar, siguiente, onSiguiente, onVolver }) {
   const info = vozSATB(voz)
   const [paso, setPaso] = useState(0)
   const [elegida, setElegida] = useState(null) // renglón que el cantante reconoce como suyo
   const [intento, setIntento] = useState(null) // último renglón tocado en el paso 1
   const PASOS = 6
+  // Al cambiar de paso, volver arriba (en el celular el paso nuevo quedaba a mitad de pantalla)
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }) }, [paso])
 
   const siguientePermitido = paso !== 1 || elegida != null
 
@@ -114,7 +116,7 @@ export default function LeccionTuVoz({ voz, onCompletar }) {
       {paso === 2 && <PasoSeguir voz={elegida} />}
       {paso === 3 && <PasoCompases />}
       {paso === 4 && <PasoEntrada voz={elegida} />}
-      {paso === 5 && <PasoPreguntas onTerminar={onCompletar} />}
+      {paso === 5 && <PasoPreguntas onTerminar={onCompletar} siguiente={siguiente} onSiguiente={onSiguiente} onVolver={onVolver} />}
 
       {paso < 5 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginTop: '6px' }}>
@@ -298,7 +300,7 @@ function PasoEntrada({ voz }) {
   )
 }
 
-function PasoPreguntas({ onTerminar }) {
+function PasoPreguntas({ onTerminar, siguiente, onSiguiente, onVolver }) {
   const [i, setI] = useState(0)
   const [elegida, setElegida] = useState(null)
   const [fin, setFin] = useState(false)
@@ -310,6 +312,15 @@ function PasoPreguntas({ onTerminar }) {
           Ya sabés encontrar tu renglón, seguirlo de un sistema al otro, ubicar un compás y buscar tu nota de entrada.
           Probalo en la próxima obra que estudies.
         </Caja>
+        {siguiente && !siguiente.disponible && (
+          <Caja tono="tip">La próxima lección, <b>{siguiente.titulo}</b>, llega pronto.</Caja>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+          <Boton onClick={onVolver}>← Ver las lecciones</Boton>
+          {siguiente?.disponible && (
+            <Boton principal onClick={onSiguiente}>Siguiente lección: {siguiente.titulo} →</Boton>
+          )}
+        </div>
       </>
     )
   }
