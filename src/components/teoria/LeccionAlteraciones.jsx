@@ -61,6 +61,9 @@ const TODO_EL_COMPAS = [
   { notas: motivo('G5:1 F#5:1 E5:1 F5:1') },
   { notas: motivo('G5:1 F5:1 E5:2'), barra: 'final' },
 ]
+const SOLO_BECUADRO = [
+  { notas: motivo('F#5:2 Fn5:2'), barra: 'final' },
+]
 const BECUADRO = [
   { notas: motivo('E5:1 F#5:1 G5:1 F#5:1') },
   { notas: motivo('E5:1 Fn5:1 E5:2'), barra: 'final' },
@@ -155,6 +158,8 @@ export default function LeccionAlteraciones({ onCompletar, siguiente, onSiguient
             <Caja>
               El <b>becuadro</b> (♮) <b>anula</b> una alteración anterior: la nota vuelve a ser natural.
             </Caja>
+            <Compases compases={SOLO_BECUADRO} />
+            <Caja tono="tip">El primer Fa tiene sostenido; el segundo tiene becuadro, así que <b>vuelve a ser natural</b>. Escuchá cómo baja.</Caja>
           </>
         ),
       },
