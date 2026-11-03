@@ -15,7 +15,7 @@ export const BORDE_TEORIA = '#E9CFE2'
 // disponible: false → se muestra como "Próximamente"
 export const LECCIONES = [
   { id: 'tu-voz', titulo: 'Tu voz en la partitura', descr: 'Encontrá tu renglón, seguilo y ubicá los compases.', disponible: true },
-  { id: 'mapa', titulo: 'El mapa de la obra', descr: 'Repeticiones, casillas, D.C., coda, calderón y dinámicas.', disponible: false },
+  { id: 'mapa', titulo: 'El mapa de la obra', descr: 'Repeticiones, casillas, D.C., coda, calderón y dinámicas.', disponible: true },
   { id: 'pulso', titulo: 'Pulso y compás', descr: 'Sentí el pulso y entendé el 4/4, el 3/4 y el 6/8.', disponible: false },
   { id: 'figuras', titulo: 'Figuras y silencios', descr: 'Notas largas y cortas, y cuándo no cantar.', disponible: false },
   { id: 'claves', titulo: 'Pentagrama y claves', descr: 'Arriba es agudo, abajo es grave. Las claves de sol y de fa.', disponible: false },
@@ -94,4 +94,35 @@ export async function tocarNota(paso, voz) {
   const { sampler, listo } = getPianoSampler()
   await listo
   sampler.triggerAttackRelease(Tone.Frequency(midiDePaso(paso) + (TRANSPORTE[voz] || 0), 'midi').toNote(), 1.6)
+}
+
+// Notas de un compás suelto ("C5:1 D5:1 E5:2") → [{ paso, dur }]
+export const motivo = (texto) => frase({ x: [texto] }).x[0]
+
+// Toca compases en el orden de un recorrido (repeticiones, D.C., etc.).
+// compases[i] = [{ paso, dur, vel?, calderon? }]; onCompas(i, k) avisa qué compás suena (k = posición en el recorrido).
+// opciones por compás: respira (corta un poco la última nota para respirar).
+export async function tocarRecorrido({ compases, orden, tempo = 100, onCompas, onFin, respiraciones = [] }) {
+  await Tone.start()
+  const { sampler, listo } = getPianoSampler()
+  await listo
+  const seg = 60 / tempo
+  const timers = []
+  let t = 0.15
+  orden.forEach((ci, k) => {
+    const inicio = t
+    timers.push(setTimeout(() => onCompas?.(ci, k), inicio * 1000))
+    const notas = compases[ci]
+    notas.forEach((n, j) => {
+      let dur = n.dur * seg * (n.calderon ? 2.6 : 1)
+      const corte = j === notas.length - 1 && respiraciones.includes(ci) ? 0.35 : 0
+      const ataque = t
+      timers.push(setTimeout(() => {
+        sampler.triggerAttackRelease(Tone.Frequency(midiDePaso(n.paso), 'midi').toNote(), Math.max(0.1, (dur - corte) * 0.92), undefined, n.vel ?? 0.7)
+      }, ataque * 1000))
+      t += dur
+    })
+  })
+  timers.push(setTimeout(() => onFin?.(), (t + 0.3) * 1000))
+  return () => { timers.forEach(clearTimeout); try { sampler.releaseAll() } catch { /* nada */ } }
 }

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import BotonVolver from '../BotonVolver'
 import LeccionTuVoz from './LeccionTuVoz'
+import LeccionMapa from './LeccionMapa'
 import { LECCIONES, COLOR_TEORIA, FONDO_TEORIA, BORDE_TEORIA } from '../../lib/teoria'
 
 // "Entendé la partitura": lista de lecciones y la lección abierta.
-const COMPONENTES = { 'tu-voz': LeccionTuVoz }
+const COMPONENTES = { 'tu-voz': LeccionTuVoz, mapa: LeccionMapa }
 
 export default function TeoriaEntrenamiento({ prog, voz, onSalir }) {
   const [abierta, setAbierta] = useState(null)
