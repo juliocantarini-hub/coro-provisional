@@ -17,11 +17,11 @@ export const LECCIONES = [
   { id: 'tu-voz', titulo: 'Tu voz en la partitura', descr: 'Encontrá tu renglón, seguilo y ubicá los compases.', disponible: true },
   { id: 'mapa', titulo: 'El mapa de la obra', descr: 'Repeticiones, casillas, D.C., coda, calderón y dinámicas.', disponible: true },
   { id: 'pulso', titulo: 'Pulso y compás', descr: 'Sentí el pulso y entendé el 4/4, el 3/4 y el 6/8.', disponible: true },
-  { id: 'figuras', titulo: 'Figuras y silencios', descr: 'Notas largas y cortas, y cuándo no cantar.', disponible: false },
-  { id: 'claves', titulo: 'Pentagrama y claves', descr: 'Arriba es agudo, abajo es grave. Las claves de sol y de fa.', disponible: false },
-  { id: 'notas', titulo: 'Las notas y el teclado', descr: 'Ubicá en el piano la nota que ves.', disponible: false },
-  { id: 'alteraciones', titulo: 'Alteraciones', descr: 'Sostenidos, bemoles y becuadros: qué cambian.', disponible: false },
-  { id: 'intervalos', titulo: 'Intervalos por oído', descr: 'Reconocé los saltos entre notas.', disponible: false },
+  { id: 'figuras', titulo: 'Figuras y silencios', descr: 'Notas largas y cortas, y cuándo no cantar.', disponible: true },
+  { id: 'claves', titulo: 'Pentagrama y claves', descr: 'Arriba es agudo, abajo es grave. Las claves de sol y de fa.', disponible: true },
+  { id: 'notas', titulo: 'Las notas y el teclado', descr: 'Ubicá en el piano la nota que ves.', disponible: true },
+  { id: 'alteraciones', titulo: 'Alteraciones', descr: 'Sostenidos, bemoles y becuadros: qué cambian.', disponible: true },
+  { id: 'intervalos', titulo: 'Intervalos por oído', descr: 'Reconocé los saltos entre notas.', disponible: true },
 ]
 
 export const NOMBRE_VOZ_SATB = { S: 'Soprano', A: 'Contralto', T: 'Tenor', B: 'Bajo' }
@@ -41,13 +41,28 @@ export function vozSATB(voz) {
 
 // Convierte la frase escrita ("E5:1") a { paso, dur }. dur en pulsos (1 negra, 2 blanca, 4 redonda).
 const LETRA = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 }
+// Alteraciones escritas: "F#5" sostenido, "Bb4" bemol, "Fn5" becuadro. Como en la partitura, una alteración
+// vale para el resto del compás en esa misma nota: un "F5" después de un "F#5" suena sostenido (alter) sin signo escrito.
+const SIGNO = { '#': ['sostenido', 1], b: ['bemol', -1], n: ['becuadro', 0] }
 export function frase(texto) {
   const r = {}
   for (const [voz, compases] of Object.entries(texto)) {
-    r[voz] = compases.map((c) => c.trim().split(/\s+/).map((tok) => {
-      const [nota, dur] = tok.split(':')
-      return { paso: 7 * Number(nota.slice(1)) + LETRA[nota[0]], dur: Number(dur) }
-    }))
+    r[voz] = compases.map((c) => {
+      const vigentes = {}
+      return c.trim().split(/\s+/).map((tok) => {
+        const [nota, dur] = tok.split(':')
+        const m = nota.match(/^([A-G])([#bn]?)(\d)$/)
+        const paso = 7 * Number(m[3]) + LETRA[m[1]]
+        const n = { paso, dur: Number(dur) }
+        if (m[2]) {
+          const [signo, alter] = SIGNO[m[2]]
+          n.signo = signo
+          vigentes[paso] = alter
+        }
+        if (vigentes[paso]) n.alter = vigentes[paso]
+        return n
+      })
+    })
   }
   return r
 }
@@ -79,7 +94,7 @@ export async function tocarFrase({ frase: f, voces, guia, desde, hasta, tempo = 
   for (const [pulso, notas] of ataques) {
     timers.push(setTimeout(() => {
       for (const n of notas) {
-        const midi = midiDePaso(n.paso) + (TRANSPORTE[n.v] || 0)
+        const midi = midiDePaso(n.paso, n.alter || 0) + (TRANSPORTE[n.v] || 0)
         sampler.triggerAttackRelease(Tone.Frequency(midi, 'midi').toNote(), n.dur * seg * 0.92)
         if (n.v === guia) onNota?.({ voz: n.v, compas: n.m, i: n.i })
       }
@@ -89,11 +104,11 @@ export async function tocarFrase({ frase: f, voces, guia, desde, hasta, tempo = 
   return () => { timers.forEach(clearTimeout); try { sampler.releaseAll() } catch { /* nada */ } }
 }
 
-export async function tocarNota(paso, voz) {
+export async function tocarNota(paso, voz, alter = 0) {
   await Tone.start()
   const { sampler, listo } = getPianoSampler()
   await listo
-  sampler.triggerAttackRelease(Tone.Frequency(midiDePaso(paso) + (TRANSPORTE[voz] || 0), 'midi').toNote(), 1.6)
+  sampler.triggerAttackRelease(Tone.Frequency(midiDePaso(paso, alter) + (TRANSPORTE[voz] || 0), 'midi').toNote(), 1.6)
 }
 
 // Notas de un compás suelto ("C5:1 D5:1 E5:2") → [{ paso, dur }]
@@ -118,7 +133,7 @@ export async function tocarRecorrido({ compases, orden, tempo = 100, onCompas, o
       const corte = j === notas.length - 1 && respiraciones.includes(ci) ? 0.35 : 0
       const ataque = t
       timers.push(setTimeout(() => {
-        sampler.triggerAttackRelease(Tone.Frequency(midiDePaso(n.paso), 'midi').toNote(), Math.max(0.1, (dur - corte) * 0.92), undefined, n.vel ?? 0.7)
+        sampler.triggerAttackRelease(Tone.Frequency(midiDePaso(n.paso, n.alter || 0), 'midi').toNote(), Math.max(0.1, (dur - corte) * 0.92), undefined, n.vel ?? 0.7)
       }, ataque * 1000))
       t += dur
     })
@@ -241,3 +256,23 @@ export function musicaDe(clave) {
   }
   return ev
 }
+
+// Melodía simple sin clic: notas [{ midi o midis, dur }] una tras otra. onNota(i) avisa cuál suena.
+export function tocarNotas({ notas, tempo = 80, onNota, onFin, juntas = false }) {
+  let t = 0
+  const eventos = []
+  const inicios = []
+  notas.forEach((n) => {
+    inicios.push(t)
+    eventos.push({ t, midis: n.midis || [n.midi], dur: n.dur || 1, vel: n.vel ?? 0.65 })
+    if (!juntas) t += n.dur || 1
+  })
+  const total = juntas ? Math.max(...notas.map((n) => n.dur || 1)) : t
+  return tocarPulsos({
+    tempo, pulsos: Math.ceil(total), clic: false, eventos,
+    onPulso: (i) => { const k = inicios.indexOf(i); if (k >= 0) onNota?.(k) },
+    onFin,
+  })
+}
+
+export const midiDe = (n) => midiDePaso(n.paso, n.alter || 0)

@@ -13,7 +13,8 @@ import { GLIFOS, ESCALA_GLIFO } from '../../lib/glifosMusicales'
 
 const K = ESCALA_GLIFO
 const PULSO = 20
-const ANCHO = 4 * PULSO + 26
+const ANCHO = 4 * PULSO + 34
+const LUGAR_SIGNO = 10 // espacio extra antes de una nota con alteración
 const ARRIBA = 52
 const ABAJO = ARRIBA + 40
 const BASE = 30 // Mi4, línea de abajo en clave de sol
@@ -84,6 +85,7 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
         const desde = i === 0 ? 0 : xm
         const off = 12 + (c.inicioRep ? 12 : 0)
         let pulso = 0
+        let extra = 0
         const ultima = c.notas.length - 1
         return (
           <g key={i}>
@@ -144,8 +146,10 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
 
             {/* Notas */}
             {c.notas.map((n, j) => {
+              const liga = c.liga && j === ultima && compases[i + 1]
               const figura = n.dur >= 4 ? 'redonda' : n.dur >= 2 ? 'blanca' : 'negra'
-              const xCab = figura === 'redonda' ? xm + (ANCHO - GLIFOS.redonda.ancho * K) / 2 + (c.inicioRep ? 6 : 0) : xm + off + pulso * PULSO
+              if (n.signo) extra += LUGAR_SIGNO
+              const xCab = figura === 'redonda' ? xm + (ANCHO - GLIFOS.redonda.ancho * K) / 2 + (c.inicioRep ? 6 : 0) : xm + off + pulso * PULSO + extra
               pulso += n.dur
               const y = yDe(n.paso)
               const arriba = n.paso < BASE + 4
@@ -165,6 +169,20 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
                       y1={y} y2={arriba ? y - 34 : y + 34} stroke={TINTA} strokeWidth={1.1} />
                   )}
                   <path d={GLIFOS[figura].d} fill={TINTA} transform={`translate(${xCab} ${y}) scale(${K})`} />
+                  {n.signo && (
+                    <path d={GLIFOS[n.signo].d} fill={TINTA} transform={`translate(${xCab - GLIFOS[n.signo].ancho * K - 3} ${y}) scale(${K})`} />
+                  )}
+                  {liga && (() => {
+                    // Ligadura hasta la primera nota del compás siguiente, del lado contrario a las plicas
+                    const sig = compases[i + 1].notas[0]
+                    const offSig = 12 + (compases[i + 1].inicioRep ? 12 : 0)
+                    const xSig = sig.dur >= 4 ? xs[i + 1] + (ANCHO - GLIFOS.redonda.ancho * K) / 2 : xs[i + 1] + offSig
+                    const x1 = xc + 3
+                    const x2 = xSig + 2
+                    const dy = arriba ? 9 : -9
+                    const y0 = y + dy
+                    return <path d={`M${x1} ${y0} Q${(x1 + x2) / 2} ${y0 + dy * 1.6} ${x2} ${y0} Q${(x1 + x2) / 2} ${y0 + dy * 1.2} ${x1} ${y0}`} fill={TINTA} stroke={TINTA} strokeWidth={0.6} />
+                  })()}
                   {c.calderon && j === ultima && (
                     <g>
                       <path d={`M${xc - 8} ${yCal} A8 8 0 0 1 ${xc + 8} ${yCal}`} stroke={TINTA} strokeWidth={1.8} fill="none" />

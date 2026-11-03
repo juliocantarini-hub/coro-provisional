@@ -3,10 +3,17 @@ import BotonVolver from '../BotonVolver'
 import LeccionTuVoz from './LeccionTuVoz'
 import LeccionMapa from './LeccionMapa'
 import LeccionPulso from './LeccionPulso'
+import LeccionFiguras from './LeccionFiguras'
+import LeccionClaves from './LeccionClaves'
+import LeccionNotas from './LeccionNotas'
+import LeccionAlteraciones from './LeccionAlteraciones'
+import LeccionIntervalos from './LeccionIntervalos'
 import { LECCIONES, COLOR_TEORIA, FONDO_TEORIA, BORDE_TEORIA } from '../../lib/teoria'
 
 // "Entendé la partitura": lista de lecciones y la lección abierta.
-const COMPONENTES = { 'tu-voz': LeccionTuVoz, mapa: LeccionMapa, pulso: LeccionPulso }
+const COMPONENTES = { 'tu-voz': LeccionTuVoz, mapa: LeccionMapa, pulso: LeccionPulso,
+  figuras: LeccionFiguras, claves: LeccionClaves, notas: LeccionNotas, alteraciones: LeccionAlteraciones, intervalos: LeccionIntervalos,
+}
 
 export default function TeoriaEntrenamiento({ prog, voz, onSalir, onIrRitmo }) {
   const [abierta, setAbierta] = useState(null)
