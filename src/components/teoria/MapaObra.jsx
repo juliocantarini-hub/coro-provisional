@@ -63,8 +63,9 @@ const espacioDe = (n, sig) => Math.max(n.dur * PULSO, 14, n.letra ? (anchoLetra(
 
 // sinNumeros: sin el número de compás (para ejemplos sueltos). notaActiva: { compas, i } se pinta de color.
 // Cada nota puede llevar letra (n.letra): se escribe debajo del pentagrama.
+// armadura: [{ paso, signo: 'bemol' | 'sostenido' }] se dibuja después de la clave (solo el dibujo: el sonido lo dan las notas).
 // marcadas: [{ compas, i }] notas con un círculo lila (por ejemplo, las dos de un intervalo).
-export default function MapaObra({ compases, actual = null, colores = {}, onCompas, sinNumeros = false, notaActiva = null, marcadas = [], descripcion = 'Partitura con signos de repetición' }) {
+export default function MapaObra({ compases, actual = null, colores = {}, onCompas, sinNumeros = false, notaActiva = null, marcadas = [], armadura = [], descripcion = 'Partitura con signos de repetición' }) {
   // Posición de cada compás
   // Ancho de cada compás: normalmente fijo, pero se agranda si las notas llevan letra y no entra
   const anchos = compases.map((c) => {
@@ -76,7 +77,7 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
     return Math.max(ANCHO, px + 10)
   })
   const xs = []
-  let x = X0
+  let x = X0 + armadura.length * 10
   compases.forEach((c, i) => {
     if (c.coda) x += SEP_CODA
     xs.push(x)
@@ -95,6 +96,9 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
 
       {/* Clave al principio */}
       <path d={GLIFOS.claveSol.d} fill={TINTA} transform={`translate(8 ${yDe(32)}) scale(${K})`} />
+      {armadura.map((a, k) => (
+        <path key={k} d={GLIFOS[a.signo].d} fill={TINTA} transform={`translate(${X0 - 14 + k * 10} ${yDe(a.paso)}) scale(${K})`} />
+      ))}
 
       {compases.map((c, i) => {
         const xm = xs[i]
