@@ -148,11 +148,15 @@ export async function tocarRecorrido({ compases, orden, tempo = 100, onCompas, o
 // Los clics se programan en el reloj de audio (precisos); el piano y los avisos a la pantalla, con temporizadores.
 const CLIC = { fuerte: [1050, 0.38], medio: [820, 0.24], debil: [660, 0.14] }
 
-// sonido: 'piano' (con resonancia natural) o 'tono' (seco: empieza y termina justo con la figura, para que se oigan los silencios).
-export async function tocarPulsos({ tempo = 90, pulsos, acento = () => 'debil', eventos = [], clic = true, onPulso, onFin, sonido = 'piano' }) {
+// resonancia: false acorta la cola del piano, para que cada nota dure lo que la figura y no tape los silencios
+// ni siga sonando al terminar el ejemplo (se restablece al final).
+export async function tocarPulsos({ tempo = 90, pulsos, acento = () => 'debil', eventos = [], clic = true, onPulso, onFin, resonancia = true }) {
   await Tone.start()
   const { sampler, listo } = getPianoSampler()
-  if (eventos.length && sonido === 'piano') await listo
+  if (eventos.length) await listo
+  const releaseOriginal = sampler.release
+  if (!resonancia) sampler.release = 0.12
+  const restablecer = () => { if (!resonancia) setTimeout(() => { sampler.release = releaseOriginal }, 200) }
   const ctx = Tone.getContext().rawContext
   const seg = 60 / tempo
   const salida = ctx.createGain()
@@ -180,38 +184,18 @@ export async function tocarPulsos({ tempo = 90, pulsos, acento = () => 'debil', 
   // (si se disparara "ahora" desde el temporizador, Tone le suma su anticipación y llega tarde respecto del clic).
   // Programar de a poco, y no todo de entrada, permite que "Parar" corte la música.
   const ANTES = 0.3
-  if (sonido === 'tono') {
-    // Tono suave (triángulo) en el reloj de audio, con la duración exacta de la figura
-    for (const e of eventos) {
-      const t = t0 + e.t * seg
-      const fin = t + e.dur * seg * 0.92
-      for (const m of e.midis) {
-        const o = ctx.createOscillator()
-        const g = ctx.createGain()
-        o.type = 'triangle'
-        o.frequency.value = 440 * 2 ** ((m - 69) / 12)
-        const vol = 0.32 * (e.vel ?? 0.7)
-        g.gain.setValueAtTime(0.0001, t)
-        g.gain.exponentialRampToValueAtTime(vol, t + 0.012)
-        g.gain.setValueAtTime(vol, Math.max(t + 0.013, fin - 0.05))
-        g.gain.exponentialRampToValueAtTime(0.0001, fin)
-        o.connect(g).connect(salida)
-        o.start(t)
-        o.stop(fin + 0.02)
-      }
-    }
-  }
-  for (const e of sonido === 'piano' ? eventos : []) {
+  for (const e of eventos) {
     const t = t0 + e.t * seg
     timers.push(setTimeout(() => {
-      for (const m of e.midis) sampler.triggerAttackRelease(Tone.Frequency(m, 'midi').toNote(), e.dur * seg * 0.9, t, e.vel ?? 0.6)
+      for (const m of e.midis) sampler.triggerAttackRelease(Tone.Frequency(m, 'midi').toNote(), e.dur * seg * (resonancia ? 0.9 : 0.97), t, e.vel ?? 0.6)
     }, Math.max(0, (t - ANTES - ctx.currentTime) * 1000)))
   }
-  timers.push(setTimeout(() => onFin?.(), (t0 + pulsos * seg - ctx.currentTime) * 1000 + 300))
+  timers.push(setTimeout(() => { restablecer(); onFin?.() }, (t0 + pulsos * seg - ctx.currentTime) * 1000 + 300))
   return () => {
     timers.forEach(clearTimeout)
     try { salida.gain.value = 0; salida.disconnect() } catch { /* nada */ }
     try { sampler.releaseAll() } catch { /* nada */ }
+    restablecer()
   }
 }
 
