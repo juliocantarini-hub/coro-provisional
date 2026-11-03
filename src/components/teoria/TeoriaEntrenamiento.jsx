@@ -2,12 +2,13 @@ import { useState } from 'react'
 import BotonVolver from '../BotonVolver'
 import LeccionTuVoz from './LeccionTuVoz'
 import LeccionMapa from './LeccionMapa'
+import LeccionPulso from './LeccionPulso'
 import { LECCIONES, COLOR_TEORIA, FONDO_TEORIA, BORDE_TEORIA } from '../../lib/teoria'
 
 // "Entendé la partitura": lista de lecciones y la lección abierta.
-const COMPONENTES = { 'tu-voz': LeccionTuVoz, mapa: LeccionMapa }
+const COMPONENTES = { 'tu-voz': LeccionTuVoz, mapa: LeccionMapa, pulso: LeccionPulso }
 
-export default function TeoriaEntrenamiento({ prog, voz, onSalir }) {
+export default function TeoriaEntrenamiento({ prog, voz, onSalir, onIrRitmo }) {
   const [abierta, setAbierta] = useState(null)
 
   if (abierta) {
@@ -19,7 +20,7 @@ export default function TeoriaEntrenamiento({ prog, voz, onSalir }) {
         <BotonVolver texto="Lecciones" onClick={() => setAbierta(null)} />
         <div style={{ fontSize: '12px', fontWeight: 600, color: COLOR_TEORIA, marginBottom: '6px' }}>Lección {n}</div>
         <Leccion key={abierta} voz={voz} onCompletar={() => prog.marcar(abierta)}
-          siguiente={siguiente} onSiguiente={() => siguiente && setAbierta(siguiente.id)} onVolver={() => setAbierta(null)} />
+          siguiente={siguiente} onSiguiente={() => siguiente && setAbierta(siguiente.id)} onVolver={() => setAbierta(null)} onIrRitmo={onIrRitmo} />
       </div>
     )
   }

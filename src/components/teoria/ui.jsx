@@ -49,12 +49,17 @@ export function Botonera({ children }) {
 
 // Reproducción con botón de parar; se detiene sola al salir de la pantalla.
 // tocar(clave, iniciar, alTerminar): iniciar(fin) debe devolver (una promesa de) la función para detener.
+// Solo suena un ejemplo a la vez: al empezar uno se corta el que estaba sonando en otro lado.
+let pararElAnterior = null
+
 export function useReproduccion() {
   const detener = useRef(null)
   const [sonando, setSonando] = useState(null)
   const parar = () => { detener.current?.(); detener.current = null; setSonando(null) }
   useEffect(() => () => detener.current?.(), [])
   const tocar = async (clave, iniciar, alTerminar) => {
+    if (pararElAnterior && pararElAnterior !== parar) pararElAnterior()
+    pararElAnterior = parar
     parar()
     setSonando(clave)
     detener.current = await iniciar(() => { alTerminar?.(); detener.current = null; setSonando(null) })
@@ -91,7 +96,7 @@ export function Leccion({ pasos }) {
 
 // Repaso final. preguntas: de opción múltiple { texto, opciones, correcta, explicacion }
 // o especiales { titulo, componente: ({ onOk }) => JSX }.
-export function Repaso({ preguntas, textoFinal, onTerminar, siguiente, onSiguiente, onVolver }) {
+export function Repaso({ preguntas, textoFinal, onTerminar, siguiente, onSiguiente, onVolver, accionExtra }) {
   const [i, setI] = useState(0)
   const [elegida, setElegida] = useState(null)
   const [okEspecial, setOkEspecial] = useState(false)
@@ -101,6 +106,7 @@ export function Repaso({ preguntas, textoFinal, onTerminar, siguiente, onSiguien
       <>
         <Titulo>¡Lección completada! 🎉</Titulo>
         <Caja tono="ok">{textoFinal}</Caja>
+        {accionExtra && <Botonera><Boton onClick={accionExtra.onClick}>{accionExtra.texto}</Boton></Botonera>}
         {siguiente && !siguiente.disponible && (
           <Caja tono="tip">La próxima lección, <b>{siguiente.titulo}</b>, llega pronto.</Caja>
         )}

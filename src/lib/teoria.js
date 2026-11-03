@@ -16,7 +16,7 @@ export const BORDE_TEORIA = '#E9CFE2'
 export const LECCIONES = [
   { id: 'tu-voz', titulo: 'Tu voz en la partitura', descr: 'Encontrá tu renglón, seguilo y ubicá los compases.', disponible: true },
   { id: 'mapa', titulo: 'El mapa de la obra', descr: 'Repeticiones, casillas, D.C., coda, calderón y dinámicas.', disponible: true },
-  { id: 'pulso', titulo: 'Pulso y compás', descr: 'Sentí el pulso y entendé el 4/4, el 3/4 y el 6/8.', disponible: false },
+  { id: 'pulso', titulo: 'Pulso y compás', descr: 'Sentí el pulso y entendé el 4/4, el 3/4 y el 6/8.', disponible: true },
   { id: 'figuras', titulo: 'Figuras y silencios', descr: 'Notas largas y cortas, y cuándo no cantar.', disponible: false },
   { id: 'claves', titulo: 'Pentagrama y claves', descr: 'Arriba es agudo, abajo es grave. Las claves de sol y de fa.', disponible: false },
   { id: 'notas', titulo: 'Las notas y el teclado', descr: 'Ubicá en el piano la nota que ves.', disponible: false },
@@ -125,4 +125,104 @@ export async function tocarRecorrido({ compases, orden, tempo = 100, onCompas, o
   })
   timers.push(setTimeout(() => onFin?.(), (t + 0.3) * 1000))
   return () => { timers.forEach(clearTimeout); try { sampler.releaseAll() } catch { /* nada */ } }
+}
+
+// ─── Pulso y compás ──────────────────────────────────────────────────────────
+// Toca una serie de pulsos con clic (el primero de cada compás más fuerte) y, opcionalmente, música de piano.
+// acento(i) → 'fuerte' | 'medio' | 'debil'. eventos: [{ t (en pulsos), midis: [..], dur (en pulsos), vel }].
+// Los clics se programan en el reloj de audio (precisos); el piano y los avisos a la pantalla, con temporizadores.
+const CLIC = { fuerte: [1050, 0.38], medio: [820, 0.24], debil: [660, 0.14] }
+
+export async function tocarPulsos({ tempo = 90, pulsos, acento = () => 'debil', eventos = [], clic = true, onPulso, onFin }) {
+  await Tone.start()
+  const { sampler, listo } = getPianoSampler()
+  if (eventos.length) await listo
+  const ctx = Tone.getContext().rawContext
+  const seg = 60 / tempo
+  const salida = ctx.createGain()
+  salida.connect(ctx.destination)
+  const t0 = ctx.currentTime + 0.25
+  const timers = []
+  for (let i = 0; i < pulsos; i++) {
+    const t = t0 + i * seg
+    if (clic) {
+      const [f, vol] = CLIC[acento(i)] || CLIC.debil
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.type = 'sine'
+      o.frequency.value = f
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.006)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12)
+      o.connect(g).connect(salida)
+      o.start(t)
+      o.stop(t + 0.15)
+    }
+    timers.push(setTimeout(() => onPulso?.(i), (t - ctx.currentTime) * 1000))
+  }
+  for (const e of eventos) {
+    timers.push(setTimeout(() => {
+      for (const m of e.midis) sampler.triggerAttackRelease(Tone.Frequency(m, 'midi').toNote(), e.dur * seg * 0.9, undefined, e.vel ?? 0.6)
+    }, (t0 + e.t * seg - ctx.currentTime) * 1000))
+  }
+  timers.push(setTimeout(() => onFin?.(), (t0 + pulsos * seg - ctx.currentTime) * 1000 + 300))
+  return () => {
+    timers.forEach(clearTimeout)
+    try { salida.gain.value = 0; salida.disconnect() } catch { /* nada */ }
+    try { sampler.releaseAll() } catch { /* nada */ }
+  }
+}
+
+// Acentos típicos de cada compás (por pulso dentro del compás)
+export function acentoDe(compas) {
+  return (i) => {
+    const p = i % compas.pulsos
+    if (p === 0) return 'fuerte'
+    if (compas.medio?.includes(p)) return 'medio'
+    return 'debil'
+  }
+}
+
+export const COMPASES = {
+  '2/4': { arriba: 2, abajo: 4, pulsos: 2, tempo: 96 },
+  '3/4': { arriba: 3, abajo: 4, pulsos: 3, tempo: 104 },
+  '4/4': { arriba: 4, abajo: 4, pulsos: 4, tempo: 96, medio: [2] },
+  '6/8': { arriba: 6, abajo: 8, pulsos: 6, tempo: 168, medio: [3], grupos: 3 },
+}
+
+// Músicas cortas de ejemplo (4 compases): bajo fuerte en el 1, acordes suaves en el resto y una melodía.
+// Do mayor: C3=48, G2=43; acordes en la octava 4; melodía en la 5.
+const ACORDE = { C: [64, 67], G7: [65, 71] }
+const BAJO = { C: 48, G7: 43 }
+export function musicaDe(clave) {
+  const ev = []
+  const armonia = ['C', 'G7', 'G7', 'C']
+  if (clave === '3/4') {
+    const melodia = [[76, 3], [74, 3], [77, 3], [76, 3]]
+    armonia.forEach((a, c) => {
+      const t = c * 3
+      ev.push({ t, midis: [BAJO[a]], dur: 1, vel: 0.85 })
+      ev.push({ t: t + 1, midis: ACORDE[a], dur: 1, vel: 0.28 }, { t: t + 2, midis: ACORDE[a], dur: 1, vel: 0.28 })
+      ev.push({ t, midis: [melodia[c][0]], dur: melodia[c][1], vel: 0.6 })
+    })
+  } else if (clave === '4/4') {
+    const melodia = [[72, 74, 76, 72], [74, 77, 79, 77], [76, 74, 71, 74], [72, null, null, null]]
+    armonia.forEach((a, c) => {
+      const t = c * 4
+      ev.push({ t, midis: [BAJO[a]], dur: 1, vel: 0.85 }, { t: t + 2, midis: [BAJO[a] + 7], dur: 1, vel: 0.5 })
+      ev.push({ t: t + 1, midis: ACORDE[a], dur: 1, vel: 0.28 }, { t: t + 3, midis: ACORDE[a], dur: 1, vel: 0.28 })
+      melodia[c].forEach((m, j) => m && ev.push({ t: t + j, midis: [m], dur: c === 3 ? 4 : 1, vel: 0.55 }))
+    })
+  } else if (clave === '6/8') {
+    const melodia = [[[76, 2], [77, 1], [79, 2], [77, 1]], [[76, 3], [74, 3]], [[74, 2], [76, 1], [77, 2], [74, 1]], [[72, 6]]]
+    armonia.forEach((a, c) => {
+      const t = c * 6
+      ev.push({ t, midis: [BAJO[a]], dur: 2, vel: 0.85 }, { t: t + 3, midis: [BAJO[a] + 7], dur: 2, vel: 0.55 })
+      ev.push({ t: t + 1, midis: ACORDE[a], dur: 1, vel: 0.22 }, { t: t + 2, midis: ACORDE[a], dur: 1, vel: 0.22 })
+      ev.push({ t: t + 4, midis: ACORDE[a], dur: 1, vel: 0.22 }, { t: t + 5, midis: ACORDE[a], dur: 1, vel: 0.22 })
+      let p = 0
+      for (const [m, d] of melodia[c]) { ev.push({ t: t + p, midis: [m], dur: d, vel: 0.55 }); p += d }
+    })
+  }
+  return ev
 }
