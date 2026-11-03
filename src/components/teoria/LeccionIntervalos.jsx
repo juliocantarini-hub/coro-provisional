@@ -69,7 +69,13 @@ const INTERVALOS = [
     intervalo: [{ compas: 0, i: 1 }, { compas: 0, i: 2 }],
   },
   {
-    n: 8, nombre: 'Octava', ej: 'Do → Do', ref: 'La misma nota, más aguda. Es lo que pasa cuando hombres y mujeres cantan juntos la misma melodía.',
+    n: 8, nombre: 'Octava', ej: 'Do → Do', ref: 'La misma nota, más aguda: el salto del comienzo de «Singin\' in the Rain». También es lo que pasa cuando mujeres y hombres cantan juntos la misma melodía.',
+    // Dos renglones: la misma melodía, una octava más grave en los hombres. El intervalo es vertical, entre los dos Do.
+    voces: [
+      { nombre: 'Mujeres', compases: [{ notas: conLetra('C5:1 E5:1 F5:1 G5:1', ['Oh', 'when', 'the', 'saints']), barra: 'final' }] },
+      { nombre: 'Hombres', compases: [{ notas: conLetra('C4:1 E4:1 F4:1 G4:1', ['Oh', 'when', 'the', 'saints']), barra: 'final' }] },
+    ],
+    intervalo: [{ voz: 1, compas: 0, i: 0 }, { voz: 0, compas: 0, i: 0 }],
   },
 ]
 
@@ -77,22 +83,25 @@ const INTERVALOS = [
 function Intervalo({ it }) {
   const { sonando, tocar, parar } = useReproduccion()
   const [abierto, setAbierto] = useState(false)
-  const [activa, setActiva] = useState(null)
+  const [activa, setActiva] = useState(null) // { voz, compas, i }; voz 'todas' = en todos los renglones
   const b = DO + it.n - 1
+  // Uno o varios renglones (la octava muestra mujeres y hombres)
+  const voces = it.voces || (it.ejemplo ? [{ compases: it.ejemplo }] : null)
+  const notaDe = (m) => voces[m.voz || 0].compases[m.compas].notas[m.i]
   // Con ejemplo, el intervalo suena a la altura en que está escrito y sus dos notas se iluminan al sonar
-  const notaDe = (m) => it.ejemplo[m.compas].notas[m.i]
   const tocarIntervalo = () => {
-    if (it.ejemplo) setAbierto(true)
-    const midis = it.ejemplo ? it.intervalo.map((m) => midiDe(notaDe(m))) : [midiDePaso(DO), midiDePaso(b)]
+    if (voces) setAbierto(true)
+    const midis = voces ? it.intervalo.map((m) => midiDe(notaDe(m))) : [midiDePaso(DO), midiDePaso(b)]
     tocar('i', (fin) => tocarNotas({
       notas: [{ midi: midis[0], dur: 1 }, { midi: midis[1], dur: 2 }], tempo: 76,
-      onNota: it.ejemplo ? (k) => setActiva(it.intervalo[k]) : undefined, onFin: fin,
+      onNota: voces ? (k) => setActiva({ voz: 0, ...it.intervalo[k] }) : undefined, onFin: fin,
     }), () => setActiva(null))
   }
-  const plano = it.ejemplo ? it.ejemplo.flatMap((c, ci) => c.notas.map((n, k) => ({ ...n, ci, k }))) : []
+  // El ejemplo suena con todos los renglones juntos (tienen el mismo ritmo)
+  const plano = voces ? voces[0].compases.flatMap((c, ci) => c.notas.map((n, k) => ({ ...n, ci, k }))) : []
   const tocarEjemplo = () => tocar('e', (fin) => tocarNotas({
-    notas: plano.map((n) => ({ midi: midiDe(n), dur: n.dur })), tempo: 96,
-    onNota: (k) => setActiva({ compas: plano[k].ci, i: plano[k].k }), onFin: fin,
+    notas: plano.map((n) => ({ midis: voces.map((v) => midiDe(v.compases[n.ci].notas[n.k])), dur: n.dur })), tempo: 96,
+    onNota: (k) => setActiva({ voz: 'todas', compas: plano[k].ci, i: plano[k].k }), onFin: fin,
   }), () => setActiva(null))
   return (
     <div style={{ background: '#FFFFFF', border: `1px solid ${sonando || abierto ? COLOR_TEORIA : '#E8E6DF'}`, borderRadius: '12px', padding: '10px 12px', marginBottom: '8px' }}>
@@ -104,9 +113,16 @@ function Intervalo({ it }) {
         </div>
         <Boton activo={sonando === 'i'} onClick={() => (sonando === 'i' ? (parar(), setActiva(null)) : tocarIntervalo())}>{sonando === 'i' ? '■' : '▶'}</Boton>
       </div>
-      {abierto && it.ejemplo && (
+      {abierto && voces && (
         <div style={{ marginTop: '10px' }}>
-          <MapaObra compases={it.ejemplo} sinNumeros notaActiva={activa} marcadas={it.intervalo} descripcion={`Ejemplo de ${it.nombre.toLowerCase()}`} />
+          {voces.map((v, vi) => (
+            <div key={vi}>
+              {v.nombre && <div style={{ fontSize: '12px', fontWeight: 700, color: '#5F5E5A', margin: '2px 0 -6px 4px' }}>{v.nombre}</div>}
+              <MapaObra compases={v.compases} sinNumeros descripcion={`Ejemplo de ${it.nombre.toLowerCase()}`}
+                notaActiva={activa && (activa.voz === 'todas' || (activa.voz || 0) === vi) ? activa : null}
+                marcadas={it.intervalo.filter((m) => (m.voz || 0) === vi)} />
+            </div>
+          ))}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
             {sonando === 'e'
               ? <Boton onClick={() => { parar(); setActiva(null) }}>■ Parar</Boton>
