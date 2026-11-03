@@ -69,7 +69,7 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={descripcion}
-      style={{ width: '100%', maxWidth: '600px', display: 'block', margin: '0 auto', userSelect: 'none' }}>
+      style={{ width: '100%', maxWidth: `${Math.min(600, Math.round(W * 1.4))}px`, display: 'block', margin: '0 auto', userSelect: 'none' }}>
       {/* Fondos de compás */}
       {compases.map((c, i) => {
         const color = colores[i] || (actual === i ? '#F7E8F3' : null)

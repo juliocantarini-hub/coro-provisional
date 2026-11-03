@@ -106,11 +106,12 @@ export default function Pentagrama({
               for (let p = base - 2; p >= n.paso; p -= 2) ledgers.push(p)
               for (let p = base + 10; p <= n.paso; p += 2) ledgers.push(p)
               let alt = null
-              if (n.alter) {
+              if (n.alter || n.becuadro) {
                 nivelAlt = n.paso - ultimoPaso <= 5 ? nivelAlt + 1 : 0
                 ultimoPaso = n.paso
-                const g = n.alter > 0 ? GLIFOS.sostenido : GLIFOS.bemol
-                alt = { d: g.d, x: xCab - (n.alter > 0 ? 7.2 : 6.2) * (ls / 10) - 1.2 * (ls / 10) - nivelAlt * 8.2 * (ls / 10) }
+                // becuadro: true dibuja el signo ♮ (la nota suena natural)
+                const g = n.becuadro ? GLIFOS.becuadro : n.alter > 0 ? GLIFOS.sostenido : GLIFOS.bemol
+                alt = { d: g.d, x: xCab - (n.becuadro ? 5.6 : n.alter > 0 ? 7.2 : 6.2) * (ls / 10) - 1.2 * (ls / 10) - nivelAlt * 8.2 * (ls / 10) }
               }
               const resaltada = n.estado === 'sel'
               return (

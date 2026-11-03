@@ -9,29 +9,32 @@ import { midiDePaso } from '../../lib/notacion'
 // Lección 7: "Alteraciones". Sostenido, bemol y becuadro: qué cambian, que valen todo el compás, y la armadura.
 // Sin teoría de tonalidades: reconocer los signos y saber que la nota cambia.
 
-// Compara una nota natural con su versión alterada: pentagrama + teclado + sonido
-function Comparar({ paso, alter, nombre }) {
+// Compara dos versiones de la misma nota (natural, sostenido, bemol o becuadro): pentagrama + teclado + sonido.
+// notas: [{ alter, becuadro, etiqueta, boton }] (dos)
+const NEGRAS = [1, 3, 6, 8, 10]
+function Comparar({ paso, notas }) {
   const { sonando, tocar, parar } = useReproduccion()
-  const [cual, setCual] = useState(null) // 'natural' | 'alterada'
-  const nat = midiDePaso(paso)
-  const alt = midiDePaso(paso, alter)
-  const sonar = (k, midi) => { setCual(k); tocar(k, (fin) => tocarNotas({ notas: [{ midi, dur: 2 }], tempo: 80, onFin: fin })) }
-  const colores = cual ? { [cual === 'natural' ? nat : alt]: COLOR_TEORIA } : {}
+  const [cual, setCual] = useState(null) // índice de la que suena, o 'ambas'
+  const midis = notas.map((n) => midiDePaso(paso, n.alter || 0))
+  let desde = Math.min(...midis) - 5
+  if (NEGRAS.includes(desde % 12)) desde -= 1
+  let hasta = Math.max(...midis) + 6
+  if (NEGRAS.includes(hasta % 12)) hasta += 1
+  const sonar = (k) => { setCual(k); tocar(`n${k}`, (fin) => tocarNotas({ notas: [{ midi: midis[k], dur: 2 }], tempo: 80, onFin: fin })) }
+  const colores = typeof cual === 'number' ? { [midis[cual]]: COLOR_TEORIA } : {}
   return (
     <>
       <Partitura>
-        <Pentagrama clave="sol" columnas={[
-          { notas: [{ paso, figura: 'blanca', estado: cual === 'natural' ? 'sel' : 'normal' }], etiqueta: 'natural' },
-          { notas: [{ paso, alter, figura: 'blanca', estado: cual === 'alterada' ? 'sel' : 'normal' }], etiqueta: nombre },
-        ]} anchoCol={80} />
+        <Pentagrama clave="sol" anchoCol={80} columnas={notas.map((n, k) => ({
+          notas: [{ paso, alter: n.alter, becuadro: n.becuadro, figura: 'blanca', estado: cual === k ? 'sel' : 'normal' }], etiqueta: n.etiqueta,
+        }))} />
       </Partitura>
-      <Teclado desde={Math.min(nat, alt) - 5 - ((Math.min(nat, alt) - 5) % 12 === 1 ? 1 : 0)} hasta={Math.max(nat, alt) + 6} colores={colores} alto={80} />
+      <Teclado desde={desde} hasta={hasta} colores={colores} alto={80} />
       <Botonera>
         {sonando ? <Boton onClick={() => { parar(); setCual(null) }}>■ Parar</Boton> : (
           <>
-            <Boton onClick={() => sonar('natural', nat)}>▶ Natural</Boton>
-            <Boton onClick={() => sonar('alterada', alt)}>▶ Con {nombre}</Boton>
-            <Boton onClick={() => { setCual(null); tocar('ambas', (fin) => tocarNotas({ notas: [{ midi: nat, dur: 1.5 }, { midi: alt, dur: 1.5 }], tempo: 80, onFin: fin })) }}>▶ Las dos seguidas</Boton>
+            {notas.map((n, k) => <Boton key={k} onClick={() => sonar(k)}>▶ {n.boton}</Boton>)}
+            <Boton onClick={() => { setCual('ambas'); tocar('ambas', (fin) => tocarNotas({ notas: midis.map((m) => ({ midi: m, dur: 1.5 })), tempo: 80, onNota: setCual, onFin: fin }), () => setCual(null)) }}>▶ Las dos seguidas</Boton>
           </>
         )}
       </Botonera>
@@ -60,9 +63,6 @@ function Compases({ compases }) {
 const TODO_EL_COMPAS = [
   { notas: motivo('G5:1 F#5:1 E5:1 F5:1') },
   { notas: motivo('G5:1 F5:1 E5:2'), barra: 'final' },
-]
-const SOLO_BECUADRO = [
-  { notas: motivo('F#5:2 Fn5:2'), barra: 'final' },
 ]
 const BECUADRO = [
   { notas: motivo('E5:1 F#5:1 G5:1 F#5:1') },
@@ -143,7 +143,7 @@ export default function LeccionAlteraciones({ onCompletar, siguiente, onSiguient
               Las <b>alteraciones</b> son signos que van <b>a la izquierda</b> de una nota y la cambian un poquito.
               El <b>sostenido</b> (♯, como un numeral) la <b>sube medio tono</b>: en el teclado, la tecla más cercana hacia la derecha.
             </Caja>
-            <Comparar paso={31} alter={1} nombre="sostenido" />
+            <Comparar paso={31} notas={[{ etiqueta: 'natural', boton: 'Natural' }, { alter: 1, etiqueta: 'sostenido', boton: 'Con sostenido' }]} />
           </>
         ),
       },
@@ -154,11 +154,11 @@ export default function LeccionAlteraciones({ onCompletar, siguiente, onSiguient
             <Caja>
               El <b>bemol</b> (♭, como una "b") <b>baja medio tono</b> la nota: la tecla más cercana hacia la izquierda.
             </Caja>
-            <Comparar paso={34} alter={-1} nombre="bemol" />
+            <Comparar paso={34} notas={[{ etiqueta: 'natural', boton: 'Natural' }, { alter: -1, etiqueta: 'bemol', boton: 'Con bemol' }]} />
             <Caja>
               El <b>becuadro</b> (♮) <b>anula</b> una alteración anterior: la nota vuelve a ser natural.
             </Caja>
-            <Compases compases={SOLO_BECUADRO} />
+            <Comparar paso={31} notas={[{ alter: 1, etiqueta: 'sostenido', boton: 'Con sostenido' }, { becuadro: true, etiqueta: 'natural', boton: 'Con becuadro' }]} />
             <Caja tono="tip">El primer Fa tiene sostenido; el segundo tiene becuadro, así que <b>vuelve a ser natural</b>. Escuchá cómo baja.</Caja>
           </>
         ),
