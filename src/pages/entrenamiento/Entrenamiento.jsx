@@ -319,7 +319,7 @@ export default function Entrenamiento() {
       {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} progDictado={MOSTRAR_DICTADO_RITMICO ? ritmoDictado : null} onSalir={() => setSeccion(null)} />}
 
       {/* Entendé la partitura */}
-      {seccion === 'teoria' && <TeoriaEntrenamiento prog={teoria} voz={perfil?.voz} onSalir={() => setSeccion(null)} />}
+      {seccion === 'teoria' && <TeoriaEntrenamiento prog={teoria} voz={perfil?.voz} onSalir={() => setSeccion(null)} onIrRitmo={() => setSeccion('ritmo')} />}
 
       {/* Práctica auditiva */}
       {MOSTRAR_PRACTICA_AUDITIVA && seccion === 'auditiva' && <AuditivaEntrenamiento prog={auditiva} voz={perfil?.voz} onSalir={() => setSeccion(null)} />}

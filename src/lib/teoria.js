@@ -141,7 +141,7 @@ export async function tocarPulsos({ tempo = 90, pulsos, acento = () => 'debil', 
   const seg = 60 / tempo
   const salida = ctx.createGain()
   salida.connect(ctx.destination)
-  const t0 = ctx.currentTime + 0.25
+  const t0 = ctx.currentTime + 0.45
   const timers = []
   for (let i = 0; i < pulsos; i++) {
     const t = t0 + i * seg
@@ -160,10 +160,15 @@ export async function tocarPulsos({ tempo = 90, pulsos, acento = () => 'debil', 
     }
     timers.push(setTimeout(() => onPulso?.(i), (t - ctx.currentTime) * 1000))
   }
+  // El piano va en el mismo reloj que el clic: cada nota se programa con su momento exacto, un ratito antes
+  // (si se disparara "ahora" desde el temporizador, Tone le suma su anticipación y llega tarde respecto del clic).
+  // Programar de a poco, y no todo de entrada, permite que "Parar" corte la música.
+  const ANTES = 0.3
   for (const e of eventos) {
+    const t = t0 + e.t * seg
     timers.push(setTimeout(() => {
-      for (const m of e.midis) sampler.triggerAttackRelease(Tone.Frequency(m, 'midi').toNote(), e.dur * seg * 0.9, undefined, e.vel ?? 0.6)
-    }, (t0 + e.t * seg - ctx.currentTime) * 1000))
+      for (const m of e.midis) sampler.triggerAttackRelease(Tone.Frequency(m, 'midi').toNote(), e.dur * seg * 0.9, t, e.vel ?? 0.6)
+    }, Math.max(0, (t - ANTES - ctx.currentTime) * 1000)))
   }
   timers.push(setTimeout(() => onFin?.(), (t0 + pulsos * seg - ctx.currentTime) * 1000 + 300))
   return () => {
@@ -212,6 +217,16 @@ export function musicaDe(clave) {
       ev.push({ t, midis: [BAJO[a]], dur: 1, vel: 0.85 }, { t: t + 2, midis: [BAJO[a] + 7], dur: 1, vel: 0.5 })
       ev.push({ t: t + 1, midis: ACORDE[a], dur: 1, vel: 0.28 }, { t: t + 3, midis: ACORDE[a], dur: 1, vel: 0.28 })
       melodia[c].forEach((m, j) => m && ev.push({ t: t + j, midis: [m], dur: c === 3 ? 4 : 1, vel: 0.55 }))
+    })
+  } else if (clave === '2/4') {
+    // Polca: bajo en el 1, acorde en el 2
+    const armonia2 = ['C', 'G7', 'G7', 'C']
+    const melodia = [[[79, 0.5], [76, 0.5], [76, 1]], [[77, 0.5], [74, 0.5], [74, 1]], [[71, 0.5], [74, 0.5], [77, 0.5], [74, 0.5]], [[72, 2]]]
+    armonia2.forEach((a, c) => {
+      const t = c * 2
+      ev.push({ t, midis: [BAJO[a]], dur: 1, vel: 0.85 }, { t: t + 1, midis: ACORDE[a], dur: 1, vel: 0.3 })
+      let p = 0
+      for (const [m, d] of melodia[c]) { ev.push({ t: t + p, midis: [m], dur: d, vel: 0.55 }); p += d }
     })
   } else if (clave === '6/8') {
     const melodia = [[[76, 2], [77, 1], [79, 2], [77, 1]], [[76, 3], [74, 3]], [[74, 2], [76, 1], [77, 2], [74, 1]], [[72, 6]]]

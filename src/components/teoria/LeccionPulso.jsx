@@ -206,8 +206,8 @@ export default function LeccionPulso({ onCompletar, siguiente, onSiguiente, onVo
             <Escuchar clave="4/4" conMusica />
             <Titulo><span style={{ fontSize: '16px' }}>En 3: un vals</span></Titulo>
             <Escuchar clave="3/4" conMusica />
-            <Titulo><span style={{ fontSize: '16px' }}>En 2</span></Titulo>
-            <Escuchar clave="2/4" />
+            <Titulo><span style={{ fontSize: '16px' }}>En 2: una polca</span></Titulo>
+            <Escuchar clave="2/4" conMusica />
             <Caja tono="tip">El número de abajo dice qué figura vale un pulso. No hace falta que lo recuerdes: con el de arriba alcanza.</Caja>
           </>
         ),
