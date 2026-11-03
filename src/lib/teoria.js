@@ -189,6 +189,7 @@ export async function tocarPulsos({ tempo = 90, pulsos, acento = () => 'debil', 
     timers.push(setTimeout(() => {
       for (const m of e.midis) sampler.triggerAttackRelease(Tone.Frequency(m, 'midi').toNote(), e.dur * seg * (resonancia ? 0.9 : 0.97), t, e.vel ?? 0.6)
     }, Math.max(0, (t - ANTES - ctx.currentTime) * 1000)))
+    if (e.alSonar) timers.push(setTimeout(e.alSonar, Math.max(0, (t - ctx.currentTime) * 1000)))
   }
   timers.push(setTimeout(() => { restablecer(); onFin?.() }, (t0 + pulsos * seg - ctx.currentTime) * 1000 + 300))
   return () => {
@@ -267,17 +268,13 @@ export function musicaDe(clave) {
 export function tocarNotas({ notas, tempo = 80, onNota, onFin, juntas = false }) {
   let t = 0
   const eventos = []
-  const inicios = []
-  notas.forEach((n) => {
-    inicios.push(t)
-    eventos.push({ t, midis: n.midis || [n.midi], dur: n.dur || 1, vel: n.vel ?? 0.65 })
+  notas.forEach((n, k) => {
+    eventos.push({ t, midis: n.midis || [n.midi], dur: n.dur || 1, vel: n.vel ?? 0.65, alSonar: onNota ? () => onNota(k) : null })
     if (!juntas) t += n.dur || 1
   })
   const total = juntas ? Math.max(...notas.map((n) => n.dur || 1)) : t
   return tocarPulsos({
-    tempo, pulsos: Math.ceil(total), clic: false, eventos,
-    onPulso: (i) => { const k = inicios.indexOf(i); if (k >= 0) onNota?.(k) },
-    onFin,
+    tempo, pulsos: Math.ceil(total), clic: false, eventos, onFin,
   })
 }
 

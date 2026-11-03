@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import Pentagrama from '../Pentagrama'
 import { Caja, Boton, Partitura, Titulo, Botonera, useReproduccion, Leccion, Repaso } from './ui'
-import { tocarNotas, COLOR_TEORIA, FONDO_TEORIA } from '../../lib/teoria'
+import MapaObra from './MapaObra'
+import { tocarNotas, motivo, midiDe, COLOR_TEORIA, FONDO_TEORIA } from '../../lib/teoria'
 import { midiDePaso } from '../../lib/notacion'
 
 // Lección 8: "Intervalos por oído". La distancia entre dos notas: pasos y saltos, los intervalos más comunes
@@ -37,25 +38,68 @@ function Par({ a, b, etiqueta, juntas = false, transponer = 0 }) {
   )
 }
 
+// Ejemplos de canciones de dominio público (letra original), escritos en Do para que el intervalo empiece en Do.
+const conLetra = (texto, letras) => motivo(texto).map((n, k) => ({ ...n, letra: letras[k] }))
 const INTERVALOS = [
-  { n: 2, nombre: 'Segunda', ej: 'Do → Re', ref: 'Es un paso: la escala está hecha de segundas. «Cumpleaños feliz» va subiendo así al principio.' },
-  { n: 3, nombre: 'Tercera', ej: 'Do → Mi', ref: 'El comienzo de «When the saints go marching in».' },
-  { n: 4, nombre: 'Cuarta', ej: 'Do → Fa', ref: 'El comienzo de la «Marcha nupcial» de Wagner.' },
-  { n: 5, nombre: 'Quinta', ej: 'Do → Sol', ref: 'El comienzo de «Estrellita, ¿dónde estás?».' },
-  { n: 8, nombre: 'Octava', ej: 'Do → Do', ref: 'El gran salto del comienzo de «Over the rainbow».' },
+  {
+    n: 2, nombre: 'Segunda', ej: 'Do → Re', ref: 'Es un paso. Como el comienzo de «Martinillo» (Frère Jacques).',
+    ejemplo: [{ notas: conLetra('C5:1 D5:1 E5:1 C5:1', ['Frè-', 're', 'Jac-', 'ques']), barra: 'final' }],
+  },
+  {
+    n: 3, nombre: 'Tercera', ej: 'Do → Mi', ref: 'El comienzo de «When the saints go marching in».',
+    ejemplo: [{ notas: conLetra('C5:1 E5:1 F5:1 G5:1', ['Oh', 'when', 'the', 'saints']), barra: 'final' }],
+  },
+  {
+    n: 4, nombre: 'Cuarta', ej: 'Do → Fa', ref: 'El comienzo de «Arroz con leche».',
+    ejemplo: [{ notas: conLetra('C5:0.5 F5:1 F5:0.5 A5:1 F5:0.5', ['A-', 'rroz', 'con', 'le-', 'che']), barra: 'final' }],
+  },
+  {
+    n: 5, nombre: 'Quinta', ej: 'Do → Sol', ref: 'El comienzo de «Estrellita, ¿dónde estás?» (Twinkle, twinkle).',
+    ejemplo: [
+      { notas: conLetra('C5:1 C5:1 G5:1 G5:1', ['Twin-', 'kle,', 'twin-', 'kle,']) },
+      { notas: conLetra('A5:1 A5:1 G5:2', ['lit-', 'tle', 'star']), barra: 'final' },
+    ],
+  },
+  {
+    n: 8, nombre: 'Octava', ej: 'Do → Do', ref: 'La misma nota, más aguda. Es lo que pasa cuando hombres y mujeres cantan juntos la misma melodía.',
+  },
 ]
 
+// Un intervalo: al tocar ▶ suena y se despliega el ejemplo con su letra, que se puede escuchar nota por nota
 function Intervalo({ it }) {
   const { sonando, tocar, parar } = useReproduccion()
+  const [abierto, setAbierto] = useState(false)
+  const [activa, setActiva] = useState(null)
   const b = DO + it.n - 1
+  const tocarIntervalo = () => {
+    if (it.ejemplo) setAbierto(true)
+    tocar('i', (fin) => tocarNotas({ notas: [{ midi: midiDePaso(DO), dur: 1 }, { midi: midiDePaso(b), dur: 2 }], tempo: 76, onFin: fin }))
+  }
+  const plano = it.ejemplo ? it.ejemplo.flatMap((c, ci) => c.notas.map((n, k) => ({ ...n, ci, k }))) : []
+  const tocarEjemplo = () => tocar('e', (fin) => tocarNotas({
+    notas: plano.map((n) => ({ midi: midiDe(n), dur: n.dur })), tempo: 96,
+    onNota: (k) => setActiva({ compas: plano[k].ci, i: plano[k].k }), onFin: fin,
+  }), () => setActiva(null))
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFFFF', border: `1px solid ${sonando ? COLOR_TEORIA : '#E8E6DF'}`, borderRadius: '12px', padding: '10px 12px', marginBottom: '8px' }}>
-      <div style={{ width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0, background: FONDO_TEORIA, color: COLOR_TEORIA, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.n}ª</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '14px', fontWeight: 600, color: '#1A1A18' }}>{it.nombre} <span style={{ fontWeight: 400, color: '#888780' }}>· {it.ej}</span></div>
-        <div style={{ fontSize: '12px', color: '#5F5E5A', lineHeight: 1.4 }}>{it.ref}</div>
+    <div style={{ background: '#FFFFFF', border: `1px solid ${sonando || abierto ? COLOR_TEORIA : '#E8E6DF'}`, borderRadius: '12px', padding: '10px 12px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0, background: FONDO_TEORIA, color: COLOR_TEORIA, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{it.n}ª</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#1A1A18' }}>{it.nombre} <span style={{ fontWeight: 400, color: '#888780' }}>· {it.ej}</span></div>
+          <div style={{ fontSize: '12px', color: '#5F5E5A', lineHeight: 1.4 }}>{it.ref}</div>
+        </div>
+        <Boton activo={sonando === 'i'} onClick={() => (sonando === 'i' ? parar() : tocarIntervalo())}>{sonando === 'i' ? '■' : '▶'}</Boton>
       </div>
-      <Boton activo={!!sonando} onClick={() => (sonando ? parar() : tocar('i', (fin) => tocarNotas({ notas: [{ midi: midiDePaso(DO), dur: 1 }, { midi: midiDePaso(b), dur: 2 }], tempo: 76, onFin: fin })))}>{sonando ? '■' : '▶'}</Boton>
+      {abierto && it.ejemplo && (
+        <div style={{ marginTop: '10px' }}>
+          <MapaObra compases={it.ejemplo} sinNumeros notaActiva={activa} descripcion={`Ejemplo de ${it.nombre.toLowerCase()}`} />
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+            {sonando === 'e'
+              ? <Boton onClick={() => { parar(); setActiva(null) }}>■ Parar</Boton>
+              : <Boton onClick={tocarEjemplo}>▶ Escuchar el ejemplo</Boton>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

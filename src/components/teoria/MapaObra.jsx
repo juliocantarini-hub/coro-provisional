@@ -1,4 +1,4 @@
-import { GLIFOS, ESCALA_GLIFO } from '../../lib/glifosMusicales'
+import { GLIFOS, GLIFOS_RITMO, ESCALA_GLIFO } from '../../lib/glifosMusicales'
 
 // Una línea de partitura (una sola voz, clave de sol) con los signos que arman el "mapa" de una obra:
 // barras de repetición, casillas 1 y 2, Fine, D.C., D.S., segno, coda, calderón, respiración y dinámicas.
@@ -56,14 +56,30 @@ function Puntos({ x }) {
   )
 }
 
-export default function MapaObra({ compases, actual = null, colores = {}, onCompas, descripcion = 'Partitura con signos de repetición' }) {
+// Lugar que ocupa una nota: según su duración, y si lleva letra, lo que necesite la sílaba
+const anchoLetra = (n) => (n?.letra ? n.letra.length * 6.6 : 0)
+// (con la sílaba siguiente: la mitad de cada una, porque las sílabas van centradas debajo de su nota)
+const espacioDe = (n, sig) => Math.max(n.dur * PULSO, 14, n.letra ? (anchoLetra(n) + anchoLetra(sig)) / 2 + 9 : 0) + ([3, 1.5, 0.75].includes(n.dur) ? 4 : 0)
+
+// sinNumeros: sin el número de compás (para ejemplos sueltos). notaActiva: { compas, i } se pinta de color.
+// Cada nota puede llevar letra (n.letra): se escribe debajo del pentagrama.
+export default function MapaObra({ compases, actual = null, colores = {}, onCompas, sinNumeros = false, notaActiva = null, descripcion = 'Partitura con signos de repetición' }) {
   // Posición de cada compás
+  // Ancho de cada compás: normalmente fijo, pero se agranda si las notas llevan letra y no entra
+  const anchos = compases.map((c) => {
+    let px = 12 + (c.inicioRep ? 12 : 0)
+    c.notas.forEach((n, j) => {
+      if (n.signo) px += LUGAR_SIGNO
+      px += espacioDe(n, c.notas[j + 1])
+    })
+    return Math.max(ANCHO, px + 10)
+  })
   const xs = []
   let x = X0
-  compases.forEach((c) => {
+  compases.forEach((c, i) => {
     if (c.coda) x += SEP_CODA
     xs.push(x)
-    x += ANCHO
+    x += anchos[i]
   })
   const W = x + 6
 
@@ -73,7 +89,7 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
       {/* Fondos de compás */}
       {compases.map((c, i) => {
         const color = colores[i] || (actual === i ? '#F7E8F3' : null)
-        return color && <rect key={`f${i}`} x={xs[i] - 3} y={6} width={ANCHO + 2} height={H - 10} rx={8} fill={color} />
+        return color && <rect key={`f${i}`} x={xs[i] - 3} y={6} width={anchos[i] + 2} height={H - 10} rx={8} fill={color} />
       })}
 
       {/* Clave al principio */}
@@ -81,10 +97,10 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
 
       {compases.map((c, i) => {
         const xm = xs[i]
-        const xFin = xm + ANCHO
+        const xFin = xm + anchos[i]
         const desde = i === 0 ? 0 : xm
         const off = 12 + (c.inicioRep ? 12 : 0)
-        let pulso = 0
+        let px = 0
         let extra = 0
         const ultima = c.notas.length - 1
         return (
@@ -147,10 +163,15 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
             {/* Notas */}
             {c.notas.map((n, j) => {
               const liga = c.liga && j === ultima && compases[i + 1]
-              const figura = n.dur >= 4 ? 'redonda' : n.dur >= 2 ? 'blanca' : 'negra'
+              const puntillo = [3, 1.5, 0.75].includes(n.dur)
+              const base = puntillo ? n.dur / 1.5 : n.dur
+              const figura = base >= 4 ? 'redonda' : base >= 2 ? 'blanca' : 'negra'
+              const bandera = base === 0.5 ? GLIFOS_RITMO.banderaCorchea : base === 0.25 ? GLIFOS_RITMO.banderaSemi : null
               if (n.signo) extra += LUGAR_SIGNO
-              const xCab = figura === 'redonda' ? xm + (ANCHO - GLIFOS.redonda.ancho * K) / 2 + (c.inicioRep ? 6 : 0) : xm + off + pulso * PULSO + extra
-              pulso += n.dur
+              const xCab = figura === 'redonda' && c.notas.length === 1 ? xm + (anchos[i] - GLIFOS.redonda.ancho * K) / 2 + (c.inicioRep ? 6 : 0) : xm + off + px + extra
+              px += espacioDe(n, c.notas[j + 1])
+              const activa = notaActiva && notaActiva.compas === i && notaActiva.i === j
+              const tinta = activa ? '#8E3E7C' : TINTA
               const y = yDe(n.paso)
               const arriba = n.paso < BASE + 4
               const adicionales = []
@@ -164,11 +185,21 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
                   {adicionales.map((p) => (
                     <line key={p} x1={xCab - 3.5} x2={xCab + anchoFig + 3.5} y1={yDe(p)} y2={yDe(p)} stroke={LINEA} strokeWidth={0.9} />
                   ))}
+                  {activa && <circle cx={xc} cy={y} r={10} fill="#8E3E7C" opacity={0.15} />}
                   {figura !== 'redonda' && (
                     <line x1={arriba ? xCab + ANCHO_CABEZA - 0.6 : xCab + 0.6} x2={arriba ? xCab + ANCHO_CABEZA - 0.6 : xCab + 0.6}
-                      y1={y} y2={arriba ? y - 34 : y + 34} stroke={TINTA} strokeWidth={1.1} />
+                      y1={y} y2={arriba ? y - 34 : y + 34} stroke={tinta} strokeWidth={1.1} />
                   )}
-                  <path d={GLIFOS[figura].d} fill={TINTA} transform={`translate(${xCab} ${y}) scale(${K})`} />
+                  {bandera && (
+                    <path d={bandera.d} fill={tinta}
+                      transform={`translate(${arriba ? xCab + ANCHO_CABEZA - 1.1 : xCab + 0.1} ${arriba ? y - 34 : y + 34}) scale(${K} ${arriba ? K : -K})`} />
+                  )}
+                  <path d={GLIFOS[figura].d} fill={tinta} transform={`translate(${xCab} ${y}) scale(${K})`} />
+                  {puntillo && <circle cx={xCab + anchoFig + 4.5} cy={(n.paso - BASE) % 2 === 0 ? y - 2.5 : y} r={1.7} fill={tinta} />}
+                  {n.letra && (
+                    <text x={xc} y={ABAJO + 40} textAnchor="middle" fontSize={12.5} fill={activa ? '#8E3E7C' : '#1A1A18'} fontWeight={activa ? 700 : 400}
+                      fontFamily="Georgia, serif">{n.letra}</text>
+                  )}
                   {n.signo && (
                     <path d={GLIFOS[n.signo].d} fill={TINTA} transform={`translate(${xCab - GLIFOS[n.signo].ancho * K - 3} ${y}) scale(${K})`} />
                   )}
@@ -176,7 +207,7 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
                     // Ligadura hasta la primera nota del compás siguiente, del lado contrario a las plicas
                     const sig = compases[i + 1].notas[0]
                     const offSig = 12 + (compases[i + 1].inicioRep ? 12 : 0)
-                    const xSig = sig.dur >= 4 ? xs[i + 1] + (ANCHO - GLIFOS.redonda.ancho * K) / 2 : xs[i + 1] + offSig
+                    const xSig = sig.dur >= 4 ? xs[i + 1] + (anchos[i + 1] - GLIFOS.redonda.ancho * K) / 2 : xs[i + 1] + offSig
                     const x1 = xc + 3
                     const x2 = xSig + 2
                     const dy = arriba ? 9 : -9
@@ -199,7 +230,8 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
             )}
             {c.regulador && (() => {
               const x1 = xm + off - 2
-              const x2 = xs[Math.min(i + (c.largo || 1) - 1, compases.length - 1)] + ANCHO - 10
+              const fin = Math.min(i + (c.largo || 1) - 1, compases.length - 1)
+              const x2 = xs[fin] + anchos[fin] - 10
               const yR = ABAJO + 22
               const [abierto, cerrado] = c.regulador === 'cresc' ? [x2, x1] : [x1, x2]
               return (
@@ -208,12 +240,14 @@ export default function MapaObra({ compases, actual = null, colores = {}, onComp
             })()}
 
             {/* Número de compás */}
-            <circle cx={xm + ANCHO / 2} cy={H - 16} r={10} fill={actual === i ? '#8E3E7C' : '#F1EFE8'} />
-            <text x={xm + ANCHO / 2} y={H - 16} textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700}
+            {!sinNumeros && <>
+            <circle cx={xm + anchos[i] / 2} cy={H - 16} r={10} fill={actual === i ? '#8E3E7C' : '#F1EFE8'} />
+            <text x={xm + anchos[i] / 2} y={H - 16} textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700}
               fill={actual === i ? '#FFFFFF' : '#5F5E5A'} fontFamily="system-ui, sans-serif">{i + 1}</text>
+            </>}
 
             {onCompas && (
-              <rect x={xm - 3} y={0} width={ANCHO + 2} height={H} fill="transparent" style={{ cursor: 'pointer' }} onClick={() => onCompas(i)} />
+              <rect x={xm - 3} y={0} width={anchos[i] + 2} height={H} fill="transparent" style={{ cursor: 'pointer' }} onClick={() => onCompas(i)} />
             )}
           </g>
         )
