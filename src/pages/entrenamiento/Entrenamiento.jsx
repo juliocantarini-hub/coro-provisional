@@ -12,6 +12,9 @@ import BotonVolver from '../../components/BotonVolver'
 import { useRitmoProgreso } from '../../hooks/useRitmoProgreso'
 import { useRitmoDictadoProgreso } from '../../hooks/useRitmoDictadoProgreso'
 import { useAuditivaProgreso } from '../../hooks/useAuditivaProgreso'
+import TeoriaEntrenamiento from '../../components/teoria/TeoriaEntrenamiento'
+import { useTeoriaProgreso } from '../../hooks/useTeoriaProgreso'
+import { COLOR_TEORIA, FONDO_TEORIA } from '../../lib/teoria'
 import { MOSTRAR_PRACTICA_AUDITIVA, MOSTRAR_DICTADO_RITMICO } from '../../lib/funcionesEntrenamiento'
 
 function useEsMovil() {
@@ -134,6 +137,7 @@ const SECCIONES = {
   tecnica: { titulo: 'Técnica vocal', subtitulo: 'Respiración, resonancia y vocalización.' },
   obras:   { titulo: 'Practicá tu afinación', subtitulo: 'Cantá, grabate y mirá tu informe.' },
   ritmo:   { titulo: 'Ritmo', subtitulo: 'Aprendé a leer y marcar el ritmo, nivel por nivel.' },
+  teoria:  { titulo: 'Entendé la partitura', subtitulo: 'Tu voz, los signos y las notas, paso a paso.' },
   auditiva: { titulo: 'Práctica auditiva', subtitulo: 'Entrená el oído, nivel por nivel. No hace falta saber música.' },
 }
 
@@ -156,6 +160,7 @@ export default function Entrenamiento() {
   const ritmo = useRitmoProgreso()
   const ritmoDictado = useRitmoDictadoProgreso()
   const auditiva = useAuditivaProgreso()
+  const teoria = useTeoriaProgreso()
   const [seccion, setSeccion] = useState(null) // null = pantalla de inicio con las tarjetas
   // Tocar "Entrenamiento" en el menú estando adentro de una sección vuelve a la pantalla de inicio:
   // el menú navega a la misma ruta, que no recarga la página pero sí cambia la clave de la ubicación
@@ -232,6 +237,10 @@ export default function Entrenamiento() {
             descripcion="Escuchá, leé y marcá el ritmo. Se desbloquea nivel por nivel."
             detalle={detalleRitmo}
             onClick={() => setSeccion('ritmo')} />
+          <TarjetaSeccion icono="🎼" titulo="Entendé la partitura" color={COLOR_TEORIA} bg={FONDO_TEORIA}
+            descripcion="Tu voz, los signos y las notas, paso a paso."
+            detalle={teoria.vistas.length > 0 ? `${teoria.vistas.length} de ${teoria.total} lecciones` : 'Empezá por la lección 1'}
+            onClick={() => setSeccion('teoria')} />
           {MOSTRAR_PRACTICA_AUDITIVA && (
             <TarjetaSeccion icono="👂" titulo="Práctica auditiva" color="#6B58B8" bg="#EEEAF9"
               descripcion="Entrená el oído con el pentagrama: ¿cuál sonó?, eco, saltos, acordes y melodías."
@@ -308,6 +317,9 @@ export default function Entrenamiento() {
 
       {/* Ritmo */}
       {seccion === 'ritmo' && <RitmoEntrenamiento prog={ritmo} progDictado={MOSTRAR_DICTADO_RITMICO ? ritmoDictado : null} onSalir={() => setSeccion(null)} />}
+
+      {/* Entendé la partitura */}
+      {seccion === 'teoria' && <TeoriaEntrenamiento prog={teoria} voz={perfil?.voz} onSalir={() => setSeccion(null)} />}
 
       {/* Práctica auditiva */}
       {MOSTRAR_PRACTICA_AUDITIVA && seccion === 'auditiva' && <AuditivaEntrenamiento prog={auditiva} voz={perfil?.voz} onSalir={() => setSeccion(null)} />}
