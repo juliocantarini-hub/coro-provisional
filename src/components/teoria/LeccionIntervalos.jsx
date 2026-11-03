@@ -136,6 +136,27 @@ function Intervalo({ it }) {
   )
 }
 
+// Un acorde con tensión (cuarta suspendida) que se resuelve: Do-Fa-Do → Do-Mi-Do
+function Resolucion() {
+  const { sonando, tocar, parar } = useReproduccion()
+  const [activa, setActiva] = useState(-1)
+  const acordes = [[28, 31, 35], [28, 30, 35]]
+  return (
+    <div style={{ background: '#FFFFFF', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '10px', marginBottom: '10px' }}>
+      <div style={{ fontSize: '14px', fontWeight: 600, color: '#1A1A18', marginBottom: '2px' }}>Tensión → reposo</div>
+      <Pentagrama clave="sol" anchoCol={70} activa={activa} pasoMin={26} pasoMax={38}
+        columnas={acordes.map((ac, i) => ({ notas: ac.map((p) => ({ paso: p, figura: 'redonda', color: p === 31 || (i === 1 && p === 30) ? COLOR_TEORIA : undefined })), etiqueta: i === 0 ? 'tensión' : 'reposo' }))} />
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+        {sonando ? <Boton onClick={() => { parar(); setActiva(-1) }}>■ Parar</Boton> : (
+          <Boton onClick={() => tocar('r', (fin) => tocarNotas({
+            notas: acordes.map((ac) => ({ midis: ac.map((p) => midiDePaso(p)), dur: 2.5 })), tempo: 70, onNota: setActiva, onFin: fin,
+          }), () => setActiva(-1))}>▶ Escuchar</Boton>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Repaso: escuchar dos notas y elegir
 function ElegirOido({ a, b, juntas = false, consigna, opciones, correcta, explicacion, onOk }) {
   const { sonando, tocar, parar } = useReproduccion()
@@ -174,6 +195,20 @@ const PREGUNTAS = [
   {
     componente: ({ onOk }) => <ElegirOido onOk={onOk} a={DO} b={DO + 2} juntas consigna="Suenan dos notas juntas. ¿Es un unísono o una tercera?" opciones={['Unísono', 'Tercera']} correcta={1}
       explicacion="Son dos notas distintas que suenan bien juntas: una tercera." />,
+  },
+  {
+    componente: ({ onOk }) => <ElegirOido onOk={onOk} a={DO} b={DO + 1} juntas consigna="Suenan dos notas juntas. ¿Suenan estables o con tensión?" opciones={['Estables', 'Con tensión']} correcta={1}
+      explicacion="Es una segunda: una disonancia." />,
+  },
+  {
+    componente: ({ onOk }) => <ElegirOido onOk={onOk} a={DO} b={DO + 4} juntas consigna="Suenan dos notas juntas. ¿Suenan estables o con tensión?" opciones={['Estables', 'Con tensión']} correcta={0}
+      explicacion="Es una quinta: una consonancia." />,
+  },
+  {
+    texto: 'Tu nota forma una disonancia con la de otra voz. ¿Qué hacés?',
+    opciones: ['La acerco a la nota de la otra voz', 'La sostengo firme: la tensión se resuelve sola', 'Dejo de cantar'],
+    correcta: 1,
+    explicacion: 'La disonancia es parte de la música; si la sostenés, se resuelve en el acorde siguiente.',
   },
   {
     texto: 'Sopranos y tenores cantan la misma melodía, pero los tenores suenan más graves. ¿A qué distancia están?',
@@ -231,8 +266,31 @@ export default function LeccionIntervalos({ onCompletar, siguiente, onSiguiente,
       },
       {
         render: () => (
+          <>
+            <Titulo>Consonancias y disonancias</Titulo>
+            <Caja>
+              Algunos intervalos suenan <b>estables</b>, en reposo: son las <b>consonancias</b>, como la octava, la quinta y la tercera.
+              Otros suenan <b>con tensión</b>, como si pidieran moverse: son las <b>disonancias</b>, como la segunda y la séptima.
+              No están "mal": la música las usa para crear expectativa.
+            </Caja>
+            <Par a={DO} b={DO + 1} juntas etiqueta="Segunda: disonante" />
+            <Par a={DO} b={DO + 6} juntas etiqueta="Séptima: disonante" />
+            <Caja>
+              Casi siempre, una disonancia <b>se resuelve</b>: una de las notas se mueve un paso y el acorde vuelve al reposo. Escuchá cómo
+              la nota marcada baja y todo "se acomoda".
+            </Caja>
+            <Resolucion />
+            <Caja tono="tip">
+              <b>En el coro:</b> si tu nota forma una disonancia con otra voz, va a sonar "rara", y es normal. <b>Sostenela firme</b> y no te
+              acerques a la nota del otro: la tensión se resuelve sola en el acorde siguiente.
+            </Caja>
+          </>
+        ),
+      },
+      {
+        render: () => (
           <Repaso preguntas={PREGUNTAS} onTerminar={onCompletar} siguiente={siguiente} onSiguiente={onSiguiente} onVolver={onVolver}
-            textoFinal="¡Terminaste la última lección! Ya reconocés pasos y saltos, los intervalos más comunes y cómo suenan juntos en el coro. Podés volver a cualquier lección cuando quieras." />
+            textoFinal="¡Terminaste la última lección! Ya reconocés pasos y saltos, los intervalos más comunes, cómo suenan juntos en el coro y la diferencia entre consonancias y disonancias. Podés volver a cualquier lección cuando quieras." />
         ),
       },
     ]} />

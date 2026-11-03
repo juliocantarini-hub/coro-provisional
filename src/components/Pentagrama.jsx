@@ -14,6 +14,7 @@ const PASOS_ARMADURA = {
   fa: { sostenido: [24, 21], bemol: [20, 23] },
 }
 const TINTA = '#1A1A18'
+const figura0 = (n) => n.figura || 'negra'
 const COLORES = { normal: TINTA, sel: '#0F6E56', correcta: '#2F9E6F', mala: '#D04A43', fantasma: '#B4B2A9' }
 
 export default function Pentagrama({
@@ -97,6 +98,12 @@ export default function Pentagrama({
             )}
             {notas.map((n, j) => {
               const y = yDe(n.paso)
+              // En un acorde, si dos notas están pegadas (una segunda), la de arriba se corre a la derecha para que no se pisen
+              // (solo en redondas, que no tienen plica; con plica quedaría una plica por nota)
+              const corrida = j > 0 && figura0(n) === 'redonda' && n.paso - notas[j - 1].paso === 1 && !notas[j - 1].corrida
+              n = { ...n, corrida }
+              notas[j] = n
+              const dx = corrida ? GLIFOS.redonda.ancho * k * 0.95 : 0
               const color = n.color || COLORES[n.estado || 'normal']
               const figura = n.figura || 'negra'
               const conPlica = figura !== 'redonda'
@@ -115,7 +122,7 @@ export default function Pentagrama({
               }
               const resaltada = n.estado === 'sel'
               return (
-                <g key={j} opacity={op}>
+                <g key={j} opacity={op} transform={dx ? `translate(${dx} 0)` : undefined}>
                   {resaltada && <circle cx={cx} cy={y} r={ls * 1.15} fill="#CDE7DC" />}
                   {ledgers.map((p) => (
                     <line key={p} x1={xCab - ls * 0.35} x2={xCab + anchoCabeza + ls * 0.35} y1={yDe(p)} y2={yDe(p)} stroke="#6E6C64" strokeWidth={ls * 0.09} />
