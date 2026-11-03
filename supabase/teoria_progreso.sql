@@ -51,3 +51,5 @@ USING (
     WHERE p.id = auth.uid() AND p.coro_id = teoria_progreso.coro_id AND p.rol IN ('director', 'admin')
   )
 );
+
+NOTIFY pgrst, 'reload schema';

@@ -56,12 +56,13 @@ export default function InformesTeoriaAdmin() {
   const cargar = useCallback(async () => {
     setCargando(true)
     setError('')
+    // En los proyectos de un solo coro getCoroActual() devuelve null: ahí no se filtra por coro
     const coro = await getCoroActual()
-    if (!coro) { setCargando(false); return }
-    const [prog, per] = await Promise.all([
-      supabase.from('teoria_progreso').select('perfil_id, leccion, completada_en').eq('coro_id', coro.id).limit(5000),
-      supabase.from('perfiles').select('id, nombre, voz, rol, estado').eq('coro_id', coro.id),
-    ])
+    const delCoro = (q) => (coro ? q.eq('coro_id', coro.id) : q)
+    const prog = await delCoro(supabase.from('teoria_progreso').select('perfil_id, leccion, completada_en')).limit(5000)
+    // Si la tabla perfiles no tiene la columna estado, se piden los datos sin ella
+    let per = await delCoro(supabase.from('perfiles').select('id, nombre, voz, rol, estado'))
+    if (per.error) per = await delCoro(supabase.from('perfiles').select('id, nombre, voz, rol'))
     if (prog.error) {
       setError('No se pudo cargar el progreso. Si es la primera vez, corré supabase/teoria_progreso.sql en Supabase. (' + prog.error.message + ')')
       setCargando(false)

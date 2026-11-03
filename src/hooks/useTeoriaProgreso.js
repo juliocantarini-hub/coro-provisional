@@ -6,6 +6,7 @@ import { LECCIONES } from '../lib/teoria'
 // Lecciones de teoría ya completadas. Se guardan en el dispositivo y en Supabase (tabla teoria_progreso,
 // ver supabase/teoria_progreso.sql) para que el director las vea en su informe. Si la tabla todavía no existe
 // o no hay conexión, sigue funcionando con la copia local; lo que esté solo en el dispositivo se sube después.
+// En los proyectos de un solo coro (sin coro_id en perfiles) la fila se guarda sin coro_id.
 const clave = (id) => `teoria_vistas_${id}`
 
 function leer(id) {
@@ -26,10 +27,10 @@ export function useTeoriaProgreso() {
   const [vistas, setVistas] = useState(() => leer(uid))
 
   const subir = useCallback(async (lecciones) => {
-    if (!uid || !coroId || !lecciones.length) return
+    if (!uid || !lecciones.length) return
     try {
       await supabase.from('teoria_progreso').upsert(
-        lecciones.map((leccion) => ({ coro_id: coroId, perfil_id: uid, leccion })),
+        lecciones.map((leccion) => ({ ...(coroId ? { coro_id: coroId } : {}), perfil_id: uid, leccion })),
         { onConflict: 'perfil_id,leccion', ignoreDuplicates: true },
       )
     } catch { /* sin tabla o sin conexión: queda la copia local */ }
