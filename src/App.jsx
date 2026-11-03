@@ -38,6 +38,7 @@ import { ArticulosAdmin, ArticuloForm } from './pages/admin/ArticulosAdmin'
 import EstudioAdmin    from './pages/admin/EstudioAdmin'
 import InformesAfinacionAdmin from './pages/admin/InformesAfinacionAdmin'
 import InformesVocalizacionAdmin from './pages/admin/InformesVocalizacionAdmin'
+import InformesTeoriaAdmin from './pages/admin/InformesTeoriaAdmin'
 import RitmoAdmin from './pages/admin/RitmoAdmin'
 import RitmoDictadoAdmin from './pages/admin/RitmoDictadoAdmin'
 import AuditivaAdmin from './pages/admin/AuditivaAdmin'
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="/admin/ritmo" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><RitmoAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/ritmo-dictado" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><RitmoDictadoAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/vocalizacion" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><InformesVocalizacionAdmin /></ConLayout></RutaProtegida>} />
+            <Route path="/admin/teoria" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><InformesTeoriaAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/auditiva" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><AuditivaAdmin /></ConLayout></RutaProtegida>} />
             <Route path="/admin/estadistica" element={<RutaProtegida rolesPermitidos={['admin','director']}><ConLayout><EstadisticaAdmin /></ConLayout></RutaProtegida>} />
 

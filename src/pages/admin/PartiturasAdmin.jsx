@@ -659,6 +659,7 @@ export default function PartiturasAdmin() {
     ...(MOSTRAR_DICTADO_RITMICO ? [{ ruta: '/admin/ritmo-dictado', icono: '✍️', titulo: 'Dictados rítmicos', texto: 'Resultados de los dictados rítmicos.' }] : []),
     ...(MOSTRAR_PRACTICA_AUDITIVA ? [{ ruta: '/admin/auditiva', icono: '👂', titulo: 'Práctica auditiva', texto: 'Resultados de la práctica auditiva.' }] : []),
     { ruta: '/admin/vocalizacion', icono: '🎶', titulo: 'Técnica vocal', texto: 'Qué ejercicios de respiración, resonancia y vocalización practican y cuántas veces.' },
+    { ruta: '/admin/teoria', icono: '🎼', titulo: 'Entendé la partitura', texto: 'Qué lecciones de teoría completó cada cantante.' },
   ]
   const pestanas = [
     { id: 'informes', label: 'Informes' },
