@@ -137,8 +137,19 @@ export default function EstadisticaAdmin() {
   const hayPractica   = Object.keys(informes).length > 0
   const COLUMNAS      = hayPractica ? COLUMNAS_CON_PRACTICA : COLUMNAS_SIN_PRACTICA
 
+  // En el celular el botón queda arriba a la derecha, a la altura del botón del menú
+  const esMovil = typeof window !== 'undefined' && window.innerWidth <= 768
+
   return (
     <div>
+      {/* Acceso al reporte de fin de temporada */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: esMovil ? '-48px 0 14px' : '0 0 12px' }}>
+        <button onClick={() => navigate('/admin/temporada')}
+          style={{ height: esMovil ? '40px' : 'auto', padding: esMovil ? '0 14px' : '7px 14px', fontSize: '13px', borderRadius: '10px', border: '1px solid #9FE1CB', background: '#E1F5EE', cursor: 'pointer', color: '#0F6E56', fontWeight: '600' }}>
+          Reporte de fin de temporada →
+        </button>
+      </div>
+
       {/* Encabezado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -148,10 +159,6 @@ export default function EstadisticaAdmin() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/admin/temporada')}
-            style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: 'none', background: '#0F6E56', cursor: 'pointer', color: '#FFFFFF', fontWeight: '500' }}>
-            Reporte de fin de temporada →
-          </button>
           <button onClick={cargar}
             style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
             ↻ Actualizar
