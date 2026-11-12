@@ -46,6 +46,9 @@ Deno.serve(async (req) => {
 
     let query = supabase.from('push_suscripciones').select('*')
     if (coro_id) query = query.eq('coro_id', coro_id)
+    // Opcional: mandar a una sola persona (por ejemplo, el reporte de temporada)
+    const perfil_id = esWebhookEjercicio ? null : body.perfil_id
+    if (perfil_id) query = query.eq('perfil_id', perfil_id)
 
     const { data: suscripciones, error } = await query
 

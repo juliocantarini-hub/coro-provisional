@@ -9,6 +9,8 @@ import MisPagos from '../components/MisPagos'
 import EncuestaDashboard from '../components/EncuestaDashboard'
 import MensajeSorpresa from '../components/MensajeSorpresa'
 import { useMensajeSorpresa } from '../hooks/useMensajeSorpresa'
+import { AvisoTemporada, TarjetaTemporada } from '../components/temporada/AvisoTemporada'
+import { useMisTemporadas, seDestacaHoy, avisoYaMostrado, marcarAvisoMostrado } from '../hooks/useReporteTemporada'
 
 function useMovil() {
   const [movil, setMovil] = useState(window.innerWidth <= 768)
@@ -36,6 +38,21 @@ export default function Inicio() {
   const { mensaje: mensajeSorpresa, cerrar: cerrarSorpresa } = useMensajeSorpresa(perfil, eventos, cargandoEventos)
   const movil = useMovil()
 
+  // Reporte de fin de temporada: el más reciente publicado para este cantante
+  const { reportes: temporadas } = useMisTemporadas(perfil?.id)
+  const temporadaActual = temporadas[0] || null
+  const [avisoTemporadaCerrado, setAvisoTemporadaCerrado] = useState(false)
+  const mostrarAvisoTemporada = !!temporadaActual && !temporadaActual.visto_en && !avisoTemporadaCerrado && !avisoYaMostrado(temporadaActual.id)
+  function verTemporada() {
+    if (!temporadaActual) return
+    marcarAvisoMostrado(temporadaActual.id)
+    navigate(`/temporada/${temporadaActual.id}`)
+  }
+  function cerrarAvisoTemporada() {
+    if (temporadaActual) marcarAvisoMostrado(temporadaActual.id)
+    setAvisoTemporadaCerrado(true)
+  }
+
   const proximoEvento = eventos[0]
   const avisosRecientes = avisos.slice(0, 3)
   const diasProx = proximoEvento ? diasRestantes(proximoEvento.fecha_inicio) : null
@@ -61,6 +78,10 @@ export default function Inicio() {
       {/* MisPagos arriba — solo si hay alerta (después del día 15 con cuota pendiente).
           No se muestra a directores/admins, que no abonan cuota. */}
       {!esDirector && <MisPagos posicion="arriba" />}
+
+      {/* Reporte de fin de temporada: bienvenida una sola vez + tarjeta destacada */}
+      {mostrarAvisoTemporada && <AvisoTemporada reporte={temporadaActual} onVer={verTemporada} onCerrar={cerrarAvisoTemporada} />}
+      {temporadaActual && seDestacaHoy(temporadaActual) && <TarjetaTemporada reporte={temporadaActual} onVer={verTemporada} />}
 
       {/* Banner de bienvenida */}
       <div style={{
@@ -95,7 +116,8 @@ export default function Inicio() {
       </div>
 
       {/* Mensaje sorpresa — aparece solo en ciertas situaciones (ver src/lib/sorpresas.js) */}
-      <MensajeSorpresa mensaje={mensajeSorpresa} onCerrar={cerrarSorpresa} />
+      {/* El aviso de la temporada reemplaza al mensaje sorpresa de esa visita */}
+      <MensajeSorpresa mensaje={mostrarAvisoTemporada ? null : mensajeSorpresa} onCerrar={cerrarSorpresa} />
 
       {/* Stats rápidas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: movil ? '8px' : '12px', marginBottom: '16px' }}>
