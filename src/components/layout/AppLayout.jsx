@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import Sidebar from './Sidebar'
+import Sidebar, { nombreSeccion } from './Sidebar'
+import { useAvisos } from '../../hooks/useAvisos'
 import { supabase } from '../../lib/supabase'
 import { usePushSubscription } from '../../hooks/usePushSubscription'
 import { useAuth } from '../../hooks/useAuth'
@@ -37,6 +38,8 @@ export default function AppLayout({ children }) {
   const [zoom, setZoom] = useState(getZoom)
   const [user, setUser] = useState(null)
   const { perfil } = useAuth()
+  const { noLeidos } = useAvisos()
+  const { lado, seccion } = nombreSeccion(location.pathname)
 
   // Al entrar (login), admins/directores arrancan del lado Admin en vez de Cantante.
   // Se aplica una sola vez por sesión del navegador (no cada vez que vuelven a Inicio).
@@ -95,9 +98,9 @@ export default function AppLayout({ children }) {
       {(!esMovil || abierto) && (
         <div style={{ position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50, display: 'flex', flexDirection: 'column', zoom: zoom }}>
           {esMovil && (
-            <button onClick={() => setAbierto(false)}
-              style={{ position: 'absolute', top: 'calc(10px + env(safe-area-inset-top, 0px))', right: '-44px', width: '36px', height: '36px', borderRadius: '50%', background: '#0A4A3A', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 51 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+            <button onClick={() => setAbierto(false)} aria-label="Cerrar menú"
+              style={{ position: 'absolute', top: 'calc(12px + env(safe-area-inset-top, 0px))', right: '-56px', width: '44px', height: '44px', borderRadius: '50%', background: '#FFFFFF', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 51 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#1A1A18" aria-hidden="true">
                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
               </svg>
             </button>
@@ -106,28 +109,58 @@ export default function AppLayout({ children }) {
             seccionAdmin={seccionAdminEfectiva}
             toggleAdmin={toggleAdmin}
             onNavegar={() => setAbierto(false)}
+            ancho={esMovil ? 288 : 232}
+            compacto={!esMovil}
           />
         </div>
       )}
 
-      {esMovil && !abierto && (
-        <button onClick={() => setAbierto(true)}
-          style={{ position: 'fixed', top: 'calc(12px + env(safe-area-inset-top, 0px))', left: '12px', zIndex: 60, width: '40px', height: '40px', borderRadius: '10px', background: '#0F6E56', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
-          </svg>
-        </button>
+      {/* Celular: barra superior fija (menú, coro y sección, avisos) */}
+      {esMovil && (
+        <header style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 30,
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          background: '#FFFFFF', borderBottom: '1px solid #E8E6DF',
+        }}>
+          <div style={{ height: '56px', display: 'flex', alignItems: 'center', gap: '4px', padding: '0 6px' }}>
+            <button onClick={() => setAbierto(true)} aria-label="Abrir menú"
+              style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="#0F6E56" aria-hidden="true">
+                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+              </svg>
+            </button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1A1A18', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {import.meta.env.VITE_CORO_NOMBRE || 'Coro'}
+              </div>
+              <div style={{ fontSize: '10.5px', fontWeight: '600', color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {seccion ? `${lado} · ${seccion}` : lado}
+              </div>
+            </div>
+            <button onClick={() => { setSeccionAdmin(false); navigate('/avisos') }}
+              aria-label={noLeidos > 0 ? `Avisos, ${noLeidos} sin leer` : 'Avisos'}
+              style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#1A1A18" aria-hidden="true">
+                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+              </svg>
+              {noLeidos > 0 && (
+                <span style={{ position: 'absolute', top: '6px', right: '5px', minWidth: '16px', height: '16px', borderRadius: '8px', background: '#D85A30', color: '#FFFFFF', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '2px solid #FFFFFF' }}>
+                  {noLeidos > 9 ? '9+' : noLeidos}
+                </span>
+              )}
+            </button>
+          </div>
+        </header>
       )}
 
       <MensajeSorpresa key={mensajeSeccion?.tipo} mensaje={mensajeSeccion} onCerrar={cerrarMensajeSeccion} />
 
       <main style={{
-        marginLeft: esMovil ? 0 : '210px',
-        // En mobile, el botón hamburguesa flota fijo arriba a la izquierda — este
-        // padding le deja lugar. Se suma env(safe-area-inset-top) porque, instalada
-        // como PWA, la barra de estado del teléfono puede superponerse al contenido
-        // si no se reserva ese espacio explícitamente.
-        padding: esMovil ? 'calc(60px + env(safe-area-inset-top, 0px)) 16px 24px' : '28px 32px',
+        marginLeft: esMovil ? 0 : '232px',
+        // En mobile, la barra superior fija mide 56px — este padding le deja lugar.
+        // Se suma env(safe-area-inset-top) porque, instalada como PWA, la barra de
+        // estado del teléfono puede superponerse al contenido si no se reserva.
+        padding: esMovil ? 'calc(72px + env(safe-area-inset-top, 0px)) 16px 24px' : '28px 32px',
         flex: 1, minHeight: '100vh', width: esMovil ? '100%' : 'auto', zoom: zoom,
       }}>
         {children}

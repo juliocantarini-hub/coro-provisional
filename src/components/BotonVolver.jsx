@@ -23,12 +23,10 @@ const base = {
 export default function BotonVolver({ texto, onClick }) {
   const esMovil = useEsMovil()
   if (esMovil) {
-    // Contenedor de la altura de la hamburguesa para que el botón quede centrado en su línea
+    // En el celular la parte de arriba es la barra fija (menú, coro, avisos):
+    // el botón va al principio de la página, alineado a la derecha.
     return (
-      <div style={{
-        position: 'fixed', zIndex: 30, right: '16px'  /* debajo del menú (40 = fondo oscuro, 50 = menú) */, height: '40px', display: 'flex', alignItems: 'center',
-        top: 'calc(12px + env(safe-area-inset-top, 0px))',
-      }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
         <button onClick={onClick} style={base}>← {texto}</button>
       </div>
     )

@@ -5,33 +5,50 @@ import { useAvisos } from '../../hooks/useAvisos'
 import { usePresencia } from '../../hooks/usePresencia'
 import { useEncuestasActivas } from '../../hooks/useEncuestas'
 
+// Menú agrupado por tema (modelo "lista con secciones"): cada grupo tiene un título
+// chico arriba; el primero va sin título.
 const NAV_CANTANTE = [
-  { ruta: '/',           label: 'Inicio',         icono: 'inicio' },
-  { ruta: '/repertorio', label: 'Repertorio',     icono: 'musica' },
-  { ruta: '/entrenamiento', label: 'Entrenamiento', icono: 'entrenamiento' },
-  { ruta: '/calendario', label: 'Calendario',     icono: 'calendario' },
-  { ruta: '/avisos',     label: 'Avisos',         icono: 'campana', badge: true },
-  { ruta: '/encuestas',  label: 'Encuestas',      icono: 'encuestas', badgeEncuestas: true },
-  { ruta: '/blog',       label: 'Textos',         icono: 'blog' },
-  { ruta: '/asistencia', label: 'Mi asistencia',  icono: 'asistencia' },
-  { ruta: '/companeros', label: 'Mis compañeros', icono: 'usuarios', presencia: true },
-  { ruta: '/perfil',     label: 'Mi perfil',      icono: 'perfil' },
+  { titulo: '', items: [
+    { ruta: '/',           label: 'Inicio',         icono: 'inicio' },
+  ] },
+  { titulo: 'Mi coro', items: [
+    { ruta: '/repertorio', label: 'Repertorio',     icono: 'musica' },
+    { ruta: '/entrenamiento', label: 'Entrenamiento', icono: 'entrenamiento' },
+    { ruta: '/calendario', label: 'Calendario',     icono: 'calendario' },
+    { ruta: '/avisos',     label: 'Avisos',         icono: 'campana', badge: true },
+    { ruta: '/encuestas',  label: 'Encuestas',      icono: 'encuestas', badgeEncuestas: true },
+    { ruta: '/blog',       label: 'Textos',         icono: 'blog' },
+  ] },
+  { titulo: 'Yo', items: [
+    { ruta: '/asistencia', label: 'Mi asistencia',  icono: 'asistencia' },
+    { ruta: '/companeros', label: 'Mis compañeros', icono: 'usuarios', presencia: true },
+    { ruta: '/perfil',     label: 'Mi perfil',      icono: 'perfil' },
+  ] },
 ]
 
 const NAV_ADMIN = [
-  { ruta: '/admin',              label: 'Dashboard',  icono: 'dashboard' },
-  { ruta: '/admin/obras',        label: 'Obras',      icono: 'musica' },
-  { ruta: '/admin/eventos',      label: 'Eventos',    icono: 'calendario' },
-  { ruta: '/admin/asistencia',   label: 'Asistencia', icono: 'asistencia' },
-  { ruta: '/admin/estudio',      label: 'Estudio',    icono: 'estudio' },
-  { ruta: '/admin/entrenamiento', label: 'Entrenamiento', icono: 'entrenamiento' },
-  { ruta: '/admin/estadistica',  label: 'Estadística', icono: 'estadistica' },
-  { ruta: '/admin/avisos',       label: 'Avisos',     icono: 'campana' },
-  { ruta: '/admin/encuestas',    label: 'Encuestas',  icono: 'encuestas' },
-  { ruta: '/admin/blog',         label: 'Textos',     icono: 'blog' },
-  { ruta: '/admin/usuarios',     label: 'Cantantes',  icono: 'usuarios', presencia: true },
-  { ruta: '/admin/pagos',        label: 'Pagos',      icono: 'pagos' },
+  { titulo: '', items: [
+    { ruta: '/admin',              label: 'Dashboard',  icono: 'dashboard' },
+  ] },
+  { titulo: 'Contenido', items: [
+    { ruta: '/admin/obras',        label: 'Obras',      icono: 'musica' },
+    { ruta: '/admin/eventos',      label: 'Eventos',    icono: 'calendario' },
+    { ruta: '/admin/avisos',       label: 'Avisos',     icono: 'campana' },
+    { ruta: '/admin/encuestas',    label: 'Encuestas',  icono: 'encuestas' },
+    { ruta: '/admin/blog',         label: 'Textos',     icono: 'blog' },
+  ] },
+  { titulo: 'Seguimiento', items: [
+    { ruta: '/admin/asistencia',   label: 'Asistencia', icono: 'asistencia' },
+    { ruta: '/admin/estudio',      label: 'Estudio',    icono: 'estudio' },
+    { ruta: '/admin/entrenamiento', label: 'Entrenamiento', icono: 'entrenamiento' },
+    { ruta: '/admin/estadistica',  label: 'Estadística', icono: 'estadistica' },
+  ] },
+  { titulo: 'Personas y pagos', items: [
+    { ruta: '/admin/usuarios',     label: 'Cantantes',  icono: 'usuarios', presencia: true },
+    { ruta: '/admin/pagos',        label: 'Pagos',      icono: 'pagos' },
+  ] },
 ]
+
 const ICONOS = {
   inicio:     "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
   musica:     "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z",
@@ -42,28 +59,60 @@ const ICONOS = {
   perfil:     "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
   dashboard:  "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
   usuarios:   "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
-  // Tenía el mismo "check en un cuadrado" que el ícono nuevo de Asistencia —
-  // a tamaño chico de menú se veían casi iguales. Estudio es "Actividad de
-  // estudio" (% estudiado, obras visitadas por cantante), así que pasa a un
-  // libro abierto: distinto de Asistencia (planilla) y de Estadística
-  // (gráfico de tendencia), y más acorde a lo que esta pantalla muestra.
+  // Estudio: libro abierto (distinto de Asistencia y de Estadística)
   estudio:    "M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z",
-  // Antes compartía el mismo ícono de calendario que "Eventos" (y del lado
-  // cantante, que "Calendario") — una planilla con un broche arriba y un
-  // tilde adentro, bien distinta de ambos, para una pantalla que en
-  // realidad es un registro de quién vino, no una fecha.
+  // Asistencia: planilla con broche y tilde (distinta de Eventos/Calendario)
   asistencia: "M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z",
   asistente:  "M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z",
   pagos: "M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z",
   encuestas:  "M5 9h3v11H5zm11-5h3v16h-3zM10.5 13h3v8h-3z",
   estadistica: "M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z",
+  ayuda:      "M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z",
+  salir:      "M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z",
 }
 
-function getPadding() {
+// Colores del menú claro
+const C = {
+  fondo: '#FFFFFF',
+  texto: '#1A1A18',
+  textoSuave: '#5F5E5A',
+  titulo: '#6B6A66',
+  linea: '#E8E6DF',
+  acento: '#0F6E56',
+  acentoOscuro: '#0A4A3A',
+  activoFondo: '#E1F5EE',
+  pie: '#FAF9F6',
+  rojo: '#A3401C',
+}
+
+// Nombre de la sección según la ruta (lo usa la barra superior del celular)
+export function nombreSeccion(pathname) {
+  const esAdminRuta = pathname.startsWith('/admin')
+  const grupos = esAdminRuta ? NAV_ADMIN : NAV_CANTANTE
+  let mejor = null
+  for (const g of grupos) {
+    for (const it of g.items) {
+      const coincide = it.ruta === '/' || it.ruta === '/admin'
+        ? pathname === it.ruta
+        : pathname.startsWith(it.ruta)
+      if (coincide && (!mejor || it.ruta.length > mejor.ruta.length)) mejor = it
+    }
+  }
+  return { lado: esAdminRuta ? 'Admin' : 'Cantante', seccion: mejor?.label || '' }
+}
+
+// En el celular cada renglón mide al menos 44px (para el dedo); en la compu va más compacto
+// así entran todas las secciones sin scroll en una pantalla de notebook.
+function getPadding(compacto) {
   const t = localStorage.getItem('tamanoFuente')
-  if (t === 'grande')  return '7px 16px'
-  if (t === 'mediana') return '9px 16px'
-  return '10px 16px'
+  if (compacto) {
+    if (t === 'grande')  return '5px 16px 5px 14px'
+    if (t === 'mediana') return '6px 16px 6px 14px'
+    return '8px 16px 8px 14px'
+  }
+  if (t === 'grande')  return '9px 16px 9px 14px'
+  if (t === 'mediana') return '11px 16px 11px 14px'
+  return '12px 16px 12px 14px'
 }
 
 function getZoom() {
@@ -75,24 +124,30 @@ function getZoom() {
 
 function LogoCorum() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', paddingTop: '24px', paddingBottom: '15px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-        <svg width="22" height="22" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 78 20 A 38 38 0 1 0 78 80" stroke="rgba(159,225,203,0.7)" strokeWidth="7" strokeLinecap="round" fill="none" />
-          <line x1="28" y1="38" x2="66" y2="38" stroke="rgba(159,225,203,0.7)" strokeWidth="6" strokeLinecap="round" />
-          <line x1="28" y1="50" x2="66" y2="50" stroke="rgba(159,225,203,0.7)" strokeWidth="6" strokeLinecap="round" />
-          <line x1="28" y1="62" x2="66" y2="62" stroke="rgba(159,225,203,0.7)" strokeWidth="6" strokeLinecap="round" />
-        </svg>
-        <div>
-          <div style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(159,225,203,0.7)', letterSpacing: '2px', lineHeight: 1 }}>CORUM</div>
-          <div style={{ fontSize: '8px', color: 'rgba(159,225,203,0.45)', letterSpacing: '0.5px', lineHeight: 1.4 }}>by Recurso Coral</div>
-        </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '10px 16px 14px' }}>
+      <svg width="18" height="18" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M 78 20 A 38 38 0 1 0 78 80" stroke="#6B6A66" strokeWidth="7" strokeLinecap="round" fill="none" />
+        <line x1="28" y1="38" x2="66" y2="38" stroke="#6B6A66" strokeWidth="6" strokeLinecap="round" />
+        <line x1="28" y1="50" x2="66" y2="50" stroke="#6B6A66" strokeWidth="6" strokeLinecap="round" />
+        <line x1="28" y1="62" x2="66" y2="62" stroke="#6B6A66" strokeWidth="6" strokeLinecap="round" />
+      </svg>
+      <div>
+        <div style={{ fontSize: '10px', fontWeight: '700', color: '#6B6A66', letterSpacing: '2px', lineHeight: 1 }}>CORUM</div>
+        <div style={{ fontSize: '8px', color: '#6B6A66', letterSpacing: '0.5px', lineHeight: 1.4 }}>by Recurso Coral</div>
       </div>
     </div>
   )
 }
 
-export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar }) {
+function Insignia({ children }) {
+  return (
+    <span style={{ background: '#D85A30', color: 'white', fontSize: '10px', fontWeight: '600', borderRadius: '10px', padding: '1px 7px' }}>
+      {children}
+    </span>
+  )
+}
+
+export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 232, compacto = false }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { perfil, cerrarSesion, esAdmin, esDirector } = useAuth()
@@ -102,17 +157,15 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar }) {
   const encuestasPendientes = encuestasActivas.filter(e => !e.yaVote).length
   const [mostrarAyuda, setMostrarAyuda] = useState(false)
   const [zoom, setZoom] = useState(getZoom)
-  const [padding, setPadding] = useState(getPadding)
+  const [padding, setPadding] = useState(() => getPadding(compacto))
 
   useEffect(() => {
-    const fn = () => { setZoom(getZoom()); setPadding(getPadding()) }
+    const fn = () => { setZoom(getZoom()); setPadding(getPadding(compacto)) }
     window.addEventListener('tamanoFuenteCambiado', fn)
     return () => window.removeEventListener('tamanoFuenteCambiado', fn)
-  }, [])
+  }, [compacto])
 
-  const iniciales = perfil?.nombre
-    ? perfil.nombre.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-    : '?'
+  useEffect(() => { setPadding(getPadding(compacto)) }, [compacto])
 
   function isActive(ruta, esMenuAdmin) {
     if (esMenuAdmin) {
@@ -130,131 +183,119 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar }) {
     if (onNavegar) onNavegar()
   }
 
-  const esMenuAdmin = seccionAdmin && (esAdmin || esDirector)
-  const navItems = esMenuAdmin ? NAV_ADMIN : NAV_CANTANTE
+  const puedeAdmin = esAdmin || esDirector
+  const esMenuAdmin = seccionAdmin && puedeAdmin
+  const grupos = esMenuAdmin ? NAV_ADMIN : NAV_CANTANTE
   const cantidadActivos = activos.length
+  const nombre = perfil?.nombre?.split(' ')[0] || '—'
+  const rol = perfil?.rol === 'director' ? 'Director' : perfil?.rol === 'admin' ? 'Admin' : (perfil?.voz || 'Cantante')
+
+  const segmento = (on) => ({
+    flex: 1, minHeight: '36px', fontSize: '13px', border: 'none', cursor: 'pointer', borderRadius: '8px',
+    background: on ? C.acento : 'transparent',
+    color: on ? '#FFFFFF' : C.textoSuave,
+    fontWeight: on ? '600' : '500',
+  })
 
   return (
-    <div style={{ width: '210px', height: '100vh', background: '#0A4A3A', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: `${ancho}px`, height: '100vh', background: C.fondo, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.linea}` }}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', zoom: zoom }}>
 
-        {/* Logo */}
-        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        {/* Coro y quién soy */}
+        <div style={{ padding: 'calc(18px + env(safe-area-inset-top, 0px)) 16px 14px', borderBottom: `1px solid ${C.linea}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '34px', height: '34px', background: '#1D9E75', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+            <div style={{ width: '38px', height: '38px', background: C.acento, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="white" aria-hidden="true">
                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
               </svg>
             </div>
-            <div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '14px', color: '#9FE1CB' }}>{import.meta.env.VITE_CORO_NOMBRE || 'Coro'}</div>
-              <div style={{ fontSize: '10px', color: 'rgba(159,225,203,0.5)' }}>Plataforma coral</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: C.texto, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {import.meta.env.VITE_CORO_NOMBRE || 'Coro'}
+              </div>
+              <div style={{ fontSize: '12px', color: C.textoSuave, marginTop: '1px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1D9E75', display: 'inline-block', flexShrink: 0 }} />
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textTransform: 'capitalize' }}>{nombre} · {rol}</span>
+              </div>
             </div>
           </div>
+
+          {/* Cantante / Admin */}
+          {puedeAdmin && (
+            <div role="group" aria-label="Lado de la app" style={{ display: 'flex', gap: '4px', marginTop: '14px', background: '#F1EFE8', borderRadius: '10px', padding: '3px' }}>
+              <button onClick={() => { toggleAdmin(false); handleNavegar('/') }} style={segmento(!seccionAdmin)}>Cantante</button>
+              <button onClick={() => { toggleAdmin(true); handleNavegar('/admin') }} style={segmento(seccionAdmin)}>Admin</button>
+            </div>
+          )}
         </div>
 
-        {/* Toggle Cantante/Admin */}
-{(esAdmin || esDirector) && (
-  <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-    <div style={{ display: 'flex', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', overflow: 'hidden' }}>
-      <button onClick={() => { toggleAdmin(false); handleNavegar('/') }}
-        style={{ flex: 1, padding: '5px 0', fontSize: '11px', border: 'none', cursor: 'pointer', background: !seccionAdmin ? '#1D9E75' : 'none', color: !seccionAdmin ? '#FFFFFF' : 'rgba(255,255,255,0.5)', borderRadius: '6px' }}>
-        Cantante
-      </button>
-      <button onClick={() => { toggleAdmin(true); handleNavegar('/admin') }}
-        style={{ flex: 1, padding: '5px 0', fontSize: '11px', border: 'none', cursor: 'pointer', background: seccionAdmin ? '#D85A30' : 'none', color: seccionAdmin ? '#FFFFFF' : 'rgba(255,255,255,0.5)', borderRadius: '6px' }}>
-        Admin
-      </button>
-    </div>
-  </div>
-)}
-
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto', minHeight: 0 }}>
-          {navItems.map(item => {
-            const activo = isActive(item.ruta, esMenuAdmin)
-            return (
-              <button key={item.ruta} onClick={() => handleNavegar(item.ruta)}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: padding, border: 'none', cursor: 'pointer',
-                  background: activo ? 'rgba(29,158,117,0.25)' : 'none',
-                  borderLeft: `2px solid ${activo ? '#5DCAA5' : 'transparent'}`,
-                  color: activo ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
-                  fontSize: '13px', textAlign: 'left',
-                }}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-                  <path d={ICONOS[item.icono] || ICONOS.inicio} />
-                </svg>
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {item.badge && noLeidos > 0 && (
-                  <span style={{ background: '#D85A30', color: 'white', fontSize: '10px', borderRadius: '10px', padding: '1px 6px' }}>
-                    {noLeidos > 9 ? '9+' : noLeidos}
-                  </span>
-                )}
-                {item.badgeEncuestas && encuestasPendientes > 0 && (
-                  <span style={{ background: '#D85A30', color: 'white', fontSize: '10px', borderRadius: '10px', padding: '1px 6px' }}>
-                    {encuestasPendientes > 9 ? '9+' : encuestasPendientes}
-                  </span>
-                )}
-                {item.presencia && cantidadActivos > 0 && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#5DCAA5', display: 'inline-block' }} />
-                    <span style={{ fontSize: '10px', color: 'rgba(159,225,203,0.8)' }}>{cantidadActivos}</span>
-                  </span>
-                )}
-              </button>
-            )
-          })}
+        {/* Secciones */}
+        <nav aria-label="Menú principal" style={{ flex: 1, padding: '4px 0 10px', overflowY: 'auto', minHeight: 0 }}>
+          {grupos.map((grupo, gi) => (
+            <div key={gi}>
+              {grupo.titulo && (
+                <div style={{ padding: compacto ? '10px 16px 2px 18px' : '14px 16px 4px 18px', fontSize: '10.5px', fontWeight: '700', color: C.titulo, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  {grupo.titulo}
+                </div>
+              )}
+              {grupo.items.map(item => {
+                const activo = isActive(item.ruta, esMenuAdmin)
+                return (
+                  <button key={item.ruta} onClick={() => handleNavegar(item.ruta)}
+                    aria-current={activo ? 'page' : undefined}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: padding, border: 'none', cursor: 'pointer',
+                      background: activo ? C.activoFondo : 'none',
+                      borderLeft: `4px solid ${activo ? C.acento : 'transparent'}`,
+                      color: activo ? C.acentoOscuro : C.texto,
+                      fontWeight: activo ? '700' : '400',
+                      fontSize: '14px', textAlign: 'left',
+                    }}>
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill={activo ? C.acento : C.textoSuave} aria-hidden="true">
+                      <path d={ICONOS[item.icono] || ICONOS.inicio} />
+                    </svg>
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.badge && noLeidos > 0 && <Insignia>{noLeidos > 9 ? '9+' : noLeidos}</Insignia>}
+                    {item.badgeEncuestas && encuestasPendientes > 0 && <Insignia>{encuestasPendientes > 9 ? '9+' : encuestasPendientes}</Insignia>}
+                    {item.presencia && cantidadActivos > 0 && (
+                      <span title="En línea ahora" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#27500A' }}>{cantidadActivos}</span>
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </nav>
 
-        {/* Footer */}
-        <div style={{ flexShrink: 0, background: '#0A4A3A' }}>
+        {/* Abajo fijo */}
+        <div style={{ flexShrink: 0, background: C.pie, borderTop: `1px solid ${C.linea}` }}>
           {mostrarAyuda && (
-            <div style={{ margin: '0 14px 10px', background: '#0F6E56', borderRadius: '10px', padding: '12px 14px', position: 'relative', border: '1px solid rgba(255,255,255,0.15)' }}>
-              <button onClick={() => setMostrarAyuda(false)}
-                style={{ position: 'absolute', top: '6px', right: '8px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}>
+            <div style={{ margin: '10px 12px 4px', background: C.activoFondo, borderRadius: '10px', padding: '12px 14px', position: 'relative', border: '1px solid #B4D8CE' }}>
+              <button onClick={() => setMostrarAyuda(false)} aria-label="Cerrar ayuda"
+                style={{ position: 'absolute', top: '6px', right: '8px', background: 'none', border: 'none', color: C.textoSuave, cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}>
                 ✕
               </button>
-              <div style={{ fontSize: '11px', color: '#FFFFFF', fontWeight: '600', marginBottom: '5px' }}>📲 Acceso directo</div>
-              <div style={{ fontSize: '11px', color: 'rgba(159,225,203,0.85)', lineHeight: '1.6' }}>
-                Si no elegiste instalar la app podés agregar un acceso directo en tu pantalla de inicio, tocá los <strong style={{ color: '#FFFFFF' }}>⋮</strong> de Chrome y elegí <strong style={{ color: '#FFFFFF' }}>"Agregar a pantalla de inicio"</strong>
+              <div style={{ fontSize: '12px', color: C.acentoOscuro, fontWeight: '600', marginBottom: '5px' }}>📲 Acceso directo</div>
+              <div style={{ fontSize: '12px', color: C.texto, lineHeight: '1.6' }}>
+                Si no elegiste instalar la app podés agregar un acceso directo en tu pantalla de inicio, tocá los <strong>⋮</strong> de Chrome y elegí <strong>"Agregar a pantalla de inicio"</strong>
               </div>
             </div>
           )}
-
-          <div style={{ padding: '12px 14px 10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#1D9E75', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: 'white' }}>
-                  {iniciales}
-                </div>
-                <span style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#5DCAA5', border: '1.5px solid #0A4A3A', display: 'block' }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {perfil?.nombre?.split(' ')[0] || '—'}
-                </div>
-                <div style={{ fontSize: '10px', color: 'rgba(159,225,203,0.6)', textTransform: 'capitalize' }}>
-                  {perfil?.voz || perfil?.rol || '—'}
-                </div>
-              </div>
-              <button onClick={() => setMostrarAyuda(v => !v)}
-                style={{ width: '24px', height: '24px', borderRadius: '50%', background: mostrarAyuda ? '#1D9E75' : 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '12px', fontWeight: '600', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                ?
-              </button>
-            </div>
-          </div>
-
-          <div style={{ height: '8px' }} />
-
-          <div style={{ padding: '10px 14px 0' }}>
-            <button onClick={cerrarSesion}
-              style={{ width: '100%', padding: '6px', fontSize: '11px', color: 'rgba(255,255,255,0.45)', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', cursor: 'pointer' }}>
-              Cerrar sesión
-            </button>
-            <LogoCorum />
-          </div>
+          <button onClick={() => setMostrarAyuda(v => !v)}
+            style={{ width: '100%', minHeight: compacto ? '36px' : '44px', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 16px 0 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', color: C.texto, textAlign: 'left' }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill={C.textoSuave} aria-hidden="true"><path d={ICONOS.ayuda} /></svg>
+            Ayuda
+          </button>
+          <button onClick={cerrarSesion}
+            style={{ width: '100%', minHeight: compacto ? '36px' : '44px', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 16px 0 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', color: C.rojo, textAlign: 'left' }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill={C.rojo} aria-hidden="true"><path d={ICONOS.salir} /></svg>
+            Cerrar sesión
+          </button>
+          <LogoCorum />
         </div>
       </div>
     </div>
