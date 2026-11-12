@@ -4,6 +4,7 @@ import ResumenTemporada from '../../components/temporada/ResumenTemporada'
 import {
   listarReportesCoro, generarReportes, actualizarReporte, enviarPushTemporada, resumenCoro, cargarReporte,
 } from '../../hooks/useReporteTemporada'
+import { descargarPdfResumen } from '../../lib/pdfTemporada'
 import { SECCIONES, avisosRevision, estadoSecciones, nombreMes, fechaCorta } from '../../lib/temporada'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,7 +139,7 @@ export default function TemporadaAdmin() {
       </div>
 
       {pestana === 'coro' ? (
-        <ResumenDelCoro desde={desde} hasta={hasta} cuenta={cuenta} hayReportes={reportes.length > 0} />
+        <ResumenDelCoro desde={desde} hasta={hasta} temporada={temporada} cuenta={cuenta} hayReportes={reportes.length > 0} />
       ) : cargando ? (
         <p style={{ fontSize: '13px', color: '#888780' }}>Cargando…</p>
       ) : reportes.length === 0 ? (
@@ -393,8 +394,20 @@ function Revision({ reporte, desde, hasta, onCambio, onCerrar, onAnterior, onSig
 }
 
 // ─── Resumen general del coro ───────────────────────────────────────────────
-function ResumenDelCoro({ desde, hasta, cuenta, hayReportes }) {
+function ResumenDelCoro({ desde, hasta, temporada, cuenta, hayReportes }) {
   const [datos, setDatos] = useState(null)
+  const [generandoPdf, setGenerandoPdf] = useState(false)
+  const [errorPdf, setErrorPdf] = useState('')
+
+  async function descargarPdf() {
+    setGenerandoPdf(true); setErrorPdf('')
+    try {
+      await descargarPdfResumen(datos, { nombreCoro: import.meta.env.VITE_CORO_NOMBRE || '', temporada, cuenta: hayReportes ? cuenta : null })
+    } catch (e) {
+      setErrorPdf('No se pudo generar el PDF. Revisá la conexión y probá de nuevo.')
+    }
+    setGenerandoPdf(false)
+  }
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
 
@@ -422,9 +435,12 @@ function ResumenDelCoro({ desde, hasta, cuenta, hayReportes }) {
         <div style={{ fontSize: '12px', color: '#888780' }}>Del {fechaCorta(datos.desde)} {datos.desde?.slice(0, 4)} al {fechaCorta(datos.hasta)} {datos.hasta?.slice(0, 4)}</div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={cargar} style={botonSec}>{cargando ? 'Actualizando…' : 'Actualizar'}</button>
-          <button onClick={() => window.print()} style={botonSec}>Imprimir</button>
+          <button onClick={descargarPdf} disabled={generandoPdf} style={{ ...botonSec, background: '#0F6E56', borderColor: '#0F6E56', color: '#FFFFFF', fontWeight: 500 }}>
+            {generandoPdf ? 'Generando…' : '↓ Descargar PDF'}
+          </button>
         </div>
       </div>
+      {errorPdf && <div style={alerta}>{errorPdf}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '14px' }}>
         <Numero valor={cantantes?.activos ?? 0} label="Cantantes activos" />
@@ -581,7 +597,7 @@ function Bloque({ titulo, nota, children }) {
   )
 }
 function Subtitulo({ children }) {
-  return <div style={{ fontSize: '11px', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.4px', margin: '10px 0 4px' }}>{children}</div>
+  return <div style={{ fontSize: '11px', fontWeight: 700, color: '#5F5E5A', textTransform: 'uppercase', letterSpacing: '0.4px', margin: '12px 0 6px' }}>{children}</div>
 }
 function SinRegistro() {
   return <div style={{ fontSize: '13px', color: '#888780', fontStyle: 'italic' }}>Sin registro esta temporada</div>

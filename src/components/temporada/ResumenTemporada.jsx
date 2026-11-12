@@ -93,7 +93,7 @@ export default function ResumenTemporada({ reporte, compacto = false, nombreCoro
 
   const pad = compacto ? '16px' : '24px'
   const tarjeta = { background: '#FFFFFF', border: `1px solid ${C.linea}`, borderRadius: '14px', padding: pad }
-  const etiqueta = { fontSize: compacto ? '10px' : '11px', fontWeight: 600, color: C.gris, textTransform: 'uppercase', letterSpacing: '0.5px', margin: `0 0 ${compacto ? '10px' : '14px'}` }
+  const etiqueta = { fontSize: compacto ? '10px' : '11px', fontWeight: 700, color: C.gris, textTransform: 'uppercase', letterSpacing: '0.5px', margin: `0 0 ${compacto ? '10px' : '14px'}` }
 
   return (
     <div style={{ display: 'grid', gap: compacto ? '10px' : '14px' }}>
