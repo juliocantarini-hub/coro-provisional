@@ -353,8 +353,8 @@ function SeccionTemporadas({ perfilId }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
         {reportes.map(r => (
           <button key={r.id} onClick={() => navigate(`/temporada/${r.id}`)}
-            style={{ background: 'linear-gradient(120deg, #3B2470 0%, #7C3AED 100%)', color: '#FFFFFF', border: 'none', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', cursor: 'pointer' }}>
-            🎶 Temporada {r.temporada}
+            style={{ background: '#E1F5EE', color: '#0F6E56', border: '1px solid #9FE1CB', borderRadius: '10px', padding: '9px 14px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>
+            Temporada {r.temporada} →
           </button>
         ))}
       </div>

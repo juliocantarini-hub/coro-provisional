@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import HistoriasTemporada from '../../components/temporada/HistoriasTemporada'
+import ResumenTemporada from '../../components/temporada/ResumenTemporada'
 import { cargarReporte, marcarReporteVisto, marcarAvisoMostrado } from '../../hooks/useReporteTemporada'
 
-// /temporada/:id — el reporte de temporada del cantante, en pantalla completa.
+// /temporada/:id — el reporte de temporada del cantante.
 // También es el destino de la notificación push al publicarlo.
 export default function MiTemporada() {
   const { id } = useParams()
@@ -24,7 +24,7 @@ export default function MiTemporada() {
     return () => { vivo = false }
   }, [id])
 
-  function cerrar() {
+  function volver() {
     if (window.history.length > 1) navigate(-1)
     else navigate('/', { replace: true })
   }
@@ -38,5 +38,13 @@ export default function MiTemporada() {
       </div>
     )
   }
-  return <HistoriasTemporada reporte={reporte} onCerrar={cerrar} />
+  return (
+    <div style={{ maxWidth: '720px' }}>
+      <button onClick={volver}
+        style={{ background: 'none', border: 'none', color: '#0F6E56', fontSize: '13px', cursor: 'pointer', padding: '0 0 12px' }}>
+        ← Volver
+      </button>
+      <ResumenTemporada reporte={reporte} />
+    </div>
+  )
 }

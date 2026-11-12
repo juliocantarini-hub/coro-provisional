@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import HistoriasTemporada from '../../components/temporada/HistoriasTemporada'
+import ResumenTemporada from '../../components/temporada/ResumenTemporada'
 import {
   listarReportesCoro, generarReportes, actualizarReporte, enviarPushTemporada, resumenCoro, cargarReporte,
 } from '../../hooks/useReporteTemporada'
@@ -280,9 +280,11 @@ function Revision({ reporte, desde, hasta, onCambio, onCerrar, onAnterior, onSig
           {/* Vista previa: exactamente lo que va a ver */}
           <div>
             <div style={{ fontSize: '11px', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', textAlign: 'center' }}>
-              Vista previa (tocá para pasar)
+              Vista previa: así lo ve el cantante
             </div>
-            <HistoriasTemporada reporte={borradorLocal} incrustado />
+            <div style={{ background: '#F1EFE8', borderRadius: '14px', padding: '10px' }}>
+              <ResumenTemporada reporte={borradorLocal} compacto />
+            </div>
           </div>
 
           {/* Edición */}
