@@ -120,31 +120,31 @@ export default function AppLayout({ children }) {
         <header style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 30,
           paddingTop: 'env(safe-area-inset-top, 0px)',
-          background: '#FFFFFF', borderBottom: '1px solid #E8E6DF',
+          background: '#0F6E56', borderBottom: '1px solid rgba(0,0,0,0.15)',
         }}>
           <div style={{ height: '56px', display: 'flex', alignItems: 'center', gap: '4px', padding: '0 6px' }}>
             <button onClick={() => setAbierto(true)} aria-label="Abrir menú"
               style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="#0F6E56" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true">
                 <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
               </svg>
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1A1A18', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {import.meta.env.VITE_CORO_NOMBRE || 'Coro'}
               </div>
-              <div style={{ fontSize: '10.5px', fontWeight: '600', color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: '10.5px', fontWeight: '600', color: '#9FE1CB', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {seccion ? `${lado} · ${seccion}` : lado}
               </div>
             </div>
             <button onClick={() => { setSeccionAdmin(false); navigate('/avisos') }}
               aria-label={noLeidos > 0 ? `Avisos, ${noLeidos} sin leer` : 'Avisos'}
               style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="#1A1A18" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true">
                 <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
               </svg>
               {noLeidos > 0 && (
-                <span style={{ position: 'absolute', top: '6px', right: '5px', minWidth: '16px', height: '16px', borderRadius: '8px', background: '#D85A30', color: '#FFFFFF', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '2px solid #FFFFFF' }}>
+                <span style={{ position: 'absolute', top: '6px', right: '5px', minWidth: '16px', height: '16px', borderRadius: '8px', background: '#D85A30', color: '#FFFFFF', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '2px solid #0F6E56' }}>
                   {noLeidos > 9 ? '9+' : noLeidos}
                 </span>
               )}
