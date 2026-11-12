@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Reporte de fin de temporada: textos y reglas para armar las "historias".
+// Reporte de fin de temporada: textos y reglas para la tarjeta del cantante.
 //
 // Los números vienen congelados en reportes_temporada.datos (los calcula la
 // función generar_reportes_temporada en Supabase). Acá solo se decide QUÉ se
@@ -44,7 +44,7 @@ export function primerNombre(nombre) {
   return (nombre || '').trim().split(/\s+/)[0] || ''
 }
 
-function plural(n, uno, varios) {
+export function plural(n, uno, varios) {
   return `${n} ${n === 1 ? uno : varios}`
 }
 
@@ -87,146 +87,7 @@ export function avisosRevision(reporte) {
   return avisos
 }
 
-const SIN_REGISTRO = 'Sin registro esta temporada'
-
-// Arma la lista de pantallas (historias) que ve el cantante.
-// Cada una: { clave, emoji, titulo, grande?, texto, lineas?, sinRegistro? }
-export function armarHistorias(reporte, { nombreCoro = '' } = {}) {
-  const d = reporte?.datos || {}
-  const ocultas = new Set(reporte?.ocultas || [])
-  const est = estadoSecciones(d)
-  const temporada = reporte?.temporada || d.temporada
-  const nombre = primerNombre(d.nombre)
-  const h = []
-
-  // 1. Bienvenida
-  h.push({
-    clave: 'bienvenida',
-    emoji: '🎶',
-    titulo: `Tu temporada ${temporada}`,
-    grande: nombre ? `${nombre}` : null,
-    texto: [d.voz ? capitalizar(d.voz) : null, nombreCoro].filter(Boolean).join(' · '),
-    lineas: d.ingreso_en_temporada
-      ? [`Desde que llegaste en ${nombreMes(d.desde)}, esto es lo que cantaste con nosotros.`]
-      : ['Un repaso de todo lo que cantaste este año.'],
-  })
-
-  // 2. Conciertos y eventos (del coro)
-  if (!ocultas.has('eventos')) {
-    const ev = d.eventos || {}
-    if (est.eventos === 'sin_registro') {
-      h.push({ clave: 'eventos', emoji: '🎤', titulo: 'Conciertos y eventos', texto: SIN_REGISTRO, sinRegistro: true })
-    } else if (ev.conciertos > 0) {
-      h.push({
-        clave: 'eventos', emoji: '🎤', titulo: 'Subimos al escenario',
-        grande: String(ev.conciertos),
-        texto: ev.conciertos === 1 ? 'concierto esta temporada' : 'conciertos esta temporada',
-        lineas: [
-          ...(ev.lista_conciertos || []).slice(0, 5).map(c => `${c.titulo} · ${fechaCorta(c.fecha)}${c.lugar ? ` · ${c.lugar}` : ''}`),
-          ev.ensayos > 0 ? `Y ${plural(ev.ensayos, 'ensayo', 'ensayos')} en el calendario.` : null,
-        ].filter(Boolean),
-      })
-    } else {
-      h.push({
-        clave: 'eventos', emoji: '📅', titulo: 'Nuestro calendario',
-        grande: String((ev.ensayos || 0) + (ev.otros || 0)),
-        texto: 'encuentros del coro esta temporada',
-      })
-    }
-  }
-
-  // 3. Asistencia
-  if (!ocultas.has('asistencia')) {
-    const as = d.asistencia || {}
-    if (est.asistencia !== 'ok') {
-      h.push({ clave: 'asistencia', emoji: '✅', titulo: 'Asistencia', texto: SIN_REGISTRO, sinRegistro: true })
-    } else {
-      const lineas = []
-      if (as.racha >= RACHA_MINIMA_ENSAYOS) lineas.push(`Tu racha más larga: ${as.racha} ensayos seguidos.`)
-      if (as.mejor_mes && as.mejor_mes.pct >= 75) lineas.push(`Tu mes más constante fue ${nombreMes(as.mejor_mes.mes)}.`)
-      const mostrarPct = as.pct != null && as.pct >= PCT_MINIMO_ASISTENCIA
-      h.push({
-        clave: 'asistencia', emoji: '✅', titulo: 'Presente',
-        grande: String(as.presentes),
-        texto: mostrarPct
-          ? `ensayos de ${as.listas} (${as.pct}%)`
-          : (as.presentes === 1 ? 'ensayo compartido con el coro' : 'ensayos compartidos con el coro'),
-        lineas,
-      })
-    }
-  }
-
-  // 4. Estudio del repertorio
-  if (!ocultas.has('estudio')) {
-    const es = d.estudio || {}
-    if (est.estudio !== 'ok') {
-      h.push({ clave: 'estudio', emoji: '📖', titulo: 'Estudio del repertorio', texto: SIN_REGISTRO, sinRegistro: true })
-    } else {
-      const lineas = []
-      if (es.obra_top) lineas.push(`Tu obra más practicada: ${es.obra_top.titulo} (la abriste ${plural(es.obra_top.veces, 'vez', 'veces')}).`)
-      if (es.estudiadas > 0) lineas.push(`Marcaste ${plural(es.estudiadas, 'obra', 'obras')} como estudiada${es.estudiadas === 1 ? '' : 's'}.`)
-      if (es.dedicacion != null && es.dedicacion >= PCT_MINIMO_DEDICACION) lineas.push(`Tu dedicación: ${es.dedicacion}%. ¡Excelente!`)
-      h.push({
-        clave: 'estudio', emoji: '📖', titulo: 'Estudiaste',
-        grande: String(es.obras_abiertas),
-        texto: es.obras_temporada > es.obras_abiertas
-          ? `de las ${es.obras_temporada} obras del repertorio`
-          : (es.obras_abiertas === 1 ? 'obra del repertorio' : 'obras del repertorio, ¡todas!'),
-        lineas,
-      })
-    }
-  }
-
-  // 5. Entrenamiento
-  if (!ocultas.has('entrenamiento')) {
-    const en = d.entrenamiento || {}
-    if (est.entrenamiento !== 'ok') {
-      h.push({ clave: 'entrenamiento', emoji: '🎵', titulo: 'Entrenamiento', texto: SIN_REGISTRO, sinRegistro: true })
-    } else {
-      const lineas = []
-      if (en.ejercicios > 0) lineas.push(`${plural(en.ejercicios, 'ejercicio completado', 'ejercicios completados')}`)
-      if (en.lecciones_teoria > 0) lineas.push(`${plural(en.lecciones_teoria, 'lección', 'lecciones')} de "Entendé la partitura"`)
-      h.push({
-        clave: 'entrenamiento', emoji: '🎵', titulo: 'Entrenaste tu voz',
-        grande: String((en.ejercicios || 0) + (en.lecciones_teoria || 0)),
-        texto: 'prácticas en Entrenamiento',
-        lineas,
-      })
-    }
-  }
-
-  // 6. Constancia
-  if (!ocultas.has('constancia')) {
-    const co = d.constancia || {}
-    if (est.constancia !== 'ok') {
-      h.push({ clave: 'constancia', emoji: '🔥', titulo: 'Constancia', texto: SIN_REGISTRO, sinRegistro: true })
-    } else {
-      const lineas = []
-      if (co.racha_dias >= RACHA_MINIMA_DIAS) lineas.push(`Tu racha: ${co.racha_dias} días seguidos estudiando.`)
-      if (co.mejor_mes && co.mejor_mes.dias > 1) lineas.push(`Tu mejor mes fue ${nombreMes(co.mejor_mes.mes)}, con ${co.mejor_mes.dias} días de práctica.`)
-      h.push({
-        clave: 'constancia', emoji: '🔥', titulo: 'Le dedicaste',
-        grande: String(co.dias_activos),
-        texto: co.dias_activos === 1 ? 'día de práctica en la app' : 'días de práctica en la app',
-        lineas,
-      })
-    }
-  }
-
-  // 7. Mensaje del director
-  if (reporte?.mensaje && reporte.mensaje.trim()) {
-    h.push({ clave: 'mensaje', emoji: '💌', titulo: 'Un mensaje para vos', mensaje: reporte.mensaje.trim() })
-  }
-
-  // 8. Cierre
-  h.push({
-    clave: 'cierre', emoji: '👏', titulo: `¡Gracias por esta temporada${nombre ? `, ${nombre}` : ''}!`,
-    texto: 'Nos vemos en la próxima.',
-    resumen: resumenCorto(reporte, est, ocultas),
-  })
-
-  return h
-}
+export const SIN_REGISTRO = 'Sin registro esta temporada'
 
 // Tres o cuatro datos para la tarjeta final y para compartir
 export function resumenCorto(reporte, est = estadoSecciones(reporte?.datos), ocultas = new Set(reporte?.ocultas || [])) {
@@ -246,6 +107,6 @@ export function textoCompartir(reporte, nombreCoro = '') {
   return [encabezado, ...items.map(i => `${i.emoji} ${i.texto}`)].join('\n')
 }
 
-function capitalizar(s) {
+export function capitalizar(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
 }

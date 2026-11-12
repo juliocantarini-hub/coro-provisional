@@ -113,7 +113,7 @@ DECLARE
   v_mejor_mes_asist jsonb;
   v_ap integer; v_unicas integer; v_estudiadas integer; v_ded integer; v_top jsonb; v_top3 jsonb;
   v_ejercicios integer; v_teoria integer;
-  v_dias date[]; v_racha_dias integer; v_mejor_mes jsonb;
+  v_dias date[]; v_racha_dias integer; v_mejor_mes jsonb; v_por_mes jsonb; v_asist_mes jsonb;
   v_n integer := 0;
 BEGIN
   IF NOT public.soy_director_de(p_coro_id) THEN
@@ -202,8 +202,18 @@ BEGIN
            LIMIT 1
         ) mm;
 
+      SELECT coalesce(jsonb_agg(jsonb_build_object('mes', m, 'listas', n, 'presentes', p, 'pct', round(100.0 * p / n)) ORDER BY m), '[]'::jsonb)
+        INTO v_asist_mes
+        FROM (
+          SELECT to_char(la.fecha, 'YYYY-MM') AS m, count(*) AS n, count(*) FILTER (WHERE rg.estado = 'presente') AS p
+            FROM listas_asistencia la
+            LEFT JOIN registros_asistencia rg ON rg.lista_id = la.id AND rg.perfil_id = r.id
+           WHERE la.coro_id = p_coro_id AND la.fecha BETWEEN v_inicio AND p_hasta
+           GROUP BY 1
+        ) am;
+
       v_asist := jsonb_build_object(
-        'sin_registro', false,
+        'sin_registro', false, 'por_mes', v_asist_mes,
         'listas', v_listas, 'presentes', v_pres, 'justificados', v_just, 'ausentes', v_aus,
         'sin_marcar', v_listas - v_conreg,
         'pct', CASE WHEN v_listas > 0 THEN round(100.0 * v_pres / v_listas) END,
@@ -277,7 +287,18 @@ BEGIN
     SELECT jsonb_build_object('mes', m, 'dias', n) INTO v_mejor_mes
       FROM (SELECT to_char(d, 'YYYY-MM') AS m, count(*) AS n FROM unnest(v_dias) AS d GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 1) mm;
 
-    v_const := jsonb_build_object('dias_activos', coalesce(array_length(v_dias, 1), 0), 'racha_dias', v_racha_dias, 'mejor_mes', v_mejor_mes);
+    -- Días de práctica de cada mes de la temporada (para el gráfico), hasta hoy
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+             'mes', to_char(mm.m, 'YYYY-MM'),
+             'dias', (SELECT count(*) FROM unnest(v_dias) AS d WHERE date_trunc('month', d::timestamp) = mm.m)
+           ) ORDER BY mm.m), '[]'::jsonb)
+      INTO v_por_mes
+      FROM generate_series(date_trunc('month', v_inicio::timestamp),
+                           date_trunc('month', least(p_hasta, current_date)::timestamp),
+                           interval '1 month') AS mm(m);
+
+    v_const := jsonb_build_object('dias_activos', coalesce(array_length(v_dias, 1), 0), 'racha_dias', v_racha_dias,
+                                  'mejor_mes', v_mejor_mes, 'por_mes', v_por_mes);
 
     INSERT INTO reportes_temporada (coro_id, perfil_id, temporada, desde, hasta, datos, estado, generado_en)
     VALUES (
