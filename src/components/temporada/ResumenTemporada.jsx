@@ -1,5 +1,5 @@
 import {
-  estadoSecciones, textoCompartir, nombreMes, fechaCorta, primerNombre, plural, capitalizar,
+  estadoSecciones, nombreMes, fechaCorta, primerNombre, plural, capitalizar,
   PCT_MINIMO_ASISTENCIA, PCT_MINIMO_DEDICACION, RACHA_MINIMA_DIAS, RACHA_MINIMA_ENSAYOS, SIN_REGISTRO,
 } from '../../lib/temporada'
 
@@ -176,13 +176,9 @@ export default function ResumenTemporada({ reporte, compacto = false, nombreCoro
           GRACIAS por este año juntos{nombre ? `, ${nombre}` : ''}
         </p>
         <p style={{ fontSize: compacto ? '13px' : '15px', color: C.verde, margin: '6px 0 0' }}>¡Nos vemos el próximo!</p>
-        {!compacto && (
-          <button
-            onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(textoCompartir(reporte, nombreCoro))}`, '_blank', 'noopener')}
-            style={{ marginTop: '16px', background: '#FFFFFF', color: C.verde, border: `1px solid #9FE1CB`, borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>
-            Compartir por WhatsApp
-          </button>
-        )}
+        <p style={{ fontSize: compacto ? '11px' : '12px', color: C.grisClaro, margin: compacto ? '12px 0 0' : '16px 0 0' }}>
+          También vas a encontrar este resumen en Mi perfil.
+        </p>
       </div>
 
       <style>{`@media (max-width: 560px) { .temporada-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }`}</style>
