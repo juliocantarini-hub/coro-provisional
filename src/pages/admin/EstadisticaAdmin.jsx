@@ -137,15 +137,12 @@ export default function EstadisticaAdmin() {
   const hayPractica   = Object.keys(informes).length > 0
   const COLUMNAS      = hayPractica ? COLUMNAS_CON_PRACTICA : COLUMNAS_SIN_PRACTICA
 
-  // En el celular el botón queda arriba a la derecha, a la altura del botón del menú
-  const esMovil = typeof window !== 'undefined' && window.innerWidth <= 768
-
   return (
     <div>
-      {/* Acceso al reporte de fin de temporada */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: esMovil ? '-48px 0 14px' : '0 0 12px' }}>
+      {/* Acceso al reporte de fin de temporada (en el celular, a la altura del botón del menú) */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: movil ? '-48px 0 14px' : '0 0 12px' }}>
         <button onClick={() => navigate('/admin/temporada')}
-          style={{ height: esMovil ? '40px' : 'auto', padding: esMovil ? '0 14px' : '7px 14px', fontSize: '13px', borderRadius: '10px', border: '1px solid #9FE1CB', background: '#E1F5EE', cursor: 'pointer', color: '#0F6E56', fontWeight: '600' }}>
+          style={{ height: movil ? '40px' : 'auto', padding: movil ? '0 14px' : '7px 14px', fontSize: '13px', borderRadius: '10px', border: '1px solid #9FE1CB', background: '#E1F5EE', cursor: 'pointer', color: '#0F6E56', fontWeight: '600' }}>
           Reporte de fin de temporada →
         </button>
       </div>
