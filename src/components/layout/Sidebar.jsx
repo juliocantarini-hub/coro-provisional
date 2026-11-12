@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useAvisos } from '../../hooks/useAvisos'
@@ -169,6 +169,35 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
 
   useEffect(() => { setPadding(getPadding(compacto)) }, [compacto])
 
+  // Si el menú no entra en el alto de la pantalla, se achica entero (en vez de mostrar barra de scroll)
+  const [ajuste, setAjuste] = useState(1)
+  const ajusteRef = useRef(1)
+  const refCaja = useRef(null)
+  const refCabeza = useRef(null)
+  const refLista = useRef(null)
+  const refPie = useRef(null)
+
+  useLayoutEffect(() => {
+    function medir() {
+      const caja = refCaja.current, cab = refCabeza.current, lista = refLista.current, pie = refPie.current
+      if (!caja || !cab || !lista || !pie) return
+      const disponible = caja.getBoundingClientRect().height
+      const necesario = cab.getBoundingClientRect().height + lista.getBoundingClientRect().height + pie.getBoundingClientRect().height
+      if (!disponible || !necesario) return
+      let nuevo = ajusteRef.current * (disponible / necesario)
+      nuevo = Math.max(0.6, Math.min(1, Math.floor(nuevo * 1000) / 1000))
+      if (Math.abs(nuevo - ajusteRef.current) > 0.005) {
+        ajusteRef.current = nuevo
+        setAjuste(nuevo)
+      }
+    }
+    medir()
+    const ro = new ResizeObserver(medir)
+    ;[refCaja, refCabeza, refLista, refPie].forEach(r => r.current && ro.observe(r.current))
+    window.addEventListener('resize', medir)
+    return () => { ro.disconnect(); window.removeEventListener('resize', medir) }
+  }, [])
+
   function isActive(ruta, esMenuAdmin) {
     if (esMenuAdmin) {
       if (ruta === '/admin') return location.pathname === '/admin'
@@ -200,11 +229,11 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
   })
 
   return (
-    <div style={{ width: `${ancho}px`, height: '100vh', background: C.fondo, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.linea}` }}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', zoom: zoom }}>
+    <div style={{ width: `${ancho}px`, height: '100vh', background: C.fondo, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.linea}`, overflow: 'hidden' }} ref={refCaja}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: `${100 / (zoom * ajuste)}%`, zoom: zoom * ajuste }}>
 
         {/* Coro y quién soy */}
-        <div style={{ padding: 'calc(18px + env(safe-area-inset-top, 0px)) 16px 14px', borderBottom: `1px solid ${C.linea}`, flexShrink: 0 }}>
+        <div ref={refCabeza} style={{ padding: 'calc(18px + env(safe-area-inset-top, 0px)) 16px 14px', borderBottom: `1px solid ${C.linea}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '38px', height: '38px', background: '#1D9E75', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="19" height="19" viewBox="0 0 24 24" fill="white" aria-hidden="true">
@@ -232,7 +261,8 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
         </div>
 
         {/* Secciones */}
-        <nav aria-label="Menú principal" style={{ flex: 1, padding: '4px 0 10px', overflowY: 'auto', minHeight: 0 }}>
+        <nav aria-label="Menú principal" style={{ flex: 1, overflowY: 'auto', minHeight: 0, scrollbarWidth: 'none' }}>
+          <div ref={refLista} style={{ padding: '4px 0 10px' }}>
           {grupos.map((grupo, gi) => (
             <div key={gi}>
               {grupo.titulo && (
@@ -271,10 +301,11 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
               })}
             </div>
           ))}
+          </div>
         </nav>
 
         {/* Abajo fijo */}
-        <div style={{ flexShrink: 0, background: C.pie, borderTop: `1px solid ${C.linea}` }}>
+        <div ref={refPie} style={{ flexShrink: 0, background: C.pie, borderTop: `1px solid ${C.linea}` }}>
           {mostrarAyuda && (
             <div style={{ margin: '10px 12px 4px', background: '#0F6E56', borderRadius: '10px', padding: '12px 14px', position: 'relative', border: '1px solid rgba(255,255,255,0.15)' }}>
               <button onClick={() => setMostrarAyuda(false)} aria-label="Cerrar ayuda"
