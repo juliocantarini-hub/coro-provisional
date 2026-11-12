@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useEventosAdmin, publicarEvento, eliminarEvento, formatFecha, formatHora } from '../../hooks/useEventos'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
+import EnsayoFijoConfig from '../../components/EnsayoFijoConfig'
 
 const TIPO_COLOR = {
   ensayo:    { bg: '#E1F5EE', color: '#04342C' },
@@ -69,6 +70,8 @@ export default function EventosLista() {
         </button>
       </div>
 
+      <EnsayoFijoConfig onGuardado={recargar} />
+
       {error && (
         <div style={{ background: '#FCEBEB', border: '1px solid #E24B4A', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#501313', marginBottom: '16px' }}>
           {error} <button onClick={recargar} style={{ color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>Reintentar</button>
@@ -99,6 +102,7 @@ export default function EventosLista() {
                     <div style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A18' }}>{ev.titulo}</div>
                     <div style={{ fontSize: '12px', color: '#888780', marginTop: '2px' }}>
                       {formatFecha(ev.fecha_inicio, { corto: true })} · {formatHora(ev.fecha_inicio)}
+                      {ev.automatico && <span style={{ color: '#0F6E56' }}> · semanal</span>}
                     </div>
                   </div>
                   <span style={{ background: tc.bg, color: tc.color, fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', flexShrink: 0, marginLeft: '8px', textTransform: 'capitalize' }}>
@@ -155,7 +159,7 @@ export default function EventosLista() {
               <div key={ev.id} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 80px 100px 90px 100px', gap: 0, padding: '12px 16px', alignItems: 'center', borderBottom: i < eventos.length - 1 ? '1px solid #F1EFE8' : 'none', opacity: procesando === ev.id ? 0.5 : 1 }}>
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A18' }}>{ev.titulo}</div>
-                  <div style={{ fontSize: '11px', color: '#888780', marginTop: '2px' }}>{formatHora(ev.fecha_inicio)}{ev.lugar ? ` · ${ev.lugar}` : ''}</div>
+                  <div style={{ fontSize: '11px', color: '#888780', marginTop: '2px' }}>{formatHora(ev.fecha_inicio)}{ev.lugar ? ` · ${ev.lugar}` : ''}{ev.automatico && <span style={{ color: '#0F6E56' }}> · semanal</span>}</div>
                 </div>
                 <span style={{ background: tc.bg, color: tc.color, fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', textTransform: 'capitalize', display: 'inline-block' }}>{ev.tipo}</span>
                 <span style={{ fontSize: '12px', color: '#5F5E5A' }}>{formatFecha(ev.fecha_inicio, { corto: true })}</span>

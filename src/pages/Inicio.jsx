@@ -7,6 +7,7 @@ import { useAvisos, tiempoRelativo, TIPO_AVISO } from '../hooks/useAvisos'
 import { useArticulos } from '../hooks/useBlog'
 import MisPagos from '../components/MisPagos'
 import EncuestaDashboard from '../components/EncuestaDashboard'
+import ConfirmarProximo from '../components/ConfirmarProximo'
 import MensajeSorpresa from '../components/MensajeSorpresa'
 import { useMensajeSorpresa } from '../hooks/useMensajeSorpresa'
 import { AvisoTemporada, TarjetaTemporada } from '../components/temporada/AvisoTemporada'
@@ -118,6 +119,9 @@ export default function Inicio() {
       {/* Mensaje sorpresa — aparece solo en ciertas situaciones (ver src/lib/sorpresas.js) */}
       {/* El aviso de la temporada reemplaza al mensaje sorpresa de esa visita */}
       <MensajeSorpresa mensaje={mostrarAvisoTemporada ? null : mensajeSorpresa} onCerrar={cerrarSorpresa} />
+
+      {/* ¿Venís al ensayo de mañana? — próximo ensayo o evento dentro de 48 hs */}
+      {!cargandoEventos && <ConfirmarProximo eventos={eventos} perfil={perfil} />}
 
       {/* Stats rápidas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: movil ? '8px' : '12px', marginBottom: '16px' }}>

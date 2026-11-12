@@ -3,10 +3,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Recordatorios automáticos de eventos (lo llama pg_cron cada hora).
 //
-// 1) Día anterior (23 a 25 hs antes), todos los tipos de evento:
-//    - Ensayos: "Recordatorio: ..." a todos menos a quienes marcaron "No podré ir".
-//    - Conciertos, reuniones y extras: el mismo recordatorio a quienes confirmaron,
-//      y un pedido de confirmación a quienes todavía no respondieron.
+// 1) Día anterior (23 a 25 hs antes), todos los tipos de evento (ensayos incluidos):
+//    "Recordatorio: ..." a quienes confirmaron, y un pedido de confirmación a quienes
+//    todavía no respondieron. Quien marcó "No podré ir" no recibe nada.
 // 2) Una semana antes (entre 2 y 7 días antes), solo conciertos, reuniones y extras:
 //    pedido de confirmación a quienes todavía no respondieron.
 //    Si el evento se carga con menos de 2 días de anticipación, este aviso no sale
@@ -128,17 +127,13 @@ Deno.serve(async (req) => {
         body: `Mañana a las ${formatHora(evento.fecha_inicio)}${enLugar(evento)}.`,
       }
 
-      if (evento.tipo === 'ensayo') {
-        sumar(await enviar(miembros.filter(id => resp.get(id) !== 'no_asiste'), evento, recordatorio))
-      } else {
-        const confirmados = miembros.filter(id => resp.get(id) === 'confirmado')
-        const sinResponder = miembros.filter(id => !resp.has(id) || resp.get(id) === 'pendiente')
-        sumar(await enviar(confirmados, evento, recordatorio))
-        sumar(await enviar(sinResponder, evento, {
-          title: `Mañana: ${evento.titulo}`,
-          body: `A las ${formatHora(evento.fecha_inicio)}${enLugar(evento)}. ¿Venís? Tocá para confirmar tu asistencia.`,
-        }))
-      }
+      const confirmados = miembros.filter(id => resp.get(id) === 'confirmado')
+      const sinResponder = miembros.filter(id => !resp.has(id) || resp.get(id) === 'pendiente')
+      sumar(await enviar(confirmados, evento, recordatorio))
+      sumar(await enviar(sinResponder, evento, {
+        title: evento.tipo === 'ensayo' ? 'Mañana ensayamos' : `Mañana: ${evento.titulo}`,
+        body: `A las ${formatHora(evento.fecha_inicio)}${enLugar(evento)}. ¿Venís? Tocá para confirmar tu asistencia.`,
+      }))
 
       await supabase.from('eventos').update({ recordatorio_enviado: true }).eq('id', evento.id)
     }

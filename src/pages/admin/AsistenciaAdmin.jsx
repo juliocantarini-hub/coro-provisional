@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useListasAsistencia, useRegistrosLista, crearLista, eliminarLista, marcarAsistencia, resetearAsistencia } from '../../hooks/useAsistencia'
+import { useState, useEffect } from 'react'
+import { useListasAsistencia, useRegistrosLista, crearLista, eliminarLista, marcarAsistencia, marcarVarios, respuestasDelDia, resetearAsistencia } from '../../hooks/useAsistencia'
 import { supabase } from '../../lib/supabase'
 
 const ESTADO_STYLE = {
@@ -17,6 +17,24 @@ export default function AsistenciaAdmin() {
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [confirmEliminar, setConfirmEliminar] = useState(null)
+
+  // Nueva lista: arranca con la fecha de hoy y, si hay un ensayo o evento ese día
+  // en el calendario, con su nombre como descripción.
+  function abrirForm() {
+    const hoy = new Date()
+    const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+    setForm({ fecha, descripcion: '' })
+    setMostrarForm(true)
+  }
+
+  useEffect(() => {
+    if (!mostrarForm || !form.fecha || form.descripcion) return
+    let cancelado = false
+    respuestasDelDia(form.fecha).then(r => {
+      if (!cancelado && r?.evento) setForm(f => (f.descripcion ? f : { ...f, descripcion: r.evento.titulo }))
+    })
+    return () => { cancelado = true }
+  }, [mostrarForm, form.fecha])
 
   async function handleCrear() {
     if (!form.fecha || !form.descripcion.trim()) return
@@ -69,7 +87,7 @@ export default function AsistenciaAdmin() {
             style={{ padding: '8px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #F0C5B4', background: 'none', cursor: 'pointer', color: '#A32D2D' }}>
             Resetear año
           </button>
-          <button onClick={() => setMostrarForm(true)}
+          <button onClick={abrirForm}
             style={{ background: '#0F6E56', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             Nueva lista
@@ -205,6 +223,45 @@ function TomarAsistencia({ lista, onVolver, onTituloActualizado }) {
   const [editandoTitulo, setEditandoTitulo] = useState(false)
   const [nuevoTitulo, setNuevoTitulo] = useState(lista.descripcion)
   const [guardandoTitulo, setGuardandoTitulo] = useState(false)
+  const [respuestas, setRespuestas] = useState(null)
+  const [marcandoConfirmados, setMarcandoConfirmados] = useState(false)
+
+  // Respuestas de "Confirmar asistencia" del ensayo del calendario de ese día.
+  // Quien avisó que no venía (antes de que empiece) queda como justificado, salvo
+  // que ya tenga otra marca en esta lista.
+  useEffect(() => {
+    if (cargando) return
+    let cancelado = false
+    ;(async () => {
+      const r = await respuestasDelDia(lista.fecha)
+      if (cancelado || !r) return
+      setRespuestas(r)
+      const activos = new Set(cantantes.map(c => c.id))
+      const conMarca = new Set(registros.map(x => x.perfil_id))
+      const justificar = [...r.avisaron].filter(id => activos.has(id) && !conMarca.has(id))
+      if (justificar.length === 0) return
+      const { ok } = await marcarVarios(lista.id, justificar, 'justificado')
+      if (ok && !cancelado) {
+        setRegistros(prev => [...prev, ...justificar.map(perfil_id => ({ lista_id: lista.id, perfil_id, estado: 'justificado' }))])
+      }
+    })()
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargando, lista.id])
+
+  const sinMarcaConfirmados = respuestas
+    ? cantantes.filter(c => respuestas.confirmados.has(c.id) && !registros.some(r => r.perfil_id === c.id)).map(c => c.id)
+    : []
+
+  async function marcarConfirmados() {
+    setMarcandoConfirmados(true)
+    const ids = sinMarcaConfirmados
+    const { ok } = await marcarVarios(lista.id, ids, 'presente')
+    if (ok) {
+      setRegistros(prev => [...prev, ...ids.map(perfil_id => ({ lista_id: lista.id, perfil_id, estado: 'presente' }))])
+    }
+    setMarcandoConfirmados(false)
+  }
 
   function getEstado(perfilId) {
     const reg = registros.find(r => r.perfil_id === perfilId)
@@ -310,6 +367,29 @@ function TomarAsistencia({ lista, onVolver, onTituloActualizado }) {
         </div>
       </div>
 
+      {/* Respuestas previas del ensayo del calendario */}
+      {respuestas && (
+        <div style={{ background: '#F8F7F3', border: '1px solid #E8E6DF', borderRadius: '12px', padding: '12px 14px', marginBottom: '14px' }}>
+          <div style={{ fontSize: '13px', color: '#1A1A18' }}>
+            <strong>Antes del ensayo:</strong>{' '}
+            {respuestas.confirmados.size} {respuestas.confirmados.size === 1 ? 'confirmó' : 'confirmaron'} que venía{respuestas.confirmados.size === 1 ? '' : 'n'}
+            {' · '}
+            {respuestas.avisaron.size} {respuestas.avisaron.size === 1 ? 'avisó' : 'avisaron'} que no venía{respuestas.avisaron.size === 1 ? '' : 'n'}
+          </div>
+          {respuestas.avisaron.size > 0 && (
+            <div style={{ fontSize: '12px', color: '#888780', marginTop: '3px' }}>
+              Quienes avisaron quedan como justificados. Si alguno vino igual, cambialo.
+            </div>
+          )}
+          {sinMarcaConfirmados.length > 0 && (
+            <button onClick={marcarConfirmados} disabled={marcandoConfirmados}
+              style={{ marginTop: '10px', height: '36px', padding: '0 14px', borderRadius: '8px', border: 'none', background: '#0F6E56', color: '#FFFFFF', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+              {marcandoConfirmados ? 'Marcando...' : `Marcar presentes a los que confirmaron (${sinMarcaConfirmados.length})`}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
@@ -339,7 +419,11 @@ function TomarAsistencia({ lista, onVolver, onTituloActualizado }) {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A18' }}>{cantante.nombre}</div>
-                  <div style={{ fontSize: '11px', color: '#888780', textTransform: 'capitalize' }}>{cantante.voz || '—'}</div>
+                  <div style={{ fontSize: '11px', color: '#888780' }}>
+                    <span style={{ textTransform: 'capitalize' }}>{cantante.voz || '—'}</span>
+                    {respuestas?.confirmados.has(cantante.id) && <span style={{ color: '#27500A', fontWeight: '600' }}> · Confirmó</span>}
+                    {respuestas?.avisaron.has(cantante.id) && <span style={{ color: '#042C53', fontWeight: '600' }}> · Avisó que no venía</span>}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {Object.entries(ESTADO_STYLE).map(([valor, es]) => (

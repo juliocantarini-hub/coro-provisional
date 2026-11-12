@@ -101,6 +101,43 @@ export async function marcarAsistencia(listaId, perfilId, estado, nota = null) {
   return { ok: !error, error: error?.message }
 }
 
+// Marca a varias personas con el mismo estado en una sola operación
+export async function marcarVarios(listaId, perfilIds, estado) {
+  if (!perfilIds.length) return { ok: true }
+  const filas = perfilIds.map(perfil_id => ({ lista_id: listaId, perfil_id, estado }))
+  const { error } = await supabase
+    .from('registros_asistencia')
+    .upsert(filas, { onConflict: 'lista_id,perfil_id' })
+  return { ok: !error, error: error?.message }
+}
+
+// Lo que respondieron en "Confirmar asistencia" para el ensayo (o evento) del calendario
+// de esa fecha. "Avisaron" = marcaron "No podré ir" antes de que empezara.
+export async function respuestasDelDia(fecha) {
+  const coro = await getCoroActual()
+  if (!coro || !fecha) return null
+  const { data: eventos } = await supabase
+    .from('eventos')
+    .select('id, titulo, tipo, fecha_inicio')
+    .eq('coro_id', coro.id)
+    .gte('fecha_inicio', `${fecha}T00:00:00-03:00`)
+    .lte('fecha_inicio', `${fecha}T23:59:59-03:00`)
+    .order('fecha_inicio')
+  if (!eventos || eventos.length === 0) return null
+  const evento = eventos.find(e => e.tipo === 'ensayo') || eventos[0]
+  const { data: resp } = await supabase
+    .from('asistencias')
+    .select('perfil_id, estado, actualizado')
+    .eq('evento_id', evento.id)
+  const confirmados = new Set()
+  const avisaron = new Set()
+  for (const r of resp || []) {
+    if (r.estado === 'confirmado') confirmados.add(r.perfil_id)
+    else if (r.estado === 'no_asiste' && (!r.actualizado || new Date(r.actualizado) <= new Date(evento.fecha_inicio))) avisaron.add(r.perfil_id)
+  }
+  return { evento, confirmados, avisaron }
+}
+
 export async function resetearAsistencia() {
   const coro = await getCoroActual()
   const { error } = await supabase
