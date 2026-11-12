@@ -158,6 +158,11 @@ export default function TemporadaAdmin() {
         </>
       )}
 
+      <style>{`@media (max-width: 560px) {
+        .temporada-dato { flex-direction: column; gap: 2px !important; }
+        .temporada-dato-valor { text-align: left !important; }
+      }`}</style>
+
       {abierto && (
         <Revision
           key={abierto.id}
@@ -268,31 +273,23 @@ function Revision({ reporte, desde, hasta, onCambio, onCerrar, onAnterior, onSig
       onClick={e => { if (e.target === e.currentTarget) onCerrar() }}>
       <div style={{ background: '#FAF9F5', borderRadius: '16px', width: '100%', maxWidth: '920px', padding: '18px', boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }}>
         {/* Encabezado */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '19px', color: '#1A1A18' }}>{d.nombre}</div>
-            <div style={{ fontSize: '12px', color: '#888780', marginTop: '2px' }}>
+        <div style={{ marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <div style={{ flex: 1, minWidth: 0, fontFamily: 'Georgia, serif', fontSize: '20px', lineHeight: 1.25, color: '#1A1A18' }}>{d.nombre}</div>
+            <button onClick={onCerrar} aria-label="Cerrar" style={{ ...botonSec, fontSize: '18px', padding: '2px 10px', flexShrink: 0 }}>×</button>
+          </div>
+          <div style={{ fontSize: '12px', color: '#888780', marginTop: '4px', lineHeight: 1.5 }}>
               {posicion} · {capitalizar(d.voz) || 'Sin cuerda'} · desde el {fechaCorta(reporte.desde)}
               {publicado && reporte.publicado_en && ` · publicado el ${new Date(reporte.publicado_en).toLocaleDateString('es-AR')}`}
               {publicado && (reporte.visto_en ? ` · visto el ${new Date(reporte.visto_en).toLocaleDateString('es-AR')}` : ' · todavía sin ver')}
-            </div>
           </div>
-          <button onClick={onAnterior} disabled={!onAnterior} style={{ ...botonSec, opacity: onAnterior ? 1 : 0.4 }}>← Anterior</button>
-          <button onClick={onSiguiente} disabled={!onSiguiente} style={{ ...botonSec, opacity: onSiguiente ? 1 : 0.4 }}>Siguiente →</button>
-          <button onClick={onCerrar} aria-label="Cerrar" style={{ ...botonSec, fontSize: '18px', padding: '4px 10px' }}>×</button>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+            <button onClick={onAnterior} disabled={!onAnterior} style={{ ...botonSec, flex: 1, maxWidth: '160px', opacity: onAnterior ? 1 : 0.4 }}>← Anterior</button>
+            <button onClick={onSiguiente} disabled={!onSiguiente} style={{ ...botonSec, flex: 1, maxWidth: '160px', opacity: onSiguiente ? 1 : 0.4 }}>Siguiente →</button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px', alignItems: 'start' }}>
-          {/* Vista previa: exactamente lo que va a ver */}
-          <div>
-            <div style={{ fontSize: '11px', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', textAlign: 'center' }}>
-              Vista previa: así lo ve el cantante
-            </div>
-            <div style={{ background: '#F1EFE8', borderRadius: '14px', padding: '10px' }}>
-              <ResumenTemporada reporte={borradorLocal} compacto />
-            </div>
-          </div>
-
           {/* Edición */}
           <div>
             {avisos.length > 0 && (
@@ -377,6 +374,16 @@ function Revision({ reporte, desde, hasta, onCambio, onCerrar, onAnterior, onSig
                   Los cambios en las secciones o el mensaje se ven enseguida. Para recalcular sus números, despublicalo primero.
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Vista previa: exactamente lo que va a ver */}
+          <div>
+            <div style={{ fontSize: '11px', color: '#888780', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', textAlign: 'center' }}>
+              Vista previa: así lo ve el cantante
+            </div>
+            <div style={{ background: '#F1EFE8', borderRadius: '14px', padding: '10px' }}>
+              <ResumenTemporada reporte={borradorLocal} compacto />
             </div>
           </div>
         </div>
@@ -550,9 +557,9 @@ function Chip({ label, color, bg }) {
 }
 function Dato({ label, valor }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '12px', padding: '4px 0', borderBottom: '1px solid #F1EFE8' }}>
+    <div className="temporada-dato" style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '12px', padding: '6px 0', borderBottom: '1px solid #F1EFE8' }}>
       <span style={{ color: '#888780', flexShrink: 0 }}>{label}</span>
-      <span style={{ color: '#1A1A18', textAlign: 'right' }}>{valor}</span>
+      <span className="temporada-dato-valor" style={{ color: '#1A1A18', textAlign: 'right' }}>{valor}</span>
     </div>
   )
 }

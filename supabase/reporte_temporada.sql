@@ -368,7 +368,7 @@ BEGIN
       SELECT la.fecha, rr.estado, coalesce(nullif(lower(trim(pf.voz)), ''), 'sin cuerda') AS voz
         FROM listas_asistencia la
         JOIN registros_asistencia rr ON rr.lista_id = la.id
-        LEFT JOIN perfiles pf ON pf.id = rr.perfil_id AND pf.coro_id = p_coro_id
+        JOIN perfiles pf ON pf.id = rr.perfil_id AND pf.coro_id = p_coro_id AND pf.rol = 'cantante'
        WHERE la.coro_id = p_coro_id AND la.fecha BETWEEN p_desde AND p_hasta
     )
     SELECT jsonb_build_object(
@@ -383,6 +383,7 @@ BEGIN
                                  round(100.0 * count(rr.*) FILTER (WHERE rr.estado = 'presente') / nullif(count(rr.*), 0)) AS pct
                             FROM listas_asistencia la
                             LEFT JOIN registros_asistencia rr ON rr.lista_id = la.id
+                                 AND EXISTS (SELECT 1 FROM perfiles pc WHERE pc.id = rr.perfil_id AND pc.coro_id = p_coro_id AND pc.rol = 'cantante')
                            WHERE la.coro_id = p_coro_id AND la.fecha BETWEEN p_desde AND p_hasta
                            GROUP BY 1) x))
       INTO v_asist;
