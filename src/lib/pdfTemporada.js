@@ -5,6 +5,7 @@
 // donde se puede elegir "Guardar como PDF".
 // ─────────────────────────────────────────────────────────────────────────────
 import { nombreMes, fechaCorta, capitalizar } from './temporada'
+import { ETIQUETAS_SECCION } from './actividad'
 
 export const SECCIONES_IMPRESION = [
   { clave: 'cuerdas',       label: 'Cantantes por cuerda' },
@@ -94,7 +95,7 @@ export function imprimirResumen(datos, { nombreCoro = '', temporada, cuenta, sec
       ${dato('Cantantes que entraron', `${u.cantantes_con_ingreso} de ${cantantes?.activos ?? 0}`)}
       ${subtitulo('Ingresos por mes')}
       ${barras(u.por_mes.map(m => ({ label: capitalizar(nombreMes(m.mes)), valor: m.sesiones, texto: `${m.sesiones} · ${m.personas} pers.` })), Math.max(1, ...u.por_mes.map(x => x.sesiones)))}
-      ${u.pantallas?.length ? subtitulo('Pantallas más visitadas') + barras(u.pantallas.map(p => ({ label: capitalizar(p.pantalla), valor: p.visitas, texto: p.visitas })), u.pantallas[0].visitas) : ''}
+      ${u.pantallas?.length ? subtitulo('Pantallas más visitadas') + barras(u.pantallas.map(p => ({ label: ETIQUETAS_SECCION[p.pantalla] || capitalizar(p.pantalla), valor: p.visitas, texto: p.visitas })), u.pantallas[0].visitas) : ''}
       ${nota(datos_desde?.uso_app ? `Registro de accesos desde el ${fechaCorta(datos_desde.uso_app)}` : '')}
     `))
   }

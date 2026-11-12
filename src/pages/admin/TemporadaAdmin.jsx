@@ -5,6 +5,7 @@ import {
   listarReportesCoro, generarReportes, actualizarReporte, enviarPushTemporada, resumenCoro, cargarReporte,
 } from '../../hooks/useReporteTemporada'
 import { imprimirResumen, SECCIONES_IMPRESION } from '../../lib/pdfTemporada'
+import { ETIQUETAS_SECCION } from '../../lib/actividad'
 import { SECCIONES, avisosRevision, estadoSecciones, nombreMes, fechaCorta } from '../../lib/temporada'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -560,7 +561,7 @@ function ResumenDelCoro({ desde, hasta, temporada, cuenta, hayReportes }) {
               {uso_app.pantallas.length > 0 && (
                 <>
                   <Subtitulo>Pantallas más visitadas</Subtitulo>
-                  {uso_app.pantallas.map(p => <Barra key={p.pantalla} label={capitalizar(p.pantalla)} valor={p.visitas} max={uso_app.pantallas[0].visitas} texto={String(p.visitas)} />)}
+                  {uso_app.pantallas.map(p => <Barra key={p.pantalla} label={ETIQUETAS_SECCION[p.pantalla] || capitalizar(p.pantalla)} valor={p.visitas} max={uso_app.pantallas[0].visitas} texto={String(p.visitas)} />)}
                 </>
               )}
             </>
