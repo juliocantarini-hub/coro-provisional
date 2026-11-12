@@ -13,6 +13,14 @@ import {
 // el director ocultó.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Tonos tenues de la app (los mismos de las tarjetas de Inicio y el panel)
+const TONOS = {
+  verde:   { fg: '#0F6E56', bg: '#E1F5EE' },
+  azul:    { fg: '#378ADD', bg: '#E6F1FB' },
+  violeta: { fg: '#7C3AED', bg: '#F3EFF8' },
+  naranja: { fg: '#D85A30', bg: '#FAECE7' },
+}
+
 const C = {
   verde: '#0F6E56', verdeMedio: '#1D9E75', verdeClaro: '#E1F5EE', verdeOscuro: '#04342C',
   texto: '#1A1A18', gris: '#5F5E5A', grisClaro: '#888780', linea: '#E8E6DF', fondoSuave: '#F1EFE8',
@@ -31,26 +39,27 @@ export default function ResumenTemporada({ reporte, compacto = false, nombreCoro
   const co = d.constancia || {}
 
   // ── Números principales ──
+  const tono = (t, n) => ({ ...n, tono: TONOS[t] })
   const numeros = []
   if (ver('eventos')) {
-    numeros.push(est.eventos === 'ok'
+    numeros.push(tono('azul', est.eventos === 'ok'
       ? { valor: ev.conciertos > 0 ? ev.conciertos : (ev.ensayos || 0) + (ev.otros || 0), label: ev.conciertos > 0 ? (ev.conciertos === 1 ? 'Concierto' : 'Conciertos') : 'Encuentros del coro' }
-      : { label: 'Conciertos', sinRegistro: true })
+      : { label: 'Conciertos', sinRegistro: true }))
   }
   if (ver('asistencia')) {
-    numeros.push(est.asistencia === 'ok'
+    numeros.push(tono('verde', est.asistencia === 'ok'
       ? { valor: as.presentes, label: as.presentes === 1 ? 'Ensayo presente' : 'Ensayos presentes', sub: as.pct >= PCT_MINIMO_ASISTENCIA ? `${as.pct}% de ${as.listas}` : null }
-      : { label: 'Asistencia', sinRegistro: true })
+      : { label: 'Asistencia', sinRegistro: true }))
   }
   if (ver('estudio')) {
-    numeros.push(est.estudio === 'ok'
+    numeros.push(tono('violeta', est.estudio === 'ok'
       ? { valor: es.obras_abiertas, label: es.obras_abiertas === 1 ? 'Obra estudiada' : 'Obras estudiadas', sub: `de ${es.obras_temporada} del repertorio` }
-      : { label: 'Obras estudiadas', sinRegistro: true })
+      : { label: 'Obras estudiadas', sinRegistro: true }))
   }
   if (ver('constancia')) {
-    numeros.push(est.constancia === 'ok'
+    numeros.push(tono('naranja', est.constancia === 'ok'
       ? { valor: co.dias_activos, label: co.dias_activos === 1 ? 'Día de práctica' : 'Días de práctica' }
-      : { label: 'Días de práctica', sinRegistro: true })
+      : { label: 'Días de práctica', sinRegistro: true }))
   }
 
   // ── Detalles (solo lo que suma) ──
@@ -104,7 +113,7 @@ export default function ResumenTemporada({ reporte, compacto = false, nombreCoro
         {numeros.length > 0 && (
           <div style={{
             display: 'grid', gridTemplateColumns: `repeat(${compacto ? 2 : Math.min(numeros.length, 4)}, minmax(0, 1fr))`,
-            gap: '1px', background: C.linea, border: `1px solid ${C.linea}`, borderRadius: '10px', overflow: 'hidden',
+            gap: compacto ? '6px' : '10px',
             marginTop: compacto ? '14px' : '20px',
           }} className="temporada-numeros">
             {numeros.map((n, k) => <Numero key={k} {...n} compacto={compacto} />)}
@@ -114,7 +123,7 @@ export default function ResumenTemporada({ reporte, compacto = false, nombreCoro
 
       {/* Gráfico */}
       {(seriePractica.length > 0 || serieAsist.length > 0) && (
-        <div style={tarjeta}>
+        <div style={{ ...tarjeta, background: '#F4FAF7', borderColor: '#DDEFE7' }}>
           {seriePractica.some(x => x.valor > 0) ? (
             <>
               <h3 style={etiqueta}>Días de práctica por mes</h3>
@@ -132,7 +141,7 @@ export default function ResumenTemporada({ reporte, compacto = false, nombreCoro
 
       {/* Detalles */}
       {(detalles.length > 0 || conciertos.length > 0) && (
-        <div style={tarjeta}>
+        <div style={{ ...tarjeta, background: '#F9F7FC', borderColor: '#ECE6F6' }}>
           {detalles.length > 0 && (
             <>
               <h3 style={etiqueta}>Tu año en detalle</h3>
@@ -162,7 +171,7 @@ export default function ResumenTemporada({ reporte, compacto = false, nombreCoro
 
       {/* Mensaje del director */}
       {reporte?.mensaje?.trim() && (
-        <div style={{ ...tarjeta, borderLeft: `3px solid ${C.verde}` }}>
+        <div style={{ ...tarjeta, background: '#FDF8F5', borderColor: '#F3E3DA', borderLeft: '3px solid #D85A30' }}>
           <h3 style={etiqueta}>Un mensaje para vos</h3>
           <p style={{ fontFamily: 'Georgia, serif', fontSize: compacto ? '14px' : '17px', lineHeight: 1.6, color: C.texto, margin: 0, whiteSpace: 'pre-wrap' }}>
             {reporte.mensaje.trim()}
@@ -186,13 +195,13 @@ export default function ResumenTemporada({ reporte, compacto = false, nombreCoro
   )
 }
 
-function Numero({ valor, label, sub, sinRegistro, compacto }) {
+function Numero({ valor, label, sub, sinRegistro, compacto, tono }) {
   return (
-    <div style={{ background: '#FFFFFF', padding: compacto ? '12px' : '16px' }}>
-      <div style={{ fontFamily: 'Georgia, serif', fontSize: sinRegistro ? (compacto ? '18px' : '22px') : (compacto ? '26px' : '34px'), lineHeight: 1.1, color: sinRegistro ? C.grisClaro : C.verde }}>
+    <div style={{ background: sinRegistro ? C.fondoSuave : tono.bg, borderRadius: '12px', padding: compacto ? '12px' : '16px' }}>
+      <div style={{ fontFamily: 'Georgia, serif', fontSize: sinRegistro ? (compacto ? '18px' : '22px') : (compacto ? '26px' : '34px'), lineHeight: 1.1, color: sinRegistro ? C.grisClaro : tono.fg }}>
         {sinRegistro ? '—' : valor}
       </div>
-      <div style={{ fontSize: compacto ? '11px' : '12px', color: C.gris, marginTop: '4px' }}>{label}</div>
+      <div style={{ fontSize: compacto ? '11px' : '12px', color: sinRegistro ? C.gris : tono.fg, opacity: sinRegistro ? 1 : 0.85, marginTop: '4px' }}>{label}</div>
       <div style={{ fontSize: compacto ? '10px' : '11px', color: C.grisClaro, marginTop: '2px', fontStyle: sinRegistro ? 'italic' : 'normal' }}>
         {sinRegistro ? 'Sin registro' : (sub || ' ')}
       </div>
