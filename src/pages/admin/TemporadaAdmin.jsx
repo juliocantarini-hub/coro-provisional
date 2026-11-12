@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ResumenTemporada from '../../components/temporada/ResumenTemporada'
 import {
   listarReportesCoro, generarReportes, actualizarReporte, enviarPushTemporada, resumenCoro, cargarReporte,
@@ -35,6 +36,7 @@ export default function TemporadaAdmin() {
   const [generando, setGenerando] = useState(false)
   const [error, setError] = useState('')
   const [abiertoId, setAbiertoId] = useState(null)
+  const navigate = useNavigate()
 
   const cargar = useCallback(async (t) => {
     setCargando(true); setError('')
@@ -86,6 +88,10 @@ export default function TemporadaAdmin() {
 
   return (
     <div>
+      <button onClick={() => navigate('/admin/estadistica')}
+        style={{ background: 'none', border: 'none', color: '#0F6E56', fontSize: '13px', cursor: 'pointer', padding: '0 0 10px' }}>
+        ← Estadística
+      </button>
       <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 4px' }}>
         Reporte de fin de temporada
       </h2>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { getCoroActual } from '../../lib/coro'
 import { ETIQUETAS_SECCION, olvidarUltimaSesion } from '../../lib/actividad'
@@ -53,6 +54,7 @@ const COLOR_NIVEL = { ok: '#1D9E75', medio: '#D85A30', bajo: '#A32D2D', nulo: '#
 // ─── Pantalla ────────────────────────────────────────────────────────────────
 
 export default function EstadisticaAdmin() {
+  const navigate = useNavigate()
   const [periodo, setPeriodo]     = useState(30)
   const [datos, setDatos]         = useState([])
   const [cargando, setCargando]   = useState(true)
@@ -146,6 +148,10 @@ export default function EstadisticaAdmin() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={() => navigate('/admin/temporada')}
+            style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: 'none', background: '#0F6E56', cursor: 'pointer', color: '#FFFFFF', fontWeight: '500' }}>
+            Reporte de fin de temporada →
+          </button>
           <button onClick={cargar}
             style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '8px', border: '1px solid #D3D1C7', background: 'none', cursor: 'pointer', color: '#0F6E56', fontWeight: '500' }}>
             ↻ Actualizar
