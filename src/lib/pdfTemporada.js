@@ -1,251 +1,192 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PDF del resumen de temporada del coro (pestaña "Resumen del coro").
-// Se arma con jsPDF, que se carga recién al tocar el botón (no suma peso a la app).
-// Solo usa fuentes estándar (Helvetica / Times), que cubren acentos y ñ.
+// Versión imprimible del resumen de temporada del coro (pestaña "Resumen del coro").
+// Mismo mecanismo que "Imprimir listado" de Cantantes: arma una página limpia
+// (sin menú ni botones) en una ventana nueva y abre el diálogo de impresión,
+// donde se puede elegir "Guardar como PDF".
 // ─────────────────────────────────────────────────────────────────────────────
 import { nombreMes, fechaCorta, capitalizar } from './temporada'
 
-const URL_JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js'
+export const SECCIONES_IMPRESION = [
+  { clave: 'cuerdas',       label: 'Cantantes por cuerda' },
+  { clave: 'asistencia',    label: 'Asistencia' },
+  { clave: 'eventos',       label: 'Conciertos y eventos' },
+  { clave: 'repertorio',    label: 'Repertorio' },
+  { clave: 'entrenamiento', label: 'Entrenamiento' },
+  { clave: 'uso',           label: 'Uso de la app' },
+  { clave: 'participacion', label: 'Participación' },
+  { clave: 'reportes',      label: 'Reportes de los cantantes' },
+]
 
-let cargaJsPDF = null
-function cargarJsPDF() {
-  if (window.jspdf?.jsPDF) return Promise.resolve(window.jspdf.jsPDF)
-  if (cargaJsPDF) return cargaJsPDF
-  cargaJsPDF = new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = URL_JSPDF
-    s.async = true
-    s.onload = () => (window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(new Error('jsPDF no disponible')))
-    s.onerror = () => { cargaJsPDF = null; reject(new Error('No se pudo cargar el generador de PDF')) }
-    document.head.appendChild(s)
-  })
-  return cargaJsPDF
+const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
+const SIN_REGISTRO = '<p class="sin">Sin registro esta temporada</p>'
+
+function barras(filas, max = 100) {
+  return `<div class="barras">${filas.map(({ label, valor, texto }) => {
+    const ancho = max > 0 && valor > 0 ? Math.max(2, Math.round((valor / max) * 100)) : 0
+    return `<div class="barra"><span class="b-label">${esc(label)}</span><span class="b-pista"><span class="b-relleno" style="width:${ancho}%"></span></span><span class="b-valor">${esc(texto)}</span></div>`
+  }).join('')}</div>`
 }
+const subtitulo = t => `<h3>${esc(t)}</h3>`
+const dato = (l, v) => `<div class="dato"><span>${esc(l)}</span><span>${esc(v)}</span></div>`
+const nota = t => (t ? `<p class="nota">${esc(t)}</p>` : '')
+const seccion = (t, cuerpo) => `<section><h2>${esc(t)}</h2>${cuerpo}</section>`
 
-// Colores de la app
-const VERDE = [15, 110, 86]
-const VERDE_MEDIO = [29, 158, 117]
-const VERDE_CLARO = [225, 245, 238]
-const TEXTO = [26, 26, 24]
-const GRIS = [95, 94, 90]
-const GRIS_CLARO = [136, 135, 128]
-const LINEA = [232, 230, 223]
-const FONDO_BARRA = [241, 239, 232]
-
-export async function descargarPdfResumen(datos, { nombreCoro = '', temporada, cuenta } = {}) {
-  const JsPDF = await cargarJsPDF()
-  const doc = new JsPDF({ unit: 'mm', format: 'a4' })
-  const W = doc.internal.pageSize.getWidth()
-  const H = doc.internal.pageSize.getHeight()
-  const M = 16
-  const ancho = W - M * 2
-  let y = M
-
-  const color = (c, tipo = 'text') => (tipo === 'text' ? doc.setTextColor(...c) : tipo === 'fill' ? doc.setFillColor(...c) : doc.setDrawColor(...c))
-  const fuente = (familia, estilo, tam) => { doc.setFont(familia, estilo); doc.setFontSize(tam) }
-  const lugar = alto => { if (y + alto > H - 18) { doc.addPage(); y = M } }
-
-  // ── Encabezado ──
-  fuente('helvetica', 'bold', 8); color(VERDE)
-  doc.text(`TEMPORADA ${temporada || String(datos.desde || '').slice(0, 4)}`, M, y + 3)
-  fuente('times', 'normal', 22); color(TEXTO)
-  doc.text('Reporte de fin de temporada', M, y + 12)
-  fuente('helvetica', 'normal', 10); color(GRIS_CLARO)
-  doc.text(`${nombreCoro ? nombreCoro + ' · ' : ''}del ${fechaCorta(datos.desde)} al ${fechaCorta(datos.hasta)} de ${String(datos.hasta || '').slice(0, 4)}`, M, y + 18)
-  y += 23
-  color(LINEA, 'draw'); doc.setLineWidth(0.3); doc.line(M, y, W - M, y)
-  y += 7
-
-  // ── Números principales ──
+export function imprimirResumen(datos, { nombreCoro = '', temporada, cuenta, secciones } = {}) {
+  const ver = new Set(secciones || SECCIONES_IMPRESION.map(s => s.clave))
   const { cantantes, asistencia, eventos, repertorio, entrenamiento, uso_app, participacion, datos_desde } = datos
+  const partes = []
+
+  if (ver.has('cuerdas')) {
+    const c = cantantes?.por_cuerda || []
+    partes.push(seccion('Cantantes por cuerda', c.length
+      ? barras(c.map(x => ({ label: capitalizar(x.voz), valor: x.n, texto: x.n })), Math.max(...c.map(x => x.n)))
+      : SIN_REGISTRO))
+  }
+
+  if (ver.has('asistencia')) {
+    partes.push(seccion('Asistencia', asistencia?.sin_registro ? SIN_REGISTRO : `
+      <p class="intro">${asistencia.listas} listas tomadas · ${asistencia.pct ?? 0}% de asistencia general (solo cantantes)</p>
+      ${subtitulo('Por cuerda')}
+      ${barras((asistencia.por_cuerda || []).map(x => ({ label: capitalizar(x.voz), valor: x.pct ?? 0, texto: `${x.pct ?? 0}%` })))}
+      ${subtitulo('Por mes')}
+      ${barras((asistencia.por_mes || []).map(m => ({ label: capitalizar(nombreMes(m.mes)), valor: m.pct ?? 0, texto: `${m.pct ?? 0}% · ${m.listas} ${m.listas === 1 ? 'lista' : 'listas'}` })))}
+    `))
+  }
+
+  if (ver.has('eventos')) {
+    const total = (eventos?.conciertos || 0) + (eventos?.ensayos || 0) + (eventos?.otros || 0)
+    partes.push(seccion('Conciertos y eventos', !total ? SIN_REGISTRO : `
+      <p class="intro">${eventos.conciertos} conciertos · ${eventos.ensayos} ensayos · ${eventos.otros} otros</p>
+      ${(eventos.lista_conciertos || []).length ? `<table class="lista"><tbody>${eventos.lista_conciertos.map(c => `
+        <tr><td class="fecha">${esc(fechaCorta(c.fecha))}</td><td>${esc(c.titulo)}${c.lugar ? `<span class="tenue"> · ${esc(c.lugar)}</span>` : ''}</td></tr>`).join('')}
+      </tbody></table>` : ''}
+    `))
+  }
+
+  if (ver.has('repertorio')) {
+    const obras = repertorio?.obras || []
+    partes.push(seccion('Repertorio', !obras.length ? SIN_REGISTRO : `
+      ${subtitulo('Dedicación por cuerda')}
+      ${barras((repertorio.dedicacion_por_cuerda || []).map(x => ({ label: capitalizar(x.voz), valor: x.pct ?? 0, texto: `${x.pct ?? 0}%` })))}
+      ${subtitulo('Obras (de más a menos estudiada)')}
+      <table class="tabla">
+        <thead><tr><th>Obra</th><th class="num">Aperturas</th><th class="num">Cantantes</th><th class="num">Estudiada</th></tr></thead>
+        <tbody>${obras.map(o => `<tr><td>${esc(o.titulo)}${o.publicada ? '' : '<span class="tenue"> (despublicada)</span>'}</td><td class="num">${o.aperturas}</td><td class="num">${o.cantantes}</td><td class="num">${o.estudiada_por}</td></tr>`).join('')}</tbody>
+      </table>
+      ${nota(datos_desde?.estudio ? `Registro de estudio desde el ${fechaCorta(datos_desde.estudio)}` : '')}
+    `))
+  }
+
+  if (ver.has('entrenamiento')) {
+    const e = entrenamiento || {}
+    partes.push(seccion('Entrenamiento', (e.ejercicios || 0) + (e.lecciones_teoria || 0) === 0 ? SIN_REGISTRO : `
+      ${dato('Ejercicios completados', `${e.ejercicios} (${e.cantantes_que_practicaron} personas)`)}
+      ${dato('Lecciones de teoría', `${e.lecciones_teoria} (${e.cantantes_teoria} personas)`)}
+      ${nota(datos_desde?.entrenamiento ? `Registro desde el ${fechaCorta(datos_desde.entrenamiento)}` : '')}
+    `))
+  }
+
+  if (ver.has('uso')) {
+    const u = uso_app || {}
+    partes.push(seccion('Uso de la app', !u.sesiones ? SIN_REGISTRO : `
+      ${dato('Ingresos', u.sesiones)}
+      ${dato('Cantantes que entraron', `${u.cantantes_con_ingreso} de ${cantantes?.activos ?? 0}`)}
+      ${subtitulo('Ingresos por mes')}
+      ${barras(u.por_mes.map(m => ({ label: capitalizar(nombreMes(m.mes)), valor: m.sesiones, texto: `${m.sesiones} · ${m.personas} pers.` })), Math.max(1, ...u.por_mes.map(x => x.sesiones)))}
+      ${u.pantallas?.length ? subtitulo('Pantallas más visitadas') + barras(u.pantallas.map(p => ({ label: capitalizar(p.pantalla), valor: p.visitas, texto: p.visitas })), u.pantallas[0].visitas) : ''}
+      ${nota(datos_desde?.uso_app ? `Registro de accesos desde el ${fechaCorta(datos_desde.uso_app)}` : '')}
+    `))
+  }
+
+  if (ver.has('participacion')) {
+    const p = participacion || {}
+    partes.push(seccion('Participación', !p.encuestas && !p.avisos ? SIN_REGISTRO : `
+      ${dato('Encuestas', p.encuestas ? `${p.encuestas} · participación promedio ${p.participacion_encuestas ?? 0}%` : 'Sin registro')}
+      ${dato('Avisos publicados', p.avisos ? `${p.avisos} · leídos en promedio por el ${p.lectura_avisos ?? 0}%` : 'Sin registro')}
+    `))
+  }
+
+  if (ver.has('reportes') && cuenta) {
+    partes.push(seccion('Reportes de los cantantes', `
+      ${dato('En borrador', cuenta.borrador)}
+      ${dato('Publicados', cuenta.publicado)}
+      ${dato('Ya los vieron', cuenta.vistos)}
+      ${cuenta.excluido ? dato('Excluidos', cuenta.excluido) : ''}
+    `))
+  }
+
   const numeros = [
-    [String(cantantes?.activos ?? 0), 'Cantantes activos'],
+    [cantantes?.activos ?? 0, 'Cantantes activos'],
     [asistencia?.sin_registro ? '—' : `${asistencia?.pct ?? 0}%`, asistencia?.sin_registro ? 'Asistencia: sin registro' : 'Asistencia general'],
-    [String(eventos?.conciertos ?? 0), 'Conciertos'],
-    [String(repertorio?.obras_temporada ?? 0), 'Obras en la temporada'],
+    [eventos?.conciertos ?? 0, 'Conciertos'],
+    [repertorio?.obras_temporada ?? 0, 'Obras en la temporada'],
     [repertorio?.dedicacion_promedio != null ? `${repertorio.dedicacion_promedio}%` : '—', 'Dedicación promedio'],
   ]
-  const porFila = 5
-  const gap = 3
-  const wBox = (ancho - gap * (porFila - 1)) / porFila
-  numeros.forEach(([v, l], i) => {
-    const x = M + i * (wBox + gap)
-    color(VERDE_CLARO, 'fill'); doc.roundedRect(x, y, wBox, 20, 2, 2, 'F')
-    fuente('times', 'normal', 17); color(VERDE); doc.text(v, x + 4, y + 9.5)
-    fuente('helvetica', 'normal', 7.5); color(VERDE)
-    doc.text(doc.splitTextToSize(l, wBox - 7), x + 4, y + 15)
-  })
-  y += 28
-
-  // ── Helpers de secciones ──
-  const titulo = t => {
-    lugar(16)
-    fuente('helvetica', 'bold', 10); color(TEXTO)
-    doc.text(t.toUpperCase(), M, y)
-    y += 2.5
-    color(LINEA, 'draw'); doc.line(M, y, W - M, y)
-    y += 6
-  }
-  const subtitulo = t => {
-    lugar(10)
-    fuente('helvetica', 'bold', 8.5); color(GRIS)
-    doc.text(t.toUpperCase(), M, y)
-    y += 5
-  }
-  const sinRegistro = () => {
-    fuente('helvetica', 'italic', 9.5); color(GRIS_CLARO)
-    doc.text('Sin registro esta temporada', M, y)
-    y += 8
-  }
-  const nota = t => {
-    if (!t) return
-    fuente('helvetica', 'normal', 7.5); color(GRIS_CLARO)
-    doc.text(t, M, y)
-    y += 6
-  }
-  const dato = (l, v) => {
-    lugar(7)
-    fuente('helvetica', 'normal', 9.5); color(GRIS); doc.text(l, M, y)
-    color(TEXTO); doc.text(String(v), W - M, y, { align: 'right' })
-    y += 6
-  }
-  const barras = (filas, max = 100) => {
-    const xBar = M + 38
-    const wBar = ancho - 38 - 26
-    filas.forEach(({ label, valor, texto }) => {
-      lugar(7)
-      fuente('helvetica', 'normal', 9); color(GRIS)
-      doc.text(String(label), M, y)
-      color(FONDO_BARRA, 'fill'); doc.roundedRect(xBar, y - 2.6, wBar, 3, 1.5, 1.5, 'F')
-      const w = max > 0 ? Math.max(1.5, (valor / max) * wBar) : 0
-      if (valor > 0) { color(VERDE_MEDIO, 'fill'); doc.roundedRect(xBar, y - 2.6, w, 3, 1.5, 1.5, 'F') }
-      color(TEXTO); doc.text(String(texto), W - M, y, { align: 'right' })
-      y += 6
-    })
-    y += 2
-  }
-
-  // ── Cantantes por cuerda ──
-  titulo('Cantantes por cuerda')
-  const cuerdas = cantantes?.por_cuerda || []
-  if (!cuerdas.length) sinRegistro()
-  else barras(cuerdas.map(c => ({ label: capitalizar(c.voz), valor: c.n, texto: c.n })), Math.max(...cuerdas.map(c => c.n)))
-
-  // ── Asistencia ──
-  titulo('Asistencia')
-  if (asistencia?.sin_registro) sinRegistro()
-  else {
-    fuente('helvetica', 'normal', 9.5); color(GRIS)
-    doc.text(`${asistencia.listas} listas tomadas · ${asistencia.pct ?? 0}% de asistencia general (solo cantantes)`, M, y)
-    y += 7
-    subtitulo('Por cuerda')
-    barras((asistencia.por_cuerda || []).map(c => ({ label: capitalizar(c.voz), valor: c.pct ?? 0, texto: `${c.pct ?? 0}%` })))
-    subtitulo('Por mes')
-    barras((asistencia.por_mes || []).map(m => ({ label: capitalizar(nombreMes(m.mes)), valor: m.pct ?? 0, texto: `${m.pct ?? 0}% · ${m.listas}` })))
-  }
-
-  // ── Conciertos y eventos ──
-  titulo('Conciertos y eventos')
-  if ((eventos?.conciertos || 0) + (eventos?.ensayos || 0) + (eventos?.otros || 0) === 0) sinRegistro()
-  else {
-    fuente('helvetica', 'normal', 9.5); color(GRIS)
-    doc.text(`${eventos.conciertos} conciertos · ${eventos.ensayos} ensayos · ${eventos.otros} otros`, M, y)
-    y += 7
-    ;(eventos.lista_conciertos || []).forEach(c => {
-      lugar(7)
-      fuente('helvetica', 'normal', 9.5); color(VERDE)
-      doc.text(fechaCorta(c.fecha), M, y)
-      color(TEXTO)
-      const t = doc.splitTextToSize(`${c.titulo}${c.lugar ? ' · ' + c.lugar : ''}`, ancho - 32)
-      doc.text(t, M + 32, y)
-      y += 5.5 * t.length
-    })
-    y += 3
-  }
-
-  // ── Repertorio ──
-  titulo('Repertorio')
-  const obras = repertorio?.obras || []
-  if (!obras.length) sinRegistro()
-  else {
-    subtitulo('Dedicación por cuerda')
-    barras((repertorio.dedicacion_por_cuerda || []).map(c => ({ label: capitalizar(c.voz), valor: c.pct ?? 0, texto: `${c.pct ?? 0}%` })))
-    subtitulo('Obras (de más a menos estudiada)')
-    const cols = [M, W - M - 52, W - M - 26, W - M]
-    lugar(8)
-    fuente('helvetica', 'bold', 8); color(GRIS_CLARO)
-    doc.text('OBRA', cols[0], y)
-    doc.text('APERTURAS', cols[1], y, { align: 'right' })
-    doc.text('CANTANTES', cols[2], y, { align: 'right' })
-    doc.text('ESTUDIADA', cols[3], y, { align: 'right' })
-    y += 2; color(LINEA, 'draw'); doc.line(M, y, W - M, y); y += 4.5
-    obras.forEach(o => {
-      const t = doc.splitTextToSize(`${o.titulo}${o.publicada ? '' : ' (despublicada)'}`, cols[1] - M - 22)
-      lugar(5.5 * t.length + 1)
-      fuente('helvetica', 'normal', 9); color(TEXTO)
-      doc.text(t, cols[0], y)
-      doc.text(String(o.aperturas), cols[1], y, { align: 'right' })
-      doc.text(String(o.cantantes), cols[2], y, { align: 'right' })
-      doc.text(String(o.estudiada_por), cols[3], y, { align: 'right' })
-      y += 5.5 * t.length
-    })
-    y += 1
-    nota(datos_desde?.estudio ? `Registro de estudio desde el ${fechaCorta(datos_desde.estudio)}` : null)
-  }
-
-  // ── Entrenamiento ──
-  titulo('Entrenamiento')
-  if ((entrenamiento?.ejercicios || 0) + (entrenamiento?.lecciones_teoria || 0) === 0) sinRegistro()
-  else {
-    dato('Ejercicios completados', `${entrenamiento.ejercicios} (${entrenamiento.cantantes_que_practicaron} personas)`)
-    dato('Lecciones de teoría', `${entrenamiento.lecciones_teoria} (${entrenamiento.cantantes_teoria} personas)`)
-    nota(datos_desde?.entrenamiento ? `Registro desde el ${fechaCorta(datos_desde.entrenamiento)}` : null)
-  }
-
-  // ── Uso de la app ──
-  titulo('Uso de la app')
-  if (!uso_app?.sesiones) sinRegistro()
-  else {
-    dato('Ingresos', uso_app.sesiones)
-    dato('Cantantes que entraron', `${uso_app.cantantes_con_ingreso} de ${cantantes?.activos ?? 0}`)
-    y += 2
-    subtitulo('Ingresos por mes')
-    const maxS = Math.max(...uso_app.por_mes.map(x => x.sesiones), 1)
-    barras(uso_app.por_mes.map(m => ({ label: capitalizar(nombreMes(m.mes)), valor: m.sesiones, texto: `${m.sesiones} · ${m.personas} pers.` })), maxS)
-    if (uso_app.pantallas?.length) {
-      subtitulo('Pantallas más visitadas')
-      barras(uso_app.pantallas.map(p => ({ label: capitalizar(p.pantalla), valor: p.visitas, texto: p.visitas })), uso_app.pantallas[0].visitas)
-    }
-    nota(datos_desde?.uso_app ? `Registro de accesos desde el ${fechaCorta(datos_desde.uso_app)}` : null)
-  }
-
-  // ── Participación ──
-  titulo('Participación')
-  if (!participacion?.encuestas && !participacion?.avisos) sinRegistro()
-  else {
-    dato('Encuestas', participacion.encuestas ? `${participacion.encuestas} · participación promedio ${participacion.participacion_encuestas ?? 0}%` : 'Sin registro')
-    dato('Avisos publicados', participacion.avisos ? `${participacion.avisos} · leídos en promedio por el ${participacion.lectura_avisos ?? 0}%` : 'Sin registro')
-  }
-
-  // ── Reportes de los cantantes ──
-  if (cuenta) {
-    titulo('Reportes de los cantantes')
-    dato('En borrador', cuenta.borrador)
-    dato('Publicados', cuenta.publicado)
-    dato('Ya los vieron', cuenta.vistos)
-    if (cuenta.excluido) dato('Excluidos', cuenta.excluido)
-  }
-
-  // ── Pie de página ──
-  const total = doc.getNumberOfPages()
+  const anio = temporada || String(datos.desde || '').slice(0, 4)
   const hoy = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
-  for (let p = 1; p <= total; p++) {
-    doc.setPage(p)
-    fuente('helvetica', 'normal', 7.5); color(GRIS_CLARO)
-    doc.text(`CORUM · ${nombreCoro} · generado el ${hoy}`, M, H - 9)
-    doc.text(`${p} de ${total}`, W - M, H - 9, { align: 'right' })
-  }
 
-  const slug = (nombreCoro || 'coro').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-  doc.save(`reporte-temporada-${temporada || ''}-${slug}.pdf`)
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte de temporada ${esc(anio)} · ${esc(nombreCoro)}</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1A1A18; padding: 28px; max-width: 820px; margin: 0 auto; }
+  @media print { body { padding: 0; max-width: none; } }
+  header { border-bottom: 1px solid #E8E6DF; padding-bottom: 12px; margin-bottom: 16px; }
+  .eyebrow { font-size: 9.5px; font-weight: 700; color: #0F6E56; letter-spacing: 0.8px; text-transform: uppercase; }
+  h1 { font-family: Georgia, serif; font-weight: normal; font-size: 24px; margin: 4px 0 3px; }
+  .periodo { color: #888780; font-size: 11.5px; }
+  .numeros { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; }
+  .numero { background: #E1F5EE; border-radius: 8px; padding: 10px 12px; }
+  .numero b { display: block; font-family: Georgia, serif; font-weight: normal; font-size: 21px; color: #0F6E56; line-height: 1.1; }
+  .numero span { font-size: 9.5px; color: #0F6E56; }
+  section { margin-bottom: 18px; break-inside: avoid; page-break-inside: avoid; }
+  h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #1A1A18; border-bottom: 1px solid #E8E6DF; padding-bottom: 5px; margin-bottom: 9px; }
+  h3 { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #5F5E5A; margin: 10px 0 5px; }
+  .intro { color: #5F5E5A; margin-bottom: 4px; }
+  .sin { color: #888780; font-style: italic; }
+  .nota { color: #888780; font-size: 9.5px; margin-top: 6px; }
+  .tenue { color: #888780; }
+  .barras { display: grid; gap: 5px; }
+  .barra { display: grid; grid-template-columns: 110px 1fr 90px; align-items: center; gap: 10px; }
+  .b-label { color: #5F5E5A; }
+  .b-pista { height: 7px; background: #F1EFE8; border-radius: 4px; overflow: hidden; }
+  .b-relleno { display: block; height: 100%; background: #1D9E75; border-radius: 4px; }
+  .b-valor { text-align: right; }
+  .dato { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid #F1EFE8; }
+  .dato span:first-child { color: #5F5E5A; }
+  table { width: 100%; border-collapse: collapse; }
+  .tabla th { text-align: left; font-size: 9px; font-weight: 700; color: #888780; text-transform: uppercase; letter-spacing: 0.4px; padding: 4px 6px; border-bottom: 1px solid #D3D1C7; }
+  .tabla td { padding: 5px 6px; border-bottom: 1px solid #F1EFE8; }
+  .tabla tr { break-inside: avoid; }
+  .num { text-align: right !important; width: 80px; }
+  .lista td { padding: 4px 0; border-bottom: 1px solid #F1EFE8; vertical-align: top; }
+  .lista .fecha { color: #0F6E56; width: 110px; }
+  footer { margin-top: 22px; padding-top: 8px; border-top: 1px solid #E8E6DF; color: #888780; font-size: 9.5px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Temporada ${esc(anio)}</div>
+    <h1>Reporte de fin de temporada</h1>
+    <div class="periodo">${esc(nombreCoro)}${nombreCoro ? ' · ' : ''}del ${esc(fechaCorta(datos.desde))} al ${esc(fechaCorta(datos.hasta))} de ${esc(String(datos.hasta || '').slice(0, 4))}</div>
+  </header>
+  <div class="numeros">${numeros.map(([v, l]) => `<div class="numero"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('')}</div>
+  ${partes.join('\n')}
+  <footer>CORUM · ${esc(nombreCoro)} · generado el ${esc(hoy)}</footer>
+</body>
+</html>`
+
+  const ventana = window.open('', '_blank')
+  if (!ventana) return false
+  ventana.document.write(html)
+  ventana.document.close()
+  ventana.focus()
+  setTimeout(() => ventana.print(), 500)
+  return true
 }

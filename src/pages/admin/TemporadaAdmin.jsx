@@ -4,7 +4,7 @@ import ResumenTemporada from '../../components/temporada/ResumenTemporada'
 import {
   listarReportesCoro, generarReportes, actualizarReporte, enviarPushTemporada, resumenCoro, cargarReporte,
 } from '../../hooks/useReporteTemporada'
-import { descargarPdfResumen } from '../../lib/pdfTemporada'
+import { imprimirResumen, SECCIONES_IMPRESION } from '../../lib/pdfTemporada'
 import { SECCIONES, avisosRevision, estadoSecciones, nombreMes, fechaCorta } from '../../lib/temporada'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -396,17 +396,21 @@ function Revision({ reporte, desde, hasta, onCambio, onCerrar, onAnterior, onSig
 // ─── Resumen general del coro ───────────────────────────────────────────────
 function ResumenDelCoro({ desde, hasta, temporada, cuenta, hayReportes }) {
   const [datos, setDatos] = useState(null)
-  const [generandoPdf, setGenerandoPdf] = useState(false)
-  const [errorPdf, setErrorPdf] = useState('')
+  const [modalImprimir, setModalImprimir] = useState(false)
+  const [seccionesImpr, setSeccionesImpr] = useState(SECCIONES_IMPRESION.map(s => s.clave))
+  const [errorImpr, setErrorImpr] = useState('')
 
-  async function descargarPdf() {
-    setGenerandoPdf(true); setErrorPdf('')
-    try {
-      await descargarPdfResumen(datos, { nombreCoro: import.meta.env.VITE_CORO_NOMBRE || '', temporada, cuenta: hayReportes ? cuenta : null })
-    } catch (e) {
-      setErrorPdf('No se pudo generar el PDF. Revisá la conexión y probá de nuevo.')
-    }
-    setGenerandoPdf(false)
+  function alternarSeccion(clave) {
+    setSeccionesImpr(sel => (sel.includes(clave) ? sel.filter(c => c !== clave) : [...sel, clave]))
+  }
+  function generarImpresion() {
+    setErrorImpr('')
+    const ok = imprimirResumen(datos, {
+      nombreCoro: import.meta.env.VITE_CORO_NOMBRE || '', temporada,
+      cuenta: hayReportes ? cuenta : null, secciones: seccionesImpr,
+    })
+    if (!ok) { setErrorImpr('El navegador bloqueó la ventana. Permití las ventanas emergentes para este sitio y probá de nuevo.'); return }
+    setModalImprimir(false)
   }
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
@@ -435,12 +439,40 @@ function ResumenDelCoro({ desde, hasta, temporada, cuenta, hayReportes }) {
         <div style={{ fontSize: '12px', color: '#888780' }}>Del {fechaCorta(datos.desde)} {datos.desde?.slice(0, 4)} al {fechaCorta(datos.hasta)} {datos.hasta?.slice(0, 4)}</div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={cargar} style={botonSec}>{cargando ? 'Actualizando…' : 'Actualizar'}</button>
-          <button onClick={descargarPdf} disabled={generandoPdf} style={{ ...botonSec, background: '#0F6E56', borderColor: '#0F6E56', color: '#FFFFFF', fontWeight: 500 }}>
-            {generandoPdf ? 'Generando…' : '↓ Descargar PDF'}
+          <button onClick={() => setModalImprimir(true)} style={{ ...botonSec, background: '#0F6E56', borderColor: '#0F6E56', color: '#FFFFFF', fontWeight: 500 }}>
+            🖨 Imprimir resumen
           </button>
         </div>
       </div>
-      {errorPdf && <div style={alerta}>{errorPdf}</div>}
+      {errorImpr && <div style={alerta}>{errorImpr}</div>}
+
+      {modalImprimir && (
+        <div onClick={e => { if (e.target === e.currentTarget) setModalImprimir(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(26,26,24,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '420px', boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }}>
+            <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: 'normal', margin: '0 0 6px', color: '#1A1A18' }}>Imprimir resumen</h3>
+            <p style={{ fontSize: '13px', color: '#888780', margin: '0 0 16px', lineHeight: 1.5 }}>
+              Elegí las secciones a incluir. En la ventana de impresión podés elegir "Guardar como PDF".
+            </p>
+            <div style={{ display: 'grid', gap: '10px', marginBottom: '20px' }}>
+              {SECCIONES_IMPRESION.filter(s => s.clave !== 'reportes' || hayReportes).map(s => (
+                <label key={s.clave} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#1A1A18', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={seccionesImpr.includes(s.clave)} onChange={() => alternarSeccion(s.clave)}
+                    style={{ width: '18px', height: '18px', accentColor: '#0F6E56' }} />
+                  {s.label}
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setModalImprimir(false)} style={{ ...botonSec, flex: 1, padding: '10px', fontSize: '13px' }}>Cancelar</button>
+              <button onClick={generarImpresion} disabled={!seccionesImpr.length}
+                style={{ ...boton('#0F6E56'), flex: 2, opacity: seccionesImpr.length ? 1 : 0.5 }}>
+                🖨 Generar e imprimir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '14px' }}>
         <Numero valor={cantantes?.activos ?? 0} label="Cantantes activos" />
