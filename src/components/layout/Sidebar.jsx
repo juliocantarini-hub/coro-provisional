@@ -71,18 +71,20 @@ const ICONOS = {
   salir:      "M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z",
 }
 
-// Colores del menú claro
+// Colores del menú (verde oscuro, como siempre)
 const C = {
-  fondo: '#FFFFFF',
-  texto: '#1A1A18',
-  textoSuave: '#5F5E5A',
-  titulo: '#6B6A66',
-  linea: '#E8E6DF',
-  acento: '#0F6E56',
-  acentoOscuro: '#0A4A3A',
-  activoFondo: '#E1F5EE',
-  pie: '#FAF9F6',
-  rojo: '#A3401C',
+  fondo: '#0A4A3A',
+  texto: 'rgba(255,255,255,0.88)',
+  textoSuave: 'rgba(255,255,255,0.62)',
+  titulo: 'rgba(159,225,203,0.75)',
+  linea: 'rgba(255,255,255,0.10)',
+  acento: '#5DCAA5',
+  activoTexto: '#FFFFFF',
+  activoFondo: 'rgba(29,158,117,0.28)',
+  pie: '#083D30',
+  rojo: '#F0A58C',
+  nombreCoro: '#9FE1CB',
+  logo: 'rgba(159,225,203,0.7)',
 }
 
 // Nombre de la sección según la ruta (lo usa la barra superior del celular)
@@ -126,14 +128,14 @@ function LogoCorum() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '10px 16px 14px' }}>
       <svg width="18" height="18" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M 78 20 A 38 38 0 1 0 78 80" stroke="#6B6A66" strokeWidth="7" strokeLinecap="round" fill="none" />
-        <line x1="28" y1="38" x2="66" y2="38" stroke="#6B6A66" strokeWidth="6" strokeLinecap="round" />
-        <line x1="28" y1="50" x2="66" y2="50" stroke="#6B6A66" strokeWidth="6" strokeLinecap="round" />
-        <line x1="28" y1="62" x2="66" y2="62" stroke="#6B6A66" strokeWidth="6" strokeLinecap="round" />
+        <path d="M 78 20 A 38 38 0 1 0 78 80" stroke={C.logo} strokeWidth="7" strokeLinecap="round" fill="none" />
+        <line x1="28" y1="38" x2="66" y2="38" stroke={C.logo} strokeWidth="6" strokeLinecap="round" />
+        <line x1="28" y1="50" x2="66" y2="50" stroke={C.logo} strokeWidth="6" strokeLinecap="round" />
+        <line x1="28" y1="62" x2="66" y2="62" stroke={C.logo} strokeWidth="6" strokeLinecap="round" />
       </svg>
       <div>
-        <div style={{ fontSize: '10px', fontWeight: '700', color: '#6B6A66', letterSpacing: '2px', lineHeight: 1 }}>CORUM</div>
-        <div style={{ fontSize: '8px', color: '#6B6A66', letterSpacing: '0.5px', lineHeight: 1.4 }}>by Recurso Coral</div>
+        <div style={{ fontSize: '10px', fontWeight: '700', color: C.logo, letterSpacing: '2px', lineHeight: 1 }}>CORUM</div>
+        <div style={{ fontSize: '8px', color: C.logo, letterSpacing: '0.5px', lineHeight: 1.4 }}>by Recurso Coral</div>
       </div>
     </div>
   )
@@ -190,9 +192,9 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
   const nombre = perfil?.nombre?.split(' ')[0] || '—'
   const rol = perfil?.rol === 'director' ? 'Director' : perfil?.rol === 'admin' ? 'Admin' : (perfil?.voz || 'Cantante')
 
-  const segmento = (on) => ({
+  const segmento = (on, color) => ({
     flex: 1, minHeight: '36px', fontSize: '13px', border: 'none', cursor: 'pointer', borderRadius: '8px',
-    background: on ? C.acento : 'transparent',
+    background: on ? color : 'transparent',
     color: on ? '#FFFFFF' : C.textoSuave,
     fontWeight: on ? '600' : '500',
   })
@@ -204,17 +206,17 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
         {/* Coro y quién soy */}
         <div style={{ padding: 'calc(18px + env(safe-area-inset-top, 0px)) 16px 14px', borderBottom: `1px solid ${C.linea}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '38px', height: '38px', background: C.acento, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: '38px', height: '38px', background: '#1D9E75', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="19" height="19" viewBox="0 0 24 24" fill="white" aria-hidden="true">
                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
               </svg>
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: C.texto, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: C.nombreCoro, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {import.meta.env.VITE_CORO_NOMBRE || 'Coro'}
               </div>
               <div style={{ fontSize: '12px', color: C.textoSuave, marginTop: '1px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1D9E75', display: 'inline-block', flexShrink: 0 }} />
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#5DCAA5', display: 'inline-block', flexShrink: 0 }} />
                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textTransform: 'capitalize' }}>{nombre} · {rol}</span>
               </div>
             </div>
@@ -222,9 +224,9 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
 
           {/* Cantante / Admin */}
           {puedeAdmin && (
-            <div role="group" aria-label="Lado de la app" style={{ display: 'flex', gap: '4px', marginTop: '14px', background: '#F1EFE8', borderRadius: '10px', padding: '3px' }}>
-              <button onClick={() => { toggleAdmin(false); handleNavegar('/') }} style={segmento(!seccionAdmin)}>Cantante</button>
-              <button onClick={() => { toggleAdmin(true); handleNavegar('/admin') }} style={segmento(seccionAdmin)}>Admin</button>
+            <div role="group" aria-label="Lado de la app" style={{ display: 'flex', gap: '4px', marginTop: '14px', background: 'rgba(0,0,0,0.25)', borderRadius: '10px', padding: '3px' }}>
+              <button onClick={() => { toggleAdmin(false); handleNavegar('/') }} style={segmento(!seccionAdmin, '#1D9E75')}>Cantante</button>
+              <button onClick={() => { toggleAdmin(true); handleNavegar('/admin') }} style={segmento(seccionAdmin, '#D85A30')}>Admin</button>
             </div>
           )}
         </div>
@@ -248,7 +250,7 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
                       padding: padding, border: 'none', cursor: 'pointer',
                       background: activo ? C.activoFondo : 'none',
                       borderLeft: `4px solid ${activo ? C.acento : 'transparent'}`,
-                      color: activo ? C.acentoOscuro : C.texto,
+                      color: activo ? C.activoTexto : C.texto,
                       fontWeight: activo ? '700' : '400',
                       fontSize: '14px', textAlign: 'left',
                     }}>
@@ -260,8 +262,8 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
                     {item.badgeEncuestas && encuestasPendientes > 0 && <Insignia>{encuestasPendientes > 9 ? '9+' : encuestasPendientes}</Insignia>}
                     {item.presencia && cantidadActivos > 0 && (
                       <span title="En línea ahora" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
-                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#27500A' }}>{cantidadActivos}</span>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#5DCAA5', display: 'inline-block' }} />
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#9FE1CB' }}>{cantidadActivos}</span>
                       </span>
                     )}
                   </button>
@@ -274,14 +276,14 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
         {/* Abajo fijo */}
         <div style={{ flexShrink: 0, background: C.pie, borderTop: `1px solid ${C.linea}` }}>
           {mostrarAyuda && (
-            <div style={{ margin: '10px 12px 4px', background: C.activoFondo, borderRadius: '10px', padding: '12px 14px', position: 'relative', border: '1px solid #B4D8CE' }}>
+            <div style={{ margin: '10px 12px 4px', background: '#0F6E56', borderRadius: '10px', padding: '12px 14px', position: 'relative', border: '1px solid rgba(255,255,255,0.15)' }}>
               <button onClick={() => setMostrarAyuda(false)} aria-label="Cerrar ayuda"
                 style={{ position: 'absolute', top: '6px', right: '8px', background: 'none', border: 'none', color: C.textoSuave, cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}>
                 ✕
               </button>
-              <div style={{ fontSize: '12px', color: C.acentoOscuro, fontWeight: '600', marginBottom: '5px' }}>📲 Acceso directo</div>
+              <div style={{ fontSize: '12px', color: '#FFFFFF', fontWeight: '600', marginBottom: '5px' }}>📲 Acceso directo</div>
               <div style={{ fontSize: '12px', color: C.texto, lineHeight: '1.6' }}>
-                Si no elegiste instalar la app podés agregar un acceso directo en tu pantalla de inicio, tocá los <strong>⋮</strong> de Chrome y elegí <strong>"Agregar a pantalla de inicio"</strong>
+                Si no elegiste instalar la app podés agregar un acceso directo en tu pantalla de inicio, tocá los <strong style={{ color: '#FFFFFF' }}>⋮</strong> de Chrome y elegí <strong style={{ color: '#FFFFFF' }}>"Agregar a pantalla de inicio"</strong>
               </div>
             </div>
           )}
