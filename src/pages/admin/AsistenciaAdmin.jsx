@@ -265,7 +265,7 @@ function TomarAsistencia({ lista, onVolver, onTituloActualizado }) {
 
   function getEstado(perfilId) {
     const reg = registros.find(r => r.perfil_id === perfilId)
-    return reg?.estado || 'ausente'
+    return reg?.estado || null
   }
 
   async function handleMarcar(perfilId, estado) {
@@ -307,6 +307,7 @@ function TomarAsistencia({ lista, onVolver, onTituloActualizado }) {
   const presentes    = registros.filter(r => r.estado === 'presente').length
   const ausentes     = registros.filter(r => r.estado === 'ausente').length
   const justificados = registros.filter(r => r.estado === 'justificado').length
+  const sinMarcar    = cantantes.filter(c => !registros.some(r => r.perfil_id === c.id)).length
 
   return (
     <div>
@@ -358,6 +359,7 @@ function TomarAsistencia({ lista, onVolver, onTituloActualizado }) {
             { label: 'Presentes',    val: presentes,    bg: '#EAF3DE', color: '#27500A' },
             { label: 'Ausentes',     val: ausentes,     bg: '#FCEBEB', color: '#501313' },
             { label: 'Justificados', val: justificados, bg: '#E6F1FB', color: '#042C53' },
+            ...(!cargando && sinMarcar > 0 ? [{ label: 'Sin marcar', val: sinMarcar, bg: '#F1EFE8', color: '#5F5E5A' }] : []),
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, borderRadius: '8px', padding: '8px 14px', textAlign: 'center' }}>
               <div style={{ fontSize: '20px', fontWeight: '600', color: s.color }}>{s.val}</div>
