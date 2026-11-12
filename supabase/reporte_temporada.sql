@@ -148,7 +148,7 @@ BEGIN
     IF v_inicio > p_hasta THEN CONTINUE; END IF;
     t_ini := (v_inicio::timestamp AT TIME ZONE tz);
 
-    -- Eventos del coro (ya ocurridos) desde que entró
+    -- Eventos del coro dentro de la temporada (incluye los ya programados) desde que entró
     SELECT jsonb_build_object(
              'conciertos', count(*) FILTER (WHERE e.tipo = 'concierto'),
              'ensayos',    count(*) FILTER (WHERE e.tipo = 'ensayo'),
@@ -159,7 +159,7 @@ BEGIN
       INTO v_eventos
       FROM eventos e
      WHERE e.coro_id = p_coro_id AND e.publicado
-       AND e.fecha_inicio >= t_ini AND e.fecha_inicio < t_fin AND e.fecha_inicio <= now();
+       AND e.fecha_inicio >= t_ini AND e.fecha_inicio < t_fin;
 
     -- Asistencia
     IF NOT v_hay_listas THEN
@@ -388,7 +388,7 @@ BEGIN
       INTO v_asist;
   END IF;
 
-  -- Eventos ya ocurridos
+  -- Eventos de la temporada (incluye los ya programados)
   SELECT jsonb_build_object(
            'conciertos', count(*) FILTER (WHERE tipo = 'concierto'),
            'ensayos',    count(*) FILTER (WHERE tipo = 'ensayo'),
@@ -398,7 +398,7 @@ BEGIN
                         ORDER BY fecha_inicio) FILTER (WHERE tipo = 'concierto'), '[]'::jsonb))
     INTO v_eventos
     FROM eventos
-   WHERE coro_id = p_coro_id AND publicado AND fecha_inicio >= t_desde AND fecha_inicio < t_fin AND fecha_inicio <= now();
+   WHERE coro_id = p_coro_id AND publicado AND fecha_inicio >= t_desde AND fecha_inicio < t_fin;
 
   -- Repertorio y dedicación (misma fórmula que Repertorio)
   WITH s AS (
