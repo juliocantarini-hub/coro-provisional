@@ -139,8 +139,8 @@ export default function EstadisticaAdmin() {
 
   return (
     <div>
-      {/* Acceso al reporte de fin de temporada (en el celular, a la altura del botón del menú) */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: movil ? '-48px 0 14px' : '0 0 12px' }}>
+      {/* Acceso al reporte de fin de temporada (arriba a la derecha, sobre el título) */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 0 12px' }}>
         <button onClick={() => navigate('/admin/temporada')}
           style={{ height: movil ? '40px' : 'auto', padding: movil ? '0 14px' : '7px 14px', fontSize: '13px', borderRadius: '10px', border: '1px solid #9FE1CB', background: '#E1F5EE', cursor: 'pointer', color: '#0F6E56', fontWeight: '600' }}>
           Reporte de fin de temporada →
