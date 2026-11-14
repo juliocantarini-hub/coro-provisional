@@ -153,7 +153,20 @@ export default function Sidebar({ seccionAdmin, toggleAdmin, onNavegar, ancho = 
   const navigate = useNavigate()
   const location = useLocation()
   const { perfil, cerrarSesion, esAdmin, esDirector } = useAuth()
-  const { noLeidos } = useAvisos()
+  const { noLeidos, recargar: recargarAvisos } = useAvisos()
+
+  // Mantiene al día el contador de avisos sin leer: se vuelve a consultar al cambiar
+  // de pantalla y cuando la app vuelve a primer plano (por ejemplo, al tocar una notificación).
+  useEffect(() => { recargarAvisos() }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const alVolver = () => { if (document.visibilityState === 'visible') recargarAvisos() }
+    document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener('focus', alVolver)
+    return () => {
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('focus', alVolver)
+    }
+  }, [recargarAvisos])
   const activos = usePresencia()
   const { encuestas: encuestasActivas } = useEncuestasActivas()
   const encuestasPendientes = encuestasActivas.filter(e => !e.yaVote).length

@@ -38,7 +38,20 @@ export default function AppLayout({ children }) {
   const [zoom, setZoom] = useState(getZoom)
   const [user, setUser] = useState(null)
   const { perfil } = useAuth()
-  const { noLeidos } = useAvisos()
+  const { noLeidos, recargar: recargarAvisos } = useAvisos()
+
+  // Mantiene al día el contador de avisos sin leer: se vuelve a consultar al cambiar
+  // de pantalla y cuando la app vuelve a primer plano (por ejemplo, al tocar una notificación).
+  useEffect(() => { recargarAvisos() }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const alVolver = () => { if (document.visibilityState === 'visible') recargarAvisos() }
+    document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener('focus', alVolver)
+    return () => {
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('focus', alVolver)
+    }
+  }, [recargarAvisos])
   const { lado, seccion } = nombreSeccion(location.pathname)
 
   // Al entrar (login), admins/directores arrancan del lado Admin en vez de Cantante.
