@@ -9,6 +9,7 @@ import { useRegistrarAcceso } from '../../hooks/useMensajeSorpresa'
 import { useRegistrarActividad } from '../../hooks/useActividad'
 import { useMensajeSeccion } from '../../hooks/useMensajeSeccion'
 import MensajeSorpresa from '../MensajeSorpresa'
+import { tocarTin, prepararTin } from '../../lib/tin'
 
 function useEsMovil() {
   const [esMovil, setEsMovil] = useState(window.innerWidth <= 768)
@@ -38,7 +39,29 @@ export default function AppLayout({ children }) {
   const [zoom, setZoom] = useState(getZoom)
   const [user, setUser] = useState(null)
   const { perfil } = useAuth()
-  const { noLeidos, recargar: recargarAvisos } = useAvisos()
+  const { avisos, noLeidos, recargar: recargarAvisos } = useAvisos()
+  const [sacudir, setSacudir] = useState(false)
+
+  // Aviso nuevo sin leer: suena un "tin" y la campanita se sacude.
+  // Una sola vez por aviso (se recuerda el último que ya alertó, en este navegador).
+  useEffect(() => { prepararTin() }, [])
+  useEffect(() => {
+    const sinLeer = (avisos || []).filter(a => !a.leido)
+    if (sinLeer.length === 0) return
+    const masNuevo = sinLeer.reduce((m, a) => (a.creado_en > m ? a.creado_en : m), '')
+    const clave = `corum_aviso_alertado_${import.meta.env.VITE_CORO_SLUG || 'coro'}`
+    let ultimo = ''
+    try { ultimo = localStorage.getItem(clave) || '' } catch {}
+    if (!masNuevo || masNuevo <= ultimo) return
+    try { localStorage.setItem(clave, masNuevo) } catch {}
+    tocarTin()
+    setSacudir(true)
+  }, [avisos])
+  useEffect(() => {
+    if (!sacudir) return
+    const t = setTimeout(() => setSacudir(false), 1200)
+    return () => clearTimeout(t)
+  }, [sacudir])
 
   // Mantiene al día el contador de avisos sin leer: se vuelve a consultar al cambiar
   // de pantalla y cuando la app vuelve a primer plano (por ejemplo, al tocar una notificación).
@@ -153,7 +176,9 @@ export default function AppLayout({ children }) {
             <button onClick={() => { setSeccionAdmin(false); navigate('/avisos') }}
               aria-label={noLeidos > 0 ? `Avisos, ${noLeidos} sin leer` : 'Avisos'}
               style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true">
+              <style>{`@keyframes corumCampana{0%,100%{transform:rotate(0)}15%{transform:rotate(18deg)}30%{transform:rotate(-16deg)}45%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}75%{transform:rotate(4deg)}}`}</style>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true"
+                style={{ transformOrigin: '50% 10%', animation: sacudir ? 'corumCampana 1s ease-in-out' : 'none' }}>
                 <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
               </svg>
               {noLeidos > 0 && (
