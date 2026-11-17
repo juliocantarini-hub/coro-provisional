@@ -5,6 +5,7 @@ import { getCoroActual } from '../../lib/coro'
 import { ETIQUETAS_SECCION, olvidarUltimaSesion } from '../../lib/actividad'
 
 const PERIODOS = [
+  { dias: 0,   label: 'Hoy' },
   { dias: 7,   label: '7 días' },
   { dias: 30,  label: '30 días' },
   { dias: 90,  label: '3 meses' },
@@ -74,7 +75,10 @@ export default function EstadisticaAdmin() {
     try {
       const coro = await getCoroActual()
       if (!coro) throw new Error('No se pudo identificar el coro.')
-      const desdeISO = new Date(Date.now() - periodo * 86400000).toISOString()
+      // "Hoy" (periodo 0) cuenta desde la medianoche de hoy; el resto, los últimos N días
+      const desdeISO = periodo === 0
+        ? new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+        : new Date(Date.now() - periodo * 86400000).toISOString()
       const { data, error: err } = await supabase.rpc('estadistica_accesos', {
         p_coro_id: coro.id,
         p_desde: desdeISO,
@@ -152,7 +156,7 @@ export default function EstadisticaAdmin() {
         <div>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', fontWeight: 'normal', color: '#1A1A18', margin: '0 0 2px' }}>Estadística de accesos</h2>
           <p style={{ fontSize: '12px', color: '#888780', margin: 0 }}>
-            {cargando ? 'Cargando...' : error ? '' : `${conActividad} de ${base.length} ingresaron en los últimos ${PERIODOS.find(p => p.dias === periodo)?.label}`}
+            {cargando ? 'Cargando...' : error ? '' : `${conActividad} de ${base.length} ingresaron ${periodo === 0 ? 'hoy' : `en los últimos ${PERIODOS.find(p => p.dias === periodo)?.label}`}`}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
