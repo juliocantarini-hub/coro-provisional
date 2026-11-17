@@ -183,7 +183,7 @@ export default function EstadisticaAdmin() {
         {PERIODOS.map(p => (
           <button key={p.dias} onClick={() => { setPeriodo(p.dias); setAbierto(null) }}
             style={{
-              padding: '6px 14px', fontSize: '12px', borderRadius: '16px', cursor: 'pointer', fontWeight: '500',
+              padding: '6px 11px', fontSize: '12px', borderRadius: '16px', cursor: 'pointer', fontWeight: '500', whiteSpace: 'nowrap',
               border: periodo === p.dias ? '1px solid #0F6E56' : '1px solid #D3D1C7',
               background: periodo === p.dias ? '#0F6E56' : '#FFFFFF',
               color: periodo === p.dias ? '#FFFFFF' : '#5F5E5A',
@@ -447,11 +447,11 @@ function TarjetaMovil({ d, expandido, onToggle, coroId, desde, inf, hayPractica 
         {activo && (
           <>
             {/* Cifras */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', background: '#F8F7F3', borderRadius: '10px', marginTop: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${hayPractica ? 4 : 3}, minmax(0, 1fr))`, background: '#F8F7F3', borderRadius: '10px', marginTop: '12px' }}>
               <Cifra label="Ingresos" valor={d.ingresos} />
               <Cifra label="Días activos" valor={d.dias_activos} separada />
               <Cifra label="Pantallas" valor={d.vistas} separada />
-              {hayPractica && <Cifra label="Práctica 🎤" valor={inf?.total ?? '—'} separada />}
+              {hayPractica && <Cifra label="Práctica" valor={inf?.total ?? '—'} separada />}
             </div>
 
             {/* Lo más visto */}
