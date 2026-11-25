@@ -33,7 +33,7 @@ export const MENSAJES = {
     emoji: '👋',
     textos: [
       '¡Ya era hora de que aparezcas por acá, {nombre}! Las partituras te extrañaban.',
-      'Mirá quién apareció! Te guardamos el lugar en la coro, {nombre}.',
+      '¡Mirá quién apareció! Te guardamos el lugar en el coro, {nombre}.',
       'Una semana sin entrar... tu voz descansó bastante. Ahora, a estudiar!',
     ],
   },
